@@ -56,9 +56,21 @@
   // treated like weak words. Filled in by useSongs().
   var SHARED = {};
 
+  // Every word that appears in any title or alias. A word the player said that
+  // is itself a real title word ("loves", "night") is never fuzzily matched to a
+  // different word ("doves", "might"): it has to be the exact word. That stops
+  // "She Loves You" from setting off "When Doves Cry" in a big song list, whilst
+  // still allowing garbled words that are in no title ("rights" for "lights").
+  var VOCAB = {};
+
   function useSongs(songs) {
-    var seen = {}, shared = {};
+    var seen = {}, shared = {}, vocab = {};
     for (var i = 0; i < songs.length; i++) {
+      var all = [songs[i].title].concat(songs[i].aliases || []);
+      for (var a = 0; a < all.length; a++) {
+        var at = tokens(all[a]);
+        for (var b = 0; b < at.length; b++) { vocab[at[b]] = true; }
+      }
       var tt = tokens(songs[i].title), once = {};
       for (var j = 0; j < tt.length; j++) {
         if (once[tt[j]]) { continue; }
@@ -68,6 +80,7 @@
       }
     }
     SHARED = shared;
+    VOCAB = vocab;
   }
 
   function normalise(s) {
@@ -126,6 +139,7 @@
 
   function wordMatches(g, t, typed) {
     if (g === t) { return true; }
+    if (VOCAB[g]) { return false; }
     var min = Math.min(g.length, t.length);
     var tol = min >= 9 ? 2 : (min >= 5 ? 1 : 0);
     if (typed && !isStrong(t)) { tol = min >= 9 ? 2 : (min >= 2 ? 1 : 0); }
@@ -158,8 +172,21 @@
       score = mStrong / strongIdx.length;
     } else {
       var m = matchedWords.length;
-      ok = m >= Math.ceil(titleTokens.length * 0.75);
-      score = titleTokens.length ? m / titleTokens.length : 0;
+      // No distinctive word to rely on. If the title has two or more content
+      // words ("I Want You Back": want, back) the guess needs all of them, so
+      // "All I Want for Christmas Is You" cannot set it off. Otherwise it needs
+      // about three quarters of the whole title ("Let It Be", "Take On Me").
+      var content = [];
+      for (i = 0; i < titleTokens.length; i++) { if (!STOP[titleTokens[i]]) { content.push(i); } }
+      if (content.length >= 2) {
+        var cm = 0;
+        for (i = 0; i < content.length; i++) { if (hit[content[i]]) { cm++; } }
+        ok = cm === content.length;
+        score = cm / content.length;
+      } else {
+        ok = m >= Math.ceil(titleTokens.length * 0.75);
+        score = titleTokens.length ? m / titleTokens.length : 0;
+      }
     }
     return { matched: ok, score: score, matchedWords: matchedWords };
   }
