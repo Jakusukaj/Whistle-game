@@ -399,7 +399,7 @@ RoomManager.prototype.guess = function (room, me, conn, msg) {
   var self = this, id = t.id;
   this.pause(t);
   t.stage = "confirming";
-  t.pending = { heard: r.guess, from: me.id };
+  t.pending = { heard: Matcher.heardPhrase(r.guess, t.song, { typed: typed }) || r.guess, from: me.id };
   t.timers.confirm = setTimeout(function () {
     if (room.turn && room.turn.id === id && room.turn.stage === "confirming") { self.confirmGuess(room, null, false, true); }
   }, this.opts.confirmMs);
