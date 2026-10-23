@@ -95,6 +95,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     var locked = t.lockUntil && t.lockUntil > this.now();
     if (locked) { tv.lockUntil = t.lockUntil; }
     if (isW && t.options && t.stage === "choose" && !t.difficulty) {
+      tv.canRefresh = !t.refreshed;
       tv.options = t.options.map(function (o) {
         return { difficulty: o.difficulty, multiplier: self.opts.multipliers[o.difficulty], title: o.song.title, artist: o.song.artist };
       });
@@ -223,6 +224,7 @@ RoomManager.prototype.handle = function (conn, msg) {
     case "setPacks":   return isHost ? this.setPacks(room, msg) : err(conn, "not_host", "Only the host can do that.");
     case "addRound":   return isHost ? this.addRound(room, conn) : err(conn, "not_host", "Only the host can do that.");
     case "cancelGame": return isHost ? this.cancelGame(room) : err(conn, "not_host", "Only the host can do that.");
+    case "refreshOptions": return this.refreshOptions(room, me);
     case "pickDifficulty": return this.pickDifficulty(room, me, msg);
     case "shuffle":    return this.shuffle(room, me);
     case "ready":      return this.ready(room, me);
@@ -454,14 +456,30 @@ RoomManager.prototype.beginTurn = function (room, t) {
     // The whistler is offered one song at each difficulty and picks one.
     // If a difficulty has run out of unplayed songs, a song of another
     // difficulty fills the card, labelled with its own difficulty.
-    var self = this, taken = [];
-    turn.options = [];
-    ["easy", "medium", "hard"].forEach(function (d) {
-      var song = self.drawFrom(room, d, taken);
-      if (song) { taken.push(song.title); turn.options.push({ difficulty: song.difficulty, song: song }); }
-    });
+    turn.options = this.dealOptions(room, []);
     if (!turn.options.length) { return this.endEarly(room); }
   }
+  this.broadcast(room);
+};
+
+// Three song cards, one per difficulty, never the same song twice and never
+// one of the titles in `avoid`.
+RoomManager.prototype.dealOptions = function (room, avoid) {
+  var self = this, taken = avoid.slice(), out = [];
+  ["easy", "medium", "hard"].forEach(function (d) {
+    var song = self.drawFrom(room, d, taken);
+    if (song) { taken.push(song.title); out.push({ difficulty: song.difficulty, song: song }); }
+  });
+  return out;
+};
+
+// Whistler does not know any of the three songs: new cards, once per turn, free.
+RoomManager.prototype.refreshOptions = function (room, me) {
+  var t = this.currentTurnFor(room, me, ["choose"]);
+  if (!t || t.difficulty || !t.options || t.refreshed) { return; }
+  var fresh = this.dealOptions(room, t.options.map(function (o) { return o.song.title; }));
+  if (!fresh.length) { return; }
+  t.options = fresh; t.refreshed = true;
   this.broadcast(room);
 };
 

@@ -354,7 +354,7 @@
       '<span class="tick">' + TICK_SVG + "</span>" +
       '<span class="pico">' + (PACK_ICON[p.id] || "") + "</span>" +
       '<span class="pn">' + esc(p.name) + '</span>' +
-      '<span class="pc">' + p.count + " songs</span></button>";
+      '<span class="pb">' + esc(p.blurb) + "</span></button>";
   }
 
   // The lobby shows one short line about the chosen packs. The picker opens on top.
@@ -364,8 +364,8 @@
     var line = !on.length ? "No packs picked yet"
       : on.slice(0, 2).map(function (p) { return p.name; }).join(", ") + (on.length > 2 ? " +" + (on.length - 2) + " more" : "");
     var note = !on.length ? (isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
-      : short ? "Only " + s.songsInPlay + " songs: pick more packs or lower the rounds"
-      : s.songsInPlay + " songs in play. No song is played twice.";
+      : short ? "Not enough songs for this many turns: pick more packs or lower the rounds"
+      : "No song is played twice in a game.";
     return '<div class="card stack"><div class="packhead"><div class="top">Song packs</div>' +
       '<button class="packall" id="openPacks">' + (isHost ? (on.length ? "Change" : "Choose packs") : "See packs") + "</button></div>" +
       '<div class="packline">' + esc(line) + "</div>" +
@@ -376,11 +376,12 @@
     var all = s.packs.length === s.selectedPacks.length;
     var cards = s.packs.map(function (p) { return packCard(p, s.selectedPacks.indexOf(p.id) !== -1, !isHost); }).join("");
     return '<div class="picker" id="picker"><div class="pwrap">' +
-      '<div class="phead"><div class="ptitle">Song packs</div>' +
-        (isHost ? '<button class="packall" id="packAll">' + (all ? "Clear" : "Select all") + "</button>" : "") + "</div>" +
+      '<div class="phead"><div class="ptitle">Choose your song packs</div></div>' +
+      '<div class="pintro">' + (isHost ? "These decide which songs come up in the game. Tick one pack or as many as you like." : "These decide which songs come up in the game. The host picks them.") + "</div>" +
+      (isHost ? '<div class="pactions"><button class="packall" id="packAll">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") +
       '<div class="pbody"><div class="packs">' + cards + "</div>" +
         (isHost ? "" : '<p class="note center">The host picks the packs</p>') + "</div>" +
-      '<div class="pfoot"><div class="pcount"><b>' + s.selectedPacks.length + "</b> picked, <b>" + s.songsInPlay + "</b> songs</div>" +
+      '<div class="pfoot"><div class="pcount"><b>' + s.selectedPacks.length + "</b> of " + s.packs.length + " packs picked</div>" +
         '<button class="btn" id="pkDone">Done</button></div>' +
     "</div></div>";
   }
@@ -510,6 +511,8 @@
       '<div class="a" id="songArtist">' + esc(T.song ? T.song.artist : "") + "</div></div>";
   }
 
+  var REFRESH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><polyline points="20 3 20 8 15 8"/></svg>';
+
   function viewTurn(s) {
     var T = s.turn, isW = T.playerId === s.me, who = pname(s, T.playerId);
 
@@ -526,9 +529,12 @@
         html: '<div class="screen">' + topBar(s) +
           '<div class="h1">' + esc(who) + ", you're up!</div>" +
           '<p class="sub">Pick a song. Choosing a harder song gives you a better score.</p>' + offs +
+          (T.canRefresh ? '<button id="refreshBtn" class="btn ghost refresh">' + REFRESH_SVG + "<span>Refresh options</span></button>" +
+            '<p class="note center">Don\'t know any of these? Refresh once for three new songs.</p>' : "") +
           '<p class="note center">Only you can see these. Keep your screen to yourself.</p>' +
           '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: function () {
+          var rf = $("#refreshBtn"); if (rf) { rf.onclick = function () { send({ t: "refreshOptions" }); }; }
           var ds = document.querySelectorAll(".opt");
           for (var i = 0; i < ds.length; i++) {
             ds[i].onclick = function () { send({ t: "pickDifficulty", i: parseInt(this.getAttribute("data-i"), 10) }); };

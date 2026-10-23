@@ -25,8 +25,8 @@ module.exports = [
   { id: "halloween",    group: "Seasonal",      name: "Spooky Season",        blurb: "Creepy classics and monster hits",     colour: "#ffb866", ink: "#3d1d00" },
   { id: "xmas",         group: "Seasonal",      name: "Christmas Cracker",    blurb: "Pop hits, UK favourites and carols",   colour: "#b9e8b0", ink: "#14501a" },
 
-  { id: "beatles",      group: "Artists",       name: "Beatlemania",          blurb: "The Beatles, from Love Me Do on",      colour: "#f7e08a", ink: "#4a3a00" },
-  { id: "bowie",        group: "Artists",       name: "Ground Control",       blurb: "David Bowie, Major Tom to Blackstar",  colour: "#c6b5f5", ink: "#2a1a63" },
-  { id: "gaga",         group: "Artists",       name: "Little Monsters",      blurb: "Lady Gaga, Just Dance to now",         colour: "#ffa8c8", ink: "#5a0a33" },
-  { id: "talkingheads", group: "Artists",       name: "Heads Up",             blurb: "Talking Heads, art-school funk",       colour: "#9fe3d0", ink: "#08443a" }
+  { id: "beatles",      group: "Artists",       name: "The Beatles",          blurb: "Beatlemania, start to finish",      colour: "#f7e08a", ink: "#4a3a00" },
+  { id: "bowie",        group: "Artists",       name: "David Bowie",          blurb: "Starman, Heroes and more",  colour: "#c6b5f5", ink: "#2a1a63" },
+  { id: "gaga",         group: "Artists",       name: "Lady Gaga",             blurb: "Just Dance to now",         colour: "#ffa8c8", ink: "#5a0a33" },
+  { id: "talkingheads", group: "Artists",       name: "Talking Heads",         blurb: "Psycho Killer and friends",       colour: "#9fe3d0", ink: "#08443a" }
 ];

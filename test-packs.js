@@ -114,5 +114,22 @@ var tw = d.cs.filter(function (x) { return x.playerId === d.room.turn.playerId; 
 d.m.handle(tw, { t: "pickDifficulty", d: "hard" });
 check("picking by difficulty still works", d.room.turn.difficulty === d.room.turn.song.difficulty || d.room.turn.difficulty);
 
+// --- refresh options: once per turn, new songs, free
+var r = newGame(2);
+r.m.handle(r.cs[0], { t: "start" });
+var rw = r.cs.filter(function (x) { return x.playerId === r.room.turn.playerId; })[0];
+var ro = r.m.viewFor(r.room, rw.playerId).turn;
+var before = ro.options.map(function (o) { return o.title; });
+check("refresh offered at first", ro.canRefresh === true);
+r.m.handle(rw, { t: "refreshOptions" });
+var rn = r.m.viewFor(r.room, rw.playerId).turn;
+var after = rn.options.map(function (o) { return o.title; });
+check("refresh gives three new songs", after.length === 3 && after.every(function (t) { return before.indexOf(t) === -1; }));
+check("refresh can only be used once", rn.canRefresh === false);
+r.m.handle(rw, { t: "refreshOptions" });
+check("second refresh does nothing", r.m.viewFor(r.room, rw.playerId).turn.options.map(function (o) { return o.title; }).join() === after.join());
+var other = r.cs.filter(function (x) { return x !== rw; })[0];
+check("guessers never see the options", !r.m.viewFor(r.room, other.playerId).turn.options);
+
 console.log(failed ? "\nFAILED: " + failed : "\nAll pack checks passed");
 process.exit(failed ? 1 : 0);
