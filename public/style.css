@@ -152,3 +152,12 @@ body.danger .bar i { background: var(--red); }
   body.danger { animation: none; background: #ff2a3f; }
   body.danger .bigtime { animation: none; }
 }
+
+/* listening orb */
+.orb { position: relative; width: 132px; height: 132px; margin: 6px auto 10px; border-radius: 50%; background: var(--teal); border: 3px solid var(--navy); box-shadow: 4px 4px 0 var(--navy); display: flex; align-items: center; justify-content: center; --lvl: 0; }
+.orb::before, .orb::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid var(--teal); pointer-events: none; }
+.orb::before { transform: scale(calc(1 + var(--lvl) * .35)); opacity: calc(.25 + var(--lvl) * .75); }
+.orb::after { transform: scale(calc(1 + var(--lvl) * .7)); opacity: calc(var(--lvl) * .6); }
+.orb.off { background: #d8d8d8; box-shadow: none; opacity: .7; }
+.orb.off::before, .orb.off::after { display: none; }
+body.danger .orb::before, body.danger .orb::after { border-color: #fff; }
