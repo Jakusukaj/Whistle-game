@@ -196,7 +196,47 @@
     return last;
   }
 
+  // The part of what was said that matched the title, e.g.
+  // "blah talking blinding rights beans" -> "Blinding Rights".
+  // Finds the shortest run of words that covers the most title words.
+  function heardPhrase(guess, song, options) {
+    var typed = !!(options && options.typed);
+    var gt = tokens(guess);
+    if (!gt.length || !song) { return ""; }
+    var titles = typeof song === "string" ? [song] : [song.title].concat(song.aliases || []);
+    var best = { score: 0, len: 999, s: 0, e: -1 };
+    function hitsAny(g, tt) {
+      for (var k = 0; k < tt.length; k++) { if (wordMatches(g, tt[k], typed)) { return true; } }
+      return false;
+    }
+    for (var ti = 0; ti < titles.length; ti++) {
+      var tt = tokens(titles[ti]);
+      if (!tt.length) { continue; }
+      for (var i = 0; i < gt.length; i++) {
+        if (!hitsAny(gt[i], tt)) { continue; }
+        for (var j = i; j < gt.length && j - i < tt.length + 2; j++) {
+          if (!hitsAny(gt[j], tt)) { continue; }
+          var score = 0;
+          for (var k = 0; k < tt.length; k++) {
+            for (var w = i; w <= j; w++) {
+              if (wordMatches(gt[w], tt[k], typed)) { score++; break; }
+            }
+          }
+          var len = j - i + 1;
+          if (score > best.score || (score === best.score && len < best.len)) {
+            best = { score: score, len: len, s: i, e: j };
+          }
+        }
+      }
+    }
+    if (best.e < best.s) { return ""; }
+    return gt.slice(best.s, best.e + 1).map(function (w) {
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join(" ");
+  }
+
   var api = {
+    heardPhrase: heardPhrase,
     matchTitle: matchTitle, matchAny: matchAny, useSongs: useSongs,
     normalise: normalise, tokens: tokens
   };
