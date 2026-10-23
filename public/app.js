@@ -213,7 +213,7 @@
           '<p class="tag">Keep a straight face. Keep whistling.</p>' +
           '<div class="card stack">' +
             '<label class="lbl" for="name">Your name</label>' +
-            '<input id="name" class="input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="e.g. James" value="' + esc(name) + '">' +
+            '<input id="name" class="input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Name" value="' + esc(name) + '">' +
             '<button id="hostBtn" class="btn">Host a game</button>' +
             '<div class="or">or join a room</div>' +
             '<input id="codeIn" class="input code-in" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="CODE">' +
@@ -272,9 +272,11 @@
             ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers ? " disabled" : "") + ">Start game</button>" +
               (s.players.length < s.minPlayers ? '<p class="note center">Waiting for at least ' + s.minPlayers + " players</p>" : "")
             : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + " to start...</p>") +
+          '<button id="helpBtn" class="btn ghost">How to play</button>' +
           '<button id="leaveBtn" class="link">Leave room</button>' +
         "</div>",
       bind: function () {
+        $("#helpBtn").onclick = showHelp;
         if (isHost) {
           var want = s.rounds;
           $("#minus").onclick = function () { want = Math.max(1, want - 1); send({ t: "setRounds", rounds: want }); };
@@ -293,12 +295,17 @@
   }
 
   function skipHtml(s) {
-    return s.hostId === s.me && s.turn.stage !== "reveal" ? '<button id="skipBtn" class="link small">Skip this turn</button>' : "";
+    if (s.hostId !== s.me) { return ""; }
+    return '<div class="row">' +
+      (s.turn.stage !== "reveal" ? '<button id="skipBtn" class="link small">Skip this turn</button>' : "") +
+      '<button id="endBtn" class="link small">End game</button></div>';
   }
 
   function bindSkip() {
     var b = $("#skipBtn");
     if (b) { b.onclick = function () { if (window.confirm("Skip this turn? It scores the full 60 seconds.")) { send({ t: "skip" }); } }; }
+    var e = $("#endBtn");
+    if (e) { e.onclick = function () { if (window.confirm("End this game? Everyone goes back to the lobby and scores are cleared.")) { send({ t: "cancelGame" }); } }; }
   }
 
   function songCardHtml(T) {
@@ -462,8 +469,8 @@
         '<div class="spacer"></div>' +
         (s.hostId === s.me
           ? '<button id="nextBtn" class="btn">' + (last ? "Finish" : "Next player") + "</button>"
-          : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") + "</div>",
-      bind: function () { var b = $("#nextBtn"); if (b) { b.onclick = function () { send({ t: "next" }); }; } }
+          : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") + skipHtml(s) + "</div>",
+      bind: function () { var b = $("#nextBtn"); if (b) { b.onclick = function () { send({ t: "next" }); }; } bindSkip(); }
     };
   }
 
@@ -491,11 +498,10 @@
     var o = document.createElement("div");
     o.className = "overlay modal";
     o.innerHTML = '<div class="card stack"><div class="h2">How to play</div><ol>' +
-      "<li>One phone each. One person hosts a game and everyone else joins with the room code.</li>" +
-      "<li>Take turns to whistle. Pick a difficulty, then whistle the song shown on your phone. Keep a straight face.</li>" +
-      "<li>Everyone else guesses out loud or types the title. When it sounds right, you confirm and the clock stops.</li>" +
-      "<li>Your time is your score, so lower is better. Harder songs knock time off. Shuffling for a new song costs 5 seconds. Nobody gets it in 60 seconds? You score 60.</li>" +
-      "<li>Lowest total after the last round wins. A tie is settled with one more song each.</li>" +
+      "<li>Take turns to whistle. Your phone shows the song, only to you.</li>" +
+      "<li>Everyone else guesses the title out loud or by typing.</li>" +
+      "<li>Whoever is whistling confirms the right answer. Your time is your score.</li>" +
+      "<li>Lowest total wins. Try not to laugh!</li>" +
       '</ol><button class="btn" id="helpClose">Got it</button></div>';
     document.body.appendChild(o);
     $("#helpClose", o).onclick = function () { document.body.removeChild(o); };
