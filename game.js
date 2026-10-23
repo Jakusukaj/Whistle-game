@@ -65,6 +65,8 @@ function findPlayer(room, id) {
   return null;
 }
 
+var LIMIT_OPTIONS_MS = [30000, 60000, 90000, 120000];
+
 function err(conn, code, message) { conn.send({ t: "error", code: code, message: message }); }
 
 RoomManager.prototype.elapsed = function (turn) {
@@ -80,16 +82,24 @@ RoomManager.prototype.viewFor = function (room, pid) {
       id: t.id, playerId: t.playerId, stage: t.stage, difficulty: t.difficulty,
       multiplier: t.multiplier, shuffles: t.shuffles, sd: t.sd, round: t.round,
       countdownEndsAt: t.countdownEndsAt, accumulatedMs: t.accumulatedMs,
-      runningSince: t.runningSince, limitMs: this.opts.limitMs,
+      runningSince: t.runningSince, limitMs: room.limitMs,
       penalty: this.opts.shufflePenaltyS
     };
-    if (isW && t.song && t.stage !== "reveal") { tv.song = { title: t.song.title, artist: t.song.artist }; }
+    var locked = t.lockUntil && t.lockUntil > this.now();
+    if (locked) { tv.lockUntil = t.lockUntil; }
+    if (isW && t.options && t.stage === "choose" && !t.difficulty) {
+      tv.options = ["easy", "medium", "hard"].map(function (d) {
+        var o = t.options[d];
+        return { difficulty: d, multiplier: self.opts.multipliers[d], title: o.title, artist: o.artist };
+      });
+    }
+    if (isW && t.song && t.stage !== "reveal" && !locked) { tv.song = { title: t.song.title, artist: t.song.artist }; }
     if (isW && t.stage === "confirming" && t.pending) { tv.pending = { heard: t.pending.heard }; }
     if (t.stage === "reveal") { tv.result = t.result; }
   }
   return {
     code: room.code, phase: room.phase, hostId: room.hostId, me: pid,
-    rounds: room.rounds, minPlayers: this.opts.minPlayers, maxPlayers: this.opts.maxPlayers,
+    rounds: room.rounds, limitMs: room.limitMs, limitOptions: LIMIT_OPTIONS_MS, minPlayers: this.opts.minPlayers, maxPlayers: this.opts.maxPlayers,
     serverNow: this.now(),
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
@@ -130,6 +140,8 @@ RoomManager.prototype.handle = function (conn, msg) {
     case "next":       return isHost ? this.next(room) : err(conn, "not_host", "Only the host can do that.");
     case "skip":       return isHost ? this.skip(room) : err(conn, "not_host", "Only the host can do that.");
     case "playAgain":  return isHost ? this.playAgain(room) : err(conn, "not_host", "Only the host can do that.");
+    case "setLimit":   return isHost ? this.setLimit(room, msg) : err(conn, "not_host", "Only the host can do that.");
+    case "addRound":   return isHost ? this.addRound(room) : err(conn, "not_host", "Only the host can do that.");
     case "cancelGame": return isHost ? this.cancelGame(room) : err(conn, "not_host", "Only the host can do that.");
     case "pickDifficulty": return this.pickDifficulty(room, me, msg);
     case "shuffle":    return this.shuffle(room, me);
@@ -160,7 +172,7 @@ RoomManager.prototype.create = function (conn, msg) {
   if (!name) { return err(conn, "bad_name", "Enter a name first."); }
   var room = {
     code: this.makeCode(), hostId: null, players: [], phase: "lobby",
-    rounds: this.opts.defaultRounds, turns: [], turnPos: -1, turn: null, turnCounter: 0,
+    rounds: this.opts.defaultRounds, limitMs: this.opts.limitMs, turns: [], turnPos: -1, turn: null, turnCounter: 0,
     used: {}, sd: null, winners: null, tieBreakWon: false,
     createdAt: this.now(), lastActive: this.now()
   };
@@ -257,6 +269,25 @@ RoomManager.prototype.setRounds = function (room, msg) {
   this.broadcast(room);
 };
 
+RoomManager.prototype.setLimit = function (room, msg) {
+  if (room.phase !== "lobby") { return; }
+  var ms = parseInt(msg.limitMs, 10);
+  if (LIMIT_OPTIONS_MS.indexOf(ms) === -1) { return; }
+  room.limitMs = ms;
+  this.broadcast(room);
+};
+
+// Host adds one more round while the final round is being played.
+RoomManager.prototype.addRound = function (room) {
+  if (room.phase !== "turn" || room.sd || !room.turn || room.turn.sd) { return; }
+  if (room.turn.round !== room.rounds) { return; }
+  room.rounds++;
+  for (var i = 0; i < room.players.length; i++) {
+    if (!room.players[i].sitOut) { room.turns.push({ playerId: room.players[i].id, round: room.rounds, sd: false }); }
+  }
+  this.broadcast(room);
+};
+
 RoomManager.prototype.start = function (room, conn) {
   if (room.phase !== "lobby") { return; }
   if (room.players.length < this.opts.minPlayers) {
@@ -294,27 +325,40 @@ RoomManager.prototype.beginTurn = function (room, t) {
     id: room.turnCounter, playerId: t.playerId, round: t.round, sd: !!t.sd,
     stage: "choose", difficulty: null, multiplier: null, song: null, shuffles: 0,
     accumulatedMs: 0, runningSince: null, countdownEndsAt: null, pending: null,
-    cooldownUntil: 0, result: null, timers: {}
+    cooldownUntil: 0, lockUntil: 0, options: null, result: null, timers: {}
   };
   room.turn = turn;
   if (t.sd) {
     turn.difficulty = this.opts.sdDifficulty;
     turn.multiplier = this.opts.multipliers[turn.difficulty];
     this.drawSong(room, turn);
+  } else {
+    // The whistler is offered one song at each difficulty and picks one.
+    var self = this;
+    turn.options = {};
+    ["easy", "medium", "hard"].forEach(function (d) { turn.options[d] = self.drawFrom(room, d, []); });
   }
   this.broadcast(room);
 };
 
-RoomManager.prototype.drawSong = function (room, turn) {
-  var self = this, last = turn.song ? turn.song.title : null;
-  var pool = SONGS.filter(function (s) {
-    return s.difficulty === turn.difficulty && !room.used[s.title] && s.title !== last;
-  });
-  if (!pool.length) {
-    SONGS.forEach(function (s) { if (s.difficulty === turn.difficulty) { delete room.used[s.title]; } });
-    pool = SONGS.filter(function (s) { return s.difficulty === turn.difficulty && s.title !== last; });
+// Pick a random song of one difficulty that has not been used yet in this room.
+// (Marks nothing as used; the caller does that once a song is actually chosen.)
+RoomManager.prototype.drawFrom = function (room, difficulty, avoid) {
+  function pool() {
+    return SONGS.filter(function (s) {
+      return s.difficulty === difficulty && !room.used[s.title] && avoid.indexOf(s.title) === -1;
+    });
   }
-  var pick = pool[Math.floor(this.random() * pool.length)];
+  var p = pool();
+  if (!p.length) {
+    SONGS.forEach(function (s) { if (s.difficulty === difficulty) { delete room.used[s.title]; } });
+    p = pool();
+  }
+  return p[Math.floor(this.random() * p.length)];
+};
+
+RoomManager.prototype.drawSong = function (room, turn) {
+  var pick = this.drawFrom(room, turn.difficulty, turn.song ? [turn.song.title] : []);
   room.used[pick.title] = true;
   turn.song = pick;
 };
@@ -326,21 +370,31 @@ RoomManager.prototype.currentTurnFor = function (room, me, stages) {
   return t;
 };
 
+// The whistler taps one of the three offered songs (msg.d is its difficulty).
 RoomManager.prototype.pickDifficulty = function (room, me, msg) {
   var t = this.currentTurnFor(room, me, ["choose"]);
-  if (!t || t.difficulty) { return; }
-  if (!this.opts.multipliers.hasOwnProperty(msg.d)) { return; }
+  if (!t || t.difficulty || !t.options) { return; }
+  if (!this.opts.multipliers.hasOwnProperty(msg.d) || !t.options[msg.d]) { return; }
   t.difficulty = msg.d;
   t.multiplier = this.opts.multipliers[msg.d];
-  this.drawSong(room, t);
+  t.song = t.options[msg.d];
+  room.used[t.song.title] = true;
   this.broadcast(room);
 };
 
+// Shuffle during the round: new song of the same difficulty, and the whistler's
+// screen locks for the penalty time. The clock keeps running through the lock.
 RoomManager.prototype.shuffle = function (room, me) {
-  var t = this.currentTurnFor(room, me, ["choose", "whistling"]);
-  if (!t || !t.difficulty) { return; }
+  var t = this.currentTurnFor(room, me, ["whistling"]);
+  if (!t || !t.difficulty || (t.lockUntil && t.lockUntil > this.now())) { return; }
+  var self = this, id = t.id, ms = this.opts.shufflePenaltyS * 1000;
   t.shuffles++;
+  t.lockUntil = this.now() + ms;
   this.drawSong(room, t);
+  if (t.timers.lock) { clearTimeout(t.timers.lock); }
+  t.timers.lock = setTimeout(function () {
+    if (room.turn && room.turn.id === id) { self.broadcast(room); }
+  }, ms + 20);
   this.broadcast(room);
 };
 
@@ -366,7 +420,7 @@ RoomManager.prototype.startWhistling = function (room, turnId) {
 RoomManager.prototype.scheduleCap = function (room, t) {
   var self = this, id = t.id;
   if (t.timers.cap) { clearTimeout(t.timers.cap); }
-  var remaining = Math.max(0, this.opts.limitMs - this.elapsed(t));
+  var remaining = Math.max(0, room.limitMs - this.elapsed(t));
   t.timers.cap = setTimeout(function () {
     if (room.turn && room.turn.id === id && room.turn.stage === "whistling") { self.finishTurn(room, "timeout"); }
   }, remaining);
@@ -385,7 +439,7 @@ RoomManager.prototype.pause = function (t) {
 RoomManager.prototype.guess = function (room, me, conn, msg) {
   var t = room.turn;
   if (room.phase !== "turn" || !t || t.stage !== "whistling" || t.playerId === me.id) { return; }
-  if (this.now() < t.cooldownUntil) { return; }
+  if (this.now() < t.cooldownUntil || this.now() < t.lockUntil) { return; }
   var typed = !!msg.typed;
   var alts = (Array.isArray(msg.alts) ? msg.alts : []).slice(0, 5)
     .map(function (a) { return String(a == null ? "" : a).slice(0, 120); })
@@ -422,7 +476,7 @@ RoomManager.prototype.confirmGuess = function (room, me, ok, byTimeout) {
 
 RoomManager.prototype.gotIt = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling", "confirming"]);
-  if (!t) { return; }
+  if (!t || this.now() < t.lockUntil) { return; }
   if (t.stage === "whistling") { this.pause(t); }
   this.finishTurn(room, "correct");
 };
@@ -438,12 +492,14 @@ RoomManager.prototype.finishTurn = function (room, outcome) {
   var t = room.turn;
   if (!t || t.stage === "reveal") { return; }
   this.clearTimers(t);
-  var limitS = this.opts.limitMs / 1000;
-  var timeMs = outcome === "correct" ? Math.min(t.accumulatedMs, this.opts.limitMs) : this.opts.limitMs;
+  var limitS = room.limitMs / 1000;
+  var timeMs = outcome === "correct" ? Math.min(t.accumulatedMs, room.limitMs) : room.limitMs;
   var mult = t.multiplier || 1;
   var score;
   if (outcome === "correct") {
-    score = round1(Math.min(limitS, (timeMs / 1000) * mult + this.opts.shufflePenaltyS * t.shuffles));
+    // The shuffle lock time is part of the clock but is not discounted by the multiplier.
+    var lockedS = this.opts.shufflePenaltyS * t.shuffles;
+    score = round1(Math.min(limitS, Math.max(0, timeMs / 1000 - lockedS) * mult + lockedS));
   } else {
     score = limitS;
   }
