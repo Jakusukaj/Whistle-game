@@ -186,3 +186,22 @@ body.danger .orb::before, body.danger .orb::after { border-color: #fff; }
 .segb { appearance: none; -webkit-appearance: none; flex: 1 1 70px; padding: 12px 6px; border: 3px solid var(--navy); border-radius: 12px; background: #fff; color: var(--navy); font: 800 15px "Montserrat", sans-serif; cursor: pointer; }
 .segb.on { background: var(--navy); color: #fff; box-shadow: 3px 3px 0 var(--red); }
 .lastbanner { appearance: none; -webkit-appearance: none; width: 100%; margin-top: 8px; padding: 12px; border: 3px solid var(--navy); border-radius: 12px; background: var(--yellow); color: var(--navy); font: 900 14px "Montserrat", sans-serif; cursor: pointer; box-shadow: 3px 3px 0 var(--navy); }
+
+/* song packs */
+.packhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.packall { appearance: none; -webkit-appearance: none; border: 3px solid var(--navy); border-radius: 10px; background: #fff; color: var(--navy); font: 800 13px "Montserrat", sans-serif; padding: 7px 12px; cursor: pointer; }
+.packall:active { transform: translate(2px, 2px); }
+.packs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pack { position: relative; appearance: none; -webkit-appearance: none; text-align: left; display: flex; flex-direction: column; gap: 6px; min-height: 126px; padding: 14px 12px 12px; border: 3px solid var(--navy); border-radius: 16px; box-shadow: 4px 4px 0 var(--navy); font-family: "Montserrat", sans-serif; cursor: pointer; opacity: .88; }
+.pack.ro { cursor: default; }
+.pack.on { opacity: 1; border-width: 4px; box-shadow: 0 0 0 4px #fff, 0 0 0 7px var(--navy); }
+.pack:not(.ro):active { transform: translate(2px, 2px); }
+.pack .pn { font-weight: 900; font-size: 18px; line-height: 1.1; padding-right: 36px; }
+.pack .pb { font-weight: 700; font-size: 13px; line-height: 1.25; }
+.pack .pc { margin-top: auto; font-weight: 800; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.pack .tick { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--navy); background: rgba(255, 255, 255, .55); display: flex; align-items: center; justify-content: center; }
+.pack .tick svg { width: 18px; height: 18px; display: none; }
+.pack.on .tick { background: var(--navy); }
+.pack.on .tick svg { display: block; }
+.packnote { text-align: center; font-weight: 800; font-size: 13px; }
+.packnote.bad { color: var(--red); }
