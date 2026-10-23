@@ -108,7 +108,7 @@
   }
 
   // ------------------------------------------------------------------- mic
-  var mic = { state: SR ? "off" : "unsupported", rec: null, want: false, lastSent: "", heard: "" };
+  var mic = { state: SR ? "off" : "unsupported", rec: null, want: false, lastSent: "", heard: "", level: 0, typeMode: !SR };
 
   function isGuessing() {
     return !!(st && st.phase === "turn" && st.turn && st.turn.stage === "whistling" && st.turn.playerId !== st.me);
@@ -127,10 +127,12 @@
     var startTimer = setTimeout(function () {
       if (mic.rec === rec && mic.state === "starting") { mic.state = "stopped"; refreshMic(); }
     }, 3500);
+    rec.onsoundstart = rec.onspeechstart = function () { mic.level = Math.max(mic.level, 0.7); };
     rec.onstart = function () { clearTimeout(startTimer); if (mic.rec === rec) { mic.state = "on"; refreshMic(); } };
     rec.onresult = function (e) {
       var text = "", i, k;
       for (i = 0; i < e.results.length; i++) { text += e.results[i][0].transcript + " "; }
+      mic.level = 1;
       mic.heard = text.replace(/\s+/g, " ").trim().slice(-90);
       var h = $("#heard"); if (h) { h.textContent = mic.heard ? "Heard: " + mic.heard : ""; }
       if (!isGuessing()) { return; }
@@ -182,11 +184,18 @@
   function refreshMic() {
     var boxes = document.querySelectorAll("[data-mic]");
     for (var i = 0; i < boxes.length; i++) {
-      boxes[i].innerHTML = micHtml();
+      var quiet = boxes[i].getAttribute("data-mic") === "quiet";
+      boxes[i].innerHTML = quiet && mic.state === "on" ? "" : micHtml();
       var b = $("#micBtn", boxes[i]);
       if (b) { b.onclick = micStart; }
     }
+    var orb = $("#orb");
+    if (orb) { orb.classList.toggle("off", mic.state !== "on"); }
+    var hd = $("#listenHead");
+    if (hd) { hd.textContent = mic.state === "on" ? "Listening" : mic.state === "blocked" ? "Mic blocked" : "Mic is off"; }
   }
+
+  var MIC_SVG = '<svg viewBox="0 0 24 24" width="64" height="64" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" fill="#1b3447"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" fill="none" stroke="#1b3447" stroke-width="2" stroke-linecap="round"/></svg>';
 
   // ----------------------------------------------------------------- views
   function standingsHtml(s, highlightLast, winners) {
@@ -417,25 +426,36 @@
     // 6. Whistling or confirming, guesser's phone
     if (T.stage === "whistling" || T.stage === "confirming") {
       return {
-        key: "g-" + T.id,
+        key: "g-" + T.id + (mic.typeMode ? "-t" : "-m"),
         html: '<div class="screen">' + topBar(s) +
           '<div class="timerbox"><div class="tlabel" id="tlabel">TIME</div><div class="bigtime" id="bigtime">0.0</div>' +
           '<div class="bar"><i id="bar"></i></div></div>' +
-          '<div class="card stack"><div class="h2">Guess ' + esc(who) + "'s song</div>" +
-          '<form id="gform" class="stack"><input id="ginput" class="input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the title">' +
-          '<button class="btn" type="submit">Send guess</button></form>' +
-          '<div data-mic></div><div class="heard" id="heard"></div></div>' +
+          (mic.typeMode
+            ? '<div class="card stack"><div class="h2">Type your guess</div>' +
+              '<form id="gform" class="stack"><input id="ginput" class="input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title">' +
+              '<button class="btn" type="submit">Send guess</button></form>' +
+              (SR ? '<button id="toMic" class="link">\u2190 Go back to mic mode</button>' : "") + "</div>"
+            : '<div class="card stack center"><div class="orb off" id="orb">' + MIC_SVG + '</div>' +
+              '<div class="h1" id="listenHead">Listening</div>' +
+              '<p class="sub">Shout your guesses! The game pauses by itself when it hears the right answer.</p>' +
+              '<div data-mic="quiet"></div><div class="heard" id="heard"></div></div>' +
+              '<button id="toType" class="link">Mic not working? Type your answer \u2192</button>') +
           '<div class="spacer"></div>' + skipHtml(s) +
           '<div class="overlay" id="checking" hidden><div class="card"><div class="h2">Checking...</div>' +
           '<p class="sub">Someone may have got it. Hold tight.</p></div></div></div>',
         bind: function () {
-          $("#gform").onsubmit = function (e) {
-            e.preventDefault();
-            var v = $("#ginput").value.trim();
-            if (v && st && st.turn && st.turn.stage === "whistling") { send({ t: "guess", alts: [v], typed: true }); }
-            $("#ginput").value = "";
-            return false;
-          };
+          var f = $("#gform");
+          if (f) {
+            f.onsubmit = function (e) {
+              e.preventDefault();
+              var v = $("#ginput").value.trim();
+              if (v && st && st.turn && st.turn.stage === "whistling") { send({ t: "guess", alts: [v], typed: true }); }
+              $("#ginput").value = "";
+              return false;
+            };
+          }
+          var tt = $("#toType"); if (tt) { tt.onclick = function () { mic.typeMode = true; render(); }; }
+          var tm = $("#toMic"); if (tm) { tm.onclick = function () { mic.typeMode = false; render(); }; }
           bindSkip();
         },
         update: function () {
@@ -533,6 +553,9 @@
   }
   function tick() {
     requestAnimationFrame(tick);
+    mic.level = Math.max(0, mic.level - 0.03);
+    var orb = document.getElementById("orb");
+    if (orb) { orb.style.setProperty("--lvl", mic.state === "on" ? mic.level.toFixed(2) : "0"); }
     var T = st && st.turn;
     if (!T) { document.body.classList.remove("danger"); return; }
     if (T.stage === "countdown") {
