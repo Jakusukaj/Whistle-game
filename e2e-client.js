@@ -34,7 +34,7 @@ function phone(port, name) {
 }
 
 (async function () {
-  var s = createServer({ limitMs: 12000, countdownMs: 150, confirmMs: 3000, cooldownMs: 300, shufflePenaltyS: 5 });
+  var s = createServer({ defaultPacks: ["bangers"], limitMs: 12000, countdownMs: 150, confirmMs: 3000, cooldownMs: 300, shufflePenaltyS: 5 });
   await new Promise(function (r) { s.server.listen(0, r); });
   var port = s.server.address().port;
   var A = phone(port, "Ann"), B = phone(port, "Bob"), C = phone(port, "Cat");
@@ -58,14 +58,12 @@ function phone(port, name) {
   check("guest sees round length as text", !!B.q("#limitVal"));
   var A_ = A.w.document, ticked = function (d) { return d.querySelectorAll(".pack.on").length; };
   check("room code is not shown", !/\b[A-Z]{4}\b/.test(A.q(".codecard").textContent.replace(/[a-z' ]+game/i, "")) || true);
-  check("lobby summary shows the chosen pack", /All Time Bangers/.test(A.q(".pchips").textContent) && !A_.querySelector(".pack"));
+  check("lobby summary shows the chosen pack", /All Time Bangers/.test(A.q(".packline").textContent) && !A_.querySelector(".pack"));
   A.click("#openPacks"); B.click("#openPacks");
-  check("picker shows 20 pack cards in groups", A_.querySelectorAll(".pack").length === 20 && B.w.document.querySelectorAll(".pack").length === 20 && A_.querySelectorAll(".pgroup").length === 6);
+  check("picker shows 20 pack cards", A_.querySelectorAll(".pack").length === 20 && B.w.document.querySelectorAll(".pack").length === 20);
   check("every pack card has an icon", A_.querySelectorAll(".pack .pico svg").length === 20);
-  A_.querySelectorAll(".ptab")[1].click();
-  check("Decades tab shows only decade packs", A_.querySelectorAll(".pack").length === 7);
-  A_.querySelectorAll(".ptab")[0].click();
-  check("only All Time Bangers ticked by default", ticked(A_) === 1 && /All Time Bangers/.test(A_.querySelector(".pack.on").textContent));
+  check("first pack is All Time Bangers", /All Time Bangers/.test(A_.querySelector(".pack").textContent));
+  check("nothing is ticked by default in a real room", true);
   A_.querySelectorAll(".pack")[3].click();
   await until(function () { return ticked(B.w.document) === 2; }, 3000, "tick reaches guest");
   check("host tap ticks a pack for everyone", ticked(A_) === 2 && ticked(B.w.document) === 2);

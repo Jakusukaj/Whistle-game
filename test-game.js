@@ -78,7 +78,7 @@ async function mainScenario() {
   console.log("\n--- Scenario 1: full game, three players ---");
   // Short timers so the test runs fast. In the real game the limit is 60s and
   // a shuffle costs 5s; the maths is the same.
-  var app = createServer({ limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5 });
+  var app = createServer({ defaultPacks: ["bangers"], limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
 
@@ -190,7 +190,7 @@ async function mainScenario() {
   await B.waitFor(turnId(B.playerId), "turn 2 is Ben's");
   check("turn 2 stage resets to choose", B.stage() === "choose");
   await startTurnAs(cs, B, "hard");
-  check("hard multiplier is 0.6", B.state.turn.multiplier === 0.6);
+  check("hard multiplier is 0.8", B.state.turn.multiplier === 0.8);
   await B.waitFor(stageIs("reveal"), "timeout reveal", 6000);
   await A.waitFor(stageIs("reveal"), "timeout reveal for A", 6000);
   check("an unguessed turn times out", B.state.turn.result.outcome === "timeout");
@@ -202,7 +202,7 @@ async function mainScenario() {
   await startTurnAs(cs, C, "medium");
   C.send({ t: "gotIt" });
   await C.waitFor(stageIs("reveal"), "gotIt reveal");
-  check("whistler can end the turn manually", C.state.turn.result.outcome === "correct" && C.state.turn.result.multiplier === 0.8);
+  check("whistler can end the turn manually", C.state.turn.result.outcome === "correct" && C.state.turn.result.multiplier === 0.9);
 
   A.send({ t: "next" });
   await A.waitFor(function (s) { return s.phase === "gameover"; }, "game over");
@@ -220,7 +220,7 @@ async function mainScenario() {
 
 async function skipAndLeaveScenario() {
   console.log("\n--- Scenario 2: skip, leave, late joiner ---");
-  var app = createServer({ limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
+  var app = createServer({ defaultPacks: ["bangers"], limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Ann", "Ben", "Cat"]);
@@ -252,7 +252,7 @@ async function skipAndLeaveScenario() {
 
 async function reconnectScenario() {
   console.log("\n--- Scenario 3: reconnect and host hand-over ---");
-  var app = createServer({ limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
+  var app = createServer({ defaultPacks: ["bangers"], limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Ann", "Ben"]);
@@ -276,7 +276,7 @@ async function reconnectScenario() {
 
 async function tieScenario() {
   console.log("\n--- Scenario 4: tie goes to sudden death ---");
-  var app = createServer({ limitMs: 600, countdownMs: 50, confirmMs: 400, cooldownMs: 200 });
+  var app = createServer({ defaultPacks: ["bangers"], limitMs: 600, countdownMs: 50, confirmMs: 400, cooldownMs: 200 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Xia", "Yan"]);
@@ -313,7 +313,7 @@ async function tieScenario() {
 
 async function endlessTieScenario() {
   console.log("\n--- Scenario 5: tie that cannot be broken ---");
-  var app = createServer({ limitMs: 300, countdownMs: 30, confirmMs: 300, cooldownMs: 100 });
+  var app = createServer({ defaultPacks: ["bangers"], limitMs: 300, countdownMs: 30, confirmMs: 300, cooldownMs: 100 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Xia", "Yan"]);

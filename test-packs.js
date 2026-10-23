@@ -12,7 +12,7 @@ function fakeConn() { var c = { roomCode: null, playerId: null, state: null, err
   return c; }
 
 function newGame(n, opts) {
-  var m = new RoomManager(opts || {});
+  var m = new RoomManager(Object.assign({ defaultPacks: ["bangers"] }, opts || {}));
   var cs = [];
   for (var i = 0; i < n; i++) { cs.push(fakeConn()); }
   m.handle(cs[0], { t: "create", name: "P0" });
@@ -43,11 +43,14 @@ var uniq = {}; pool.forEach(function (s) { uniq[s.title] = 1; });
 check("pool has no duplicate titles", Object.keys(uniq).length === pool.length);
 
 // --- selecting packs
-check("default is All Time Bangers only", newGame(2).room.packs.join() === "bangers");
+check("no packs are ticked by default", new RoomManager({}).rooms && (function () { var m = new RoomManager({}), c = fakeConn(); m.handle(c, { t: "create", name: "A" }); return m.rooms[c.code].packs.length === 0; })());
+var np = newGame(2, { defaultPacks: [] });
+np.m.handle(np.cs[0], { t: "start" });
+check("cannot start with no pack picked", np.room.phase === "lobby" && np.cs[0].errors.indexOf("no_packs") !== -1);
 g.m.handle(g.cs[1], { t: "setPacks", packs: ["rock"] });
 check("non-host cannot change packs", room.packs.join() === "eighties,bangers" || room.packs.join() === "bangers,eighties");
 g.m.handle(g.cs[0], { t: "setPacks", packs: [] });
-check("empty selection ignored", room.packs.length === 2);
+check("host can untick everything", room.packs.length === 0);
 g.m.handle(g.cs[0], { t: "setPacks", packs: ["nope", "rock"] });
 check("unknown pack ids dropped", room.packs.join() === "rock");
 g.m.handle(g.cs[0], { t: "setPacks", packs: ids });

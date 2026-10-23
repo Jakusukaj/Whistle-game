@@ -3,7 +3,7 @@
 // RoomManager.handle(conn, msg), and conn.send(obj) is how replies go back.
 //
 // Rules in one paragraph: every player whistles once per round. The whistler
-// picks easy, medium or hard (score multipliers x1.0, x0.8, x0.6, so a lower
+// picks easy, medium or hard (score multipliers x1.0, x0.9, x0.8, so a lower
 // score is better), sees the song on their own phone, and the clock runs until
 // the room guesses it (max 60s). Guesses come from the other phones, by voice
 // or typing, and are checked HERE so the song never reaches a guesser's phone.
@@ -28,7 +28,7 @@ var DEFAULTS = {
   confirmMs: 10000,      // whistler has this long to confirm a detected guess
   cooldownMs: 4000,      // ignore guesses this long after the whistler says "no"
   shufflePenaltyS: 5,
-  multipliers: { easy: 1, medium: 0.8, hard: 0.6 },
+  multipliers: { easy: 1, medium: 0.9, hard: 0.8 },
   sdDifficulty: "medium",
   sdMaxRounds: 3,
   minPlayers: 2,
@@ -253,7 +253,7 @@ RoomManager.prototype.create = function (conn, msg) {
   var room = {
     code: this.makeCode(), hostId: null, players: [], phase: "lobby",
     rounds: this.opts.defaultRounds, limitMs: this.opts.limitMs, turns: [], turnPos: -1, turn: null, turnCounter: 0,
-    packs: ["bangers"], used: {}, sd: null, winners: null, tieBreakWon: false,
+    packs: (this.opts.defaultPacks || []).slice(), used: {}, sd: null, winners: null, tieBreakWon: false,
     createdAt: this.now(), lastActive: this.now()
   };
   var p = this.addPlayer(room, name);
@@ -378,11 +378,10 @@ RoomManager.prototype.unusedCount = function (room) {
   return this.poolFor(room).filter(function (s) { return !room.used[s.title]; }).length;
 };
 
-// Host ticks packs in the lobby. At least one pack must stay ticked.
+// Host ticks packs in the lobby. None are ticked to begin with.
 RoomManager.prototype.setPacks = function (room, msg) {
   if (room.phase !== "lobby" || !Array.isArray(msg.packs)) { return; }
   var chosen = PACK_IDS.filter(function (id) { return msg.packs.indexOf(id) !== -1; });
-  if (!chosen.length) { return; }
   room.packs = chosen;
   this.broadcast(room);
 };
@@ -407,6 +406,7 @@ RoomManager.prototype.start = function (room, conn) {
   if (room.players.length < this.opts.minPlayers) {
     return err(conn, "too_few", "You need at least " + this.opts.minPlayers + " players.");
   }
+  if (!room.packs.length) { return err(conn, "no_packs", "Pick at least one song pack first."); }
   var need = room.players.length * room.rounds + SONG_BUFFER;
   if (this.poolFor(room).length < need) {
     return err(conn, "too_few_songs", "These packs only have " + this.poolFor(room).length + " songs, and this game needs about " + need + ". Tick more packs or lower the rounds.");

@@ -349,45 +349,38 @@
   var TABS = ["All", "Decades", "Genres", "Screen", "Seasonal", "Artists"];
 
   function packCard(p, on, ro) {
-    return '<button class="pack' + (on ? " on" : "") + (ro ? " ro" : "") + (p.group === "Start here" ? " hero" : "") + '" data-id="' + p.id + '" aria-pressed="' + on +
+    return '<button class="pack' + (on ? " on" : "") + (ro ? " ro" : "") + '" data-id="' + p.id + '" aria-pressed="' + on +
       '" style="background:' + p.colour + ";color:" + p.ink + '">' +
       '<span class="tick">' + TICK_SVG + "</span>" +
       '<span class="pico">' + (PACK_ICON[p.id] || "") + "</span>" +
-      '<span class="pn">' + esc(p.name) + '</span><span class="pb">' + esc(p.blurb) + '</span>' +
+      '<span class="pn">' + esc(p.name) + '</span>' +
       '<span class="pc">' + p.count + " songs</span></button>";
   }
 
-  // The lobby shows a short summary of the chosen packs. The full picker opens on top.
+  // The lobby shows one short line about the chosen packs. The picker opens on top.
   function packsSummaryHtml(s, isHost) {
     var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
-    var chips = on.slice(0, 5).map(function (p) {
-      return '<span class="pchip" style="background:' + p.colour + ";color:" + p.ink + '"><span class="pci">' + (PACK_ICON[p.id] || "") + "</span>" + esc(p.name) + "</span>";
-    }).join("") + (on.length > 5 ? '<span class="pchip more">+' + (on.length - 5) + " more</span>" : "");
     var need = s.rounds * s.players.length + 5, short = s.songsInPlay < need;
+    var line = !on.length ? "No packs picked yet"
+      : on.slice(0, 2).map(function (p) { return p.name; }).join(", ") + (on.length > 2 ? " +" + (on.length - 2) + " more" : "");
+    var note = !on.length ? (isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
+      : short ? "Only " + s.songsInPlay + " songs: pick more packs or lower the rounds"
+      : s.songsInPlay + " songs in play. No song is played twice.";
     return '<div class="card stack"><div class="packhead"><div class="top">Song packs</div>' +
-      '<button class="packall" id="openPacks">' + (isHost ? "Choose packs" : "See packs") + "</button></div>" +
-      '<div class="pchips">' + chips + "</div>" +
-      '<div class="packnote' + (short ? " bad" : "") + '">' +
-        (short ? "Only " + s.songsInPlay + " songs: tick more packs or lower the rounds"
-               : s.songsInPlay + " songs in play. No song is played twice.") + "</div></div>";
+      '<button class="packall" id="openPacks">' + (isHost ? (on.length ? "Change" : "Choose packs") : "See packs") + "</button></div>" +
+      '<div class="packline">' + esc(line) + "</div>" +
+      '<div class="packnote' + (short || !on.length ? " bad" : "") + '">' + esc(note) + "</div></div>";
   }
 
   function pickerHtml(s, isHost) {
     var all = s.packs.length === s.selectedPacks.length;
-    var body = GROUPS.map(function (g) {
-      if (pickerTab !== "All" && g !== pickerTab) { return ""; }
-      var ps = s.packs.filter(function (p) { return p.group === g; });
-      if (!ps.length) { return ""; }
-      return '<div class="pgroup"><div class="top">' + esc(g === "Start here" ? "Start here" : g) + '</div><div class="packs' + (g === "Start here" ? " one" : "") + '">' +
-        ps.map(function (p) { return packCard(p, s.selectedPacks.indexOf(p.id) !== -1, !isHost); }).join("") + "</div></div>";
-    }).join("");
-    var tabs = TABS.map(function (t) { return '<button class="ptab' + (t === pickerTab ? " on" : "") + '" data-tab="' + t + '">' + t + "</button>"; }).join("");
+    var cards = s.packs.map(function (p) { return packCard(p, s.selectedPacks.indexOf(p.id) !== -1, !isHost); }).join("");
     return '<div class="picker" id="picker"><div class="pwrap">' +
       '<div class="phead"><div class="ptitle">Song packs</div>' +
-        (isHost ? '<button class="packall" id="packAll">' + (all ? "Just Bangers" : "Select all") + "</button>" : "") + "</div>" +
-      '<div class="ptabs">' + tabs + "</div>" +
-      '<div class="pbody">' + body + (isHost ? "" : '<p class="note center">The host picks the packs</p>') + "</div>" +
-      '<div class="pfoot"><div class="pcount"><b>' + s.selectedPacks.length + "</b> of " + s.packs.length + " packs, <b>" + s.songsInPlay + "</b> songs</div>" +
+        (isHost ? '<button class="packall" id="packAll">' + (all ? "Clear" : "Select all") + "</button>" : "") + "</div>" +
+      '<div class="pbody"><div class="packs">' + cards + "</div>" +
+        (isHost ? "" : '<p class="note center">The host picks the packs</p>') + "</div>" +
+      '<div class="pfoot"><div class="pcount"><b>' + s.selectedPacks.length + "</b> picked, <b>" + s.songsInPlay + "</b> songs</div>" +
         '<button class="btn" id="pkDone">Done</button></div>' +
     "</div></div>";
   }
@@ -422,7 +415,7 @@
           '<div class="stack" data-mic></div>' +
           '<div class="spacer"></div>' +
           (isHost
-            ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
+            ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers || !s.selectedPacks.length || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
               (s.players.length < s.minPlayers ? '<p class="note center">Waiting for at least ' + s.minPlayers + " players</p>" : "")
             : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + " to start...</p>") +
           '<button id="helpBtn" class="btn ghost">How to play</button>' +
@@ -431,13 +424,9 @@
         "</div>",
       bind: function () {
         $("#helpBtn").onclick = showHelp;
-        $("#openPacks").onclick = function () { pickerOpen = true; pickerTab = "All"; keepPickerScroll = false; render(); };
+        $("#openPacks").onclick = function () { pickerOpen = true; keepPickerScroll = false; render(); };
         if (pickerOpen) {
           $("#pkDone").onclick = function () { pickerOpen = false; render(); };
-          var tabEls = document.querySelectorAll(".ptab");
-          for (var t = 0; t < tabEls.length; t++) {
-            tabEls[t].onclick = function () { pickerTab = this.getAttribute("data-tab"); keepPickerScroll = false; render(); };
-          }
           if (isHost) {
             var sel = s.selectedPacks.slice(), allIds = s.packs.map(function (p) { return p.id; });
             var sendPacks = function () { send({ t: "setPacks", packs: sel }); };
@@ -446,15 +435,14 @@
               cardsEl[c].onclick = function () {
                 var id = this.getAttribute("data-id"), at = sel.indexOf(id);
                 if (at === -1) { sel.push(id); }
-                else if (sel.length > 1) { sel.splice(at, 1); }
-                else { toast("Keep at least one pack ticked."); return; }
+                else { sel.splice(at, 1); }
                 this.classList.toggle("on", sel.indexOf(id) !== -1);
                 this.setAttribute("aria-pressed", sel.indexOf(id) !== -1);
                 sendPacks();
               };
             }
             $("#packAll").onclick = function () {
-              if (sel.length === allIds.length) { sel = [allIds[0]]; } else { sel = allIds.slice(); }
+              if (sel.length === allIds.length) { sel = []; } else { sel = allIds.slice(); }
               sendPacks();
             };
           }
