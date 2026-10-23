@@ -251,6 +251,15 @@
     };
   }
 
+  var LEN_LABEL = { 30000: "30s", 60000: "1 min", 90000: "1 min 30", 120000: "2 min" };
+  function lengthHtml(s, isHost) {
+    var opts = s.limitOptions || [30000, 60000, 90000, 120000];
+    if (!isHost) { return '<div class="center h2" id="limitVal">' + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + "s") + "</div>"; }
+    return '<div class="seg">' + opts.map(function (ms) {
+      return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
+    }).join("") + "</div>";
+  }
+
   function viewLobby(s) {
     var isHost = s.hostId === s.me;
     var turns = s.rounds * s.players.length;
@@ -275,6 +284,7 @@
               : '<div class="center h1" id="roundsVal">' + s.rounds + "</div>") +
             '<p class="note center">Everyone whistles once per round: ' + turns + " turns in all</p>" +
           "</div>" +
+          '<div class="card stack"><div class="top">Round length</div>' + lengthHtml(s, isHost) + "</div>" +
           '<div class="stack" data-mic></div>' +
           '<div class="spacer"></div>' +
           (isHost
@@ -291,16 +301,36 @@
           $("#minus").onclick = function () { want = Math.max(1, want - 1); send({ t: "setRounds", rounds: want }); };
           $("#plus").onclick = function () { want = Math.min(10, want + 1); send({ t: "setRounds", rounds: want }); };
           $("#startBtn").onclick = function () { send({ t: "start" }); };
+          var segs = document.querySelectorAll(".segb");
+          for (var i = 0; i < segs.length; i++) {
+            segs[i].onclick = function () { send({ t: "setLimit", limitMs: parseInt(this.getAttribute("data-ms"), 10) }); };
+          }
         }
         $("#leaveBtn").onclick = leaveRoom;
       }
     };
   }
 
-  function topBar(s) {
+  function topLabel(s) {
     var T = s.turn;
-    var label = T.sd ? "Tie-break round " + s.sdRound : "Round " + T.round + " of " + s.rounds + " - Turn " + s.turnNumber + " of " + s.totalTurns;
-    return '<div class="top">' + esc(label) + "</div>";
+    return T.sd ? "Tie-break round " + s.sdRound : "Round " + T.round + " of " + s.rounds + " - Turn " + s.turnNumber + " of " + s.totalTurns;
+  }
+
+  function topBar(s) {
+    return '<div class="top" id="topLabel">' + esc(topLabel(s)) + '</div><div id="lastRound"></div>';
+  }
+
+  // Kept up to date on every state change, even when the screen itself is not redrawn.
+  function refreshTop() {
+    if (!st || !st.turn) { return; }
+    var l = $("#topLabel"); if (l) { l.textContent = topLabel(st); }
+    var b = $("#lastRound"); if (!b) { return; }
+    var show = st.hostId === st.me && !st.turn.sd && !st.suddenDeath && st.turn.round === st.rounds;
+    var has = !!$("#addRound");
+    if (show && !has) {
+      b.innerHTML = '<button id="addRound" class="lastbanner">Last round. Tap to add an extra round</button>';
+      $("#addRound").onclick = function () { send({ t: "addRound" }); };
+    } else if (!show && has) { b.innerHTML = ""; }
   }
 
   function skipHtml(s) {
@@ -317,6 +347,11 @@
     if (e) { e.onclick = function () { if (window.confirm("End this game? Everyone goes back to the lobby and scores are cleared.")) { send({ t: "cancelGame" }); } }; }
   }
 
+  function lockHtml(note) {
+    return '<div class="lockov" id="lock" hidden><div class="lk1">SHUFFLE!</div><div class="lk2">5s penalty</div>' +
+      '<div class="lknum" id="lknum">5</div><div class="lk3">' + note + "</div></div>";
+  }
+
   function songCardHtml(T) {
     var d = T.difficulty;
     return '<div class="card songcard"><div class="chips"><span class="chip ok">' + esc(d) + " x" + T.multiplier + "</span></div>" +
@@ -327,20 +362,23 @@
   function viewTurn(s) {
     var T = s.turn, isW = T.playerId === s.me, who = pname(s, T.playerId);
 
-    // 1. Whistler choosing a difficulty
+    // 1. Whistler choosing one of three songs
     if (T.stage === "choose" && isW && !T.difficulty) {
-      var btns = ["easy", "medium", "hard"].map(function (d) {
-        return '<button class="diff" data-d="' + d + '">' + d + "<span>x" + s.multipliers[d] + "</span></button>";
+      var offs = (T.options || []).map(function (o) {
+        var off = Math.round((1 - o.multiplier) * 100);
+        return '<button class="opt" data-d="' + o.difficulty + '"><span class="od">' + o.difficulty +
+          (off ? " - " + off + "% off your time" : " - normal score") + '</span><span class="ot">' + esc(o.title) +
+          '</span><span class="oa">' + esc(o.artist) + "</span></button>";
       }).join("");
       return {
         key: "choose-" + T.id,
         html: '<div class="screen">' + topBar(s) +
           '<div class="h1">' + esc(who) + ", you're up!</div>" +
-          '<p class="sub">Pick a difficulty. Lower scores win, and harder songs knock time off.</p>' + btns +
-          '<p class="note center">Only you will see the song. Stay out of everyone else\'s view.</p>' +
+          '<p class="sub">Pick a song. Choosing a harder song gives you a better score.</p>' + offs +
+          '<p class="note center">Only you can see these. Keep your screen to yourself.</p>' +
           '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: function () {
-          var ds = document.querySelectorAll(".diff");
+          var ds = document.querySelectorAll(".opt");
           for (var i = 0; i < ds.length; i++) {
             ds[i].onclick = function () { send({ t: "pickDifficulty", d: this.getAttribute("data-d") }); };
           }
@@ -349,18 +387,16 @@
       };
     }
 
-    // 2. Whistler has a song and is getting ready
+    // 2. Whistler has picked and is getting ready
     if (T.stage === "choose" && isW) {
       return {
         key: "ready-" + T.id,
         html: '<div class="screen">' + topBar(s) +
           '<div class="h1">Your song</div>' + songCardHtml(T) +
-          '<p class="note center">Only you can see this.' + (T.shuffles ? " Shuffles so far: " + T.shuffles + "." : "") + "</p>" +
+          '<p class="note center">Only you can see this. Stuck once the clock is running? Shuffle gives you a new song but locks your screen for ' + T.penalty + ' seconds.</p>' +
           '<div class="spacer"></div>' +
-          '<button id="shuffleBtn" class="btn teal">Shuffle (+' + T.penalty + "s)</button>" +
           '<button id="readyBtn" class="btn">Ready?</button>' + skipHtml(s) + "</div>",
         bind: function () {
-          $("#shuffleBtn").onclick = function () { send({ t: "shuffle" }); };
           $("#readyBtn").onclick = function () { send({ t: "ready" }); };
           bindSkip();
         }
@@ -399,8 +435,9 @@
           '<div class="timerbox"><div class="tlabel" id="tlabel">TIME</div><div class="bigtime" id="bigtime">0.0</div>' +
           '<div class="bar"><i id="bar"></i></div></div>' + songCardHtml(T) +
           '<div class="spacer"></div>' +
-          '<div class="row"><button id="shuffleBtn" class="btn teal">Shuffle (+' + T.penalty + "s)</button>" +
+          '<div class="row"><button id="shuffleBtn" class="btn teal">Shuffle (' + T.penalty + 's penalty)</button>' +
           '<button id="gotBtn" class="btn navy">Someone got it</button></div>' + skipHtml(s) +
+          lockHtml("New song coming up.") +
           '<div class="overlay" id="confirm" hidden><div class="card"><div class="h2">Did they get it?</div>' +
           '<p class="sub">Heard: <b id="heardTxt"></b></p>' +
           '<button id="yesBtn" class="btn">Yes, that\'s it</button><button id="noBtn" class="btn ghost">No, keep going</button></div></div></div>',
@@ -441,6 +478,7 @@
               '<div data-mic="quiet"></div><div class="heard" id="heard"></div></div>' +
               '<button id="toType" class="link">Mic not working? Type your answer \u2192</button>') +
           '<div class="spacer"></div>' + skipHtml(s) +
+          lockHtml("Song changing. Guessing is paused.") +
           '<div class="overlay" id="checking" hidden><div class="card"><div class="h2">Checking...</div>' +
           '<p class="sub">Someone may have got it. Hold tight.</p></div></div></div>',
         bind: function () {
@@ -480,7 +518,7 @@
     }
     var last = s.turnNumber >= s.totalTurns;
     return {
-      key: "reveal-" + T.id,
+      key: "reveal-" + T.id + "-" + s.totalTurns,
       html: '<div class="screen">' + topBar(s) +
         '<div class="winline">' + head + "</div>" +
         (R.song ? '<div class="card songcard"><div class="note">The song was</div><div class="t">' + esc(R.song.title) + '</div><div class="a">' + esc(R.song.artist) + "</div></div>" : "") +
@@ -519,10 +557,10 @@
     o.className = "overlay modal";
     o.innerHTML = '<div class="card stack"><div class="h2">How to play</div>' +
       "<p class=\"sub\">The aim of the game is to get everyone to guess your song as quickly as possible. Points are the seconds it takes, so more seconds means more points \u2013 but in this game the fewest points wins!</p><ol>" +
-      "<li>On your turn, pick Easy, Medium or Hard. Harder songs take points off your time.</li>" +
+      "<li>On your turn, pick one of three songs: Easy, Medium or Hard. Harder songs take points off your time.</li>" +
       "<li>You'll see a song on your phone. Whistle it! Only you can see it \u2013 so don't show anyone else!</li>" +
       "<li>Everyone else shouts (or types) guesses. The clock stops when the mic detects the correct answer.</li>" +
-      "<li>Stuck? Shuffle for a new song, but it costs 5 seconds. No guess in 60 seconds scores the full 60.</li>" +
+      "<li>Stuck? Shuffle for a new song, but your screen locks for 5 seconds. No guess before time runs out scores the full time.</li>" +
       "<li>After the last round, the lowest total wins.</li>" +
       '</ol><button class="btn" id="helpClose">Got it</button></div>';
     document.body.appendChild(o);
@@ -545,6 +583,7 @@
       if (view.update) { view.update(); }
     }
     refreshMic();
+    refreshTop();
   }
 
   // The clock and countdown run locally between server messages.
@@ -560,6 +599,19 @@
     if (orb) { orb.style.setProperty("--lvl", mic.state === "on" ? mic.level.toFixed(2) : "0"); }
     var T = st && st.turn;
     if (!T) { document.body.classList.remove("danger"); return; }
+    var lk = document.getElementById("lock");
+    if (lk) {
+      var L = T.lockUntil, on = !!(L && L > nowS() && T.stage === "whistling");
+      lk.hidden = !on;
+      if (on) {
+        var ln = document.getElementById("lknum"), n = Math.max(1, Math.ceil((L - nowS()) / 1000));
+        if (ln && ln.textContent !== String(n)) { ln.textContent = n; }
+        var lp = lk.querySelector(".lk2"); if (lp) { lp.textContent = T.penalty + "s penalty"; }
+      }
+      var sb = document.getElementById("shuffleBtn"), gb = document.getElementById("gotBtn");
+      if (sb) { sb.disabled = on || T.stage === "confirming"; }
+      if (gb) { gb.disabled = on || T.stage === "confirming"; }
+    }
     if (T.stage === "countdown") {
       var cd = $("#cd");
       if (cd) {
