@@ -162,3 +162,27 @@ body.danger .bar i { background: var(--red); }
 .orb.off::before, .orb.off::after { display: none; }
 body.danger .orb::before, body.danger .orb::after { border-color: #fff; }
 .overlay .card { max-height: 90vh; overflow-y: auto; }
+
+/* song options */
+.opt { appearance: none; -webkit-appearance: none; width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 3px solid var(--navy); border-radius: 16px; box-shadow: 5px 5px 0 var(--navy); background: var(--paper); color: var(--navy); cursor: pointer; font-family: "Montserrat", sans-serif; }
+.opt:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--navy); }
+.opt .od { font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.opt .ot { font-weight: 900; font-style: italic; font-size: 26px; line-height: 1.05; text-transform: uppercase; }
+.opt .oa { font-weight: 700; font-size: 14px; }
+.opt[data-d="easy"] { background: var(--teal); }
+.opt[data-d="medium"] { background: var(--yellow); }
+.opt[data-d="hard"] { background: var(--red); color: #fff; }
+
+/* shuffle lock */
+.lockov { position: fixed; inset: 0; z-index: 40; background: #d90429; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 6px; }
+.lockov[hidden] { display: none; }
+.lockov .lk1 { font-weight: 900; font-style: italic; font-size: 52px; letter-spacing: -1px; }
+.lockov .lk2 { font-weight: 800; font-size: 22px; text-transform: uppercase; }
+.lockov .lknum { font-weight: 900; font-style: italic; font-size: 200px; line-height: 1; margin: 10px 0; animation: pulse 1s ease-in-out infinite; }
+.lockov .lk3 { font-weight: 700; }
+
+/* round length and last-round banner */
+.seg { display: flex; gap: 8px; flex-wrap: wrap; }
+.segb { appearance: none; -webkit-appearance: none; flex: 1 1 70px; padding: 12px 6px; border: 3px solid var(--navy); border-radius: 12px; background: #fff; color: var(--navy); font: 800 15px "Montserrat", sans-serif; cursor: pointer; }
+.segb.on { background: var(--navy); color: #fff; box-shadow: 3px 3px 0 var(--red); }
+.lastbanner { appearance: none; -webkit-appearance: none; width: 100%; margin-top: 8px; padding: 12px; border: 3px solid var(--navy); border-radius: 12px; background: var(--yellow); color: var(--navy); font: 900 14px "Montserrat", sans-serif; cursor: pointer; box-shadow: 3px 3px 0 var(--navy); }
