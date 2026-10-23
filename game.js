@@ -93,7 +93,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     serverNow: this.now(),
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
-    players: room.players.map(function (p) {
+    players: room.players.filter(function (p) { return !p.sitOut; }).map(function (p) {
       return { id: p.id, name: p.name, connected: p.connected, total: round1(p.total), last: p.last, turns: p.turns };
     }),
     turn: tv,
@@ -130,6 +130,7 @@ RoomManager.prototype.handle = function (conn, msg) {
     case "next":       return isHost ? this.next(room) : err(conn, "not_host", "Only the host can do that.");
     case "skip":       return isHost ? this.skip(room) : err(conn, "not_host", "Only the host can do that.");
     case "playAgain":  return isHost ? this.playAgain(room) : err(conn, "not_host", "Only the host can do that.");
+    case "cancelGame": return isHost ? this.cancelGame(room) : err(conn, "not_host", "Only the host can do that.");
     case "pickDifficulty": return this.pickDifficulty(room, me, msg);
     case "shuffle":    return this.shuffle(room, me);
     case "ready":      return this.ready(room, me);
@@ -184,7 +185,9 @@ RoomManager.prototype.join = function (conn, msg) {
       return this.broadcast(room);
     }
   }
-  if (room.phase !== "lobby") { return err(conn, "game_started", "That game has already started."); }
+  if (room.phase === "turn" && room.sd) {
+    return err(conn, "game_started", "That game is in its final tie-break. Try again once it has finished.");
+  }
   var name = cleanName(msg.name);
   if (!name) { return err(conn, "bad_name", "Enter a name first."); }
   for (var i = 0; i < room.players.length; i++) {
@@ -192,9 +195,26 @@ RoomManager.prototype.join = function (conn, msg) {
   }
   if (room.players.length >= this.opts.maxPlayers) { return err(conn, "full", "That room is full."); }
   var p = this.addPlayer(room, name);
+  if (room.phase === "turn") { this.scheduleLatePlayer(room, p); }
+  if (room.phase === "gameover") { p.sitOut = true; }
   this.attach(room, p, conn);
   conn.send({ t: "joined", code: room.code, playerId: p.id });
   this.broadcast(room);
+};
+
+// Someone joining mid-game plays the rest of this round and every later round.
+// The rounds they missed are added to the very end so everyone gets the same
+// number of turns.
+RoomManager.prototype.scheduleLatePlayer = function (room, p) {
+  var cur = room.turns[room.turnPos] ? room.turns[room.turnPos].round : room.rounds;
+  var r, i, last;
+  for (r = cur; r <= room.rounds; r++) {
+    last = -1;
+    for (i = 0; i < room.turns.length; i++) { if (room.turns[i].round === r && !room.turns[i].sd) { last = i; } }
+    if (last < 0) { continue; }
+    room.turns.splice(last + 1, 0, { playerId: p.id, round: r, sd: false });
+  }
+  for (r = 1; r < cur; r++) { room.turns.push({ playerId: p.id, round: room.rounds, sd: false }); }
 };
 
 RoomManager.prototype.promoteHost = function (room) {
@@ -483,14 +503,25 @@ RoomManager.prototype.gameOver = function (room, winnerIds, viaTieBreak) {
   this.broadcast(room);
 };
 
-RoomManager.prototype.playAgain = function (room) {
-  if (room.phase !== "gameover") { return; }
+RoomManager.prototype.resetToLobby = function (room) {
+  this.clearTimers(room.turn);
   room.players = room.players.filter(function (p) { return p.connected; });
-  room.players.forEach(function (p) { p.total = 0; p.last = null; p.turns = 0; });
+  room.players.forEach(function (p) { p.total = 0; p.last = null; p.turns = 0; p.sitOut = false; });
   room.phase = "lobby"; room.turn = null; room.turns = []; room.turnPos = -1;
   room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {};
   this.promoteHost(room);
   this.broadcast(room);
+};
+
+RoomManager.prototype.playAgain = function (room) {
+  if (room.phase !== "gameover") { return; }
+  this.resetToLobby(room);
+};
+
+// Host abandons a game in progress: everyone goes back to the lobby, same code.
+RoomManager.prototype.cancelGame = function (room) {
+  if (room.phase === "lobby") { return; }
+  this.resetToLobby(room);
 };
 
 // ------------------------------------------------------------------- cleanup
