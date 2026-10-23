@@ -161,3 +161,4 @@ body.danger .bar i { background: var(--red); }
 .orb.off { background: #d8d8d8; box-shadow: none; opacity: .7; }
 .orb.off::before, .orb.off::after { display: none; }
 body.danger .orb::before, body.danger .orb::after { border-color: #fff; }
+.overlay .card { max-height: 90vh; overflow-y: auto; }
