@@ -517,11 +517,13 @@
   function showHelp() {
     var o = document.createElement("div");
     o.className = "overlay modal";
-    o.innerHTML = '<div class="card stack"><div class="h2">How to play</div><ol>' +
-      "<li>Take turns to whistle. Your phone shows the song, only to you.</li>" +
-      "<li>Everyone else guesses the title out loud or by typing.</li>" +
-      "<li>Whoever is whistling confirms the right answer. Your time is your score.</li>" +
-      "<li>Lowest total wins. Try not to laugh!</li>" +
+    o.innerHTML = '<div class="card stack"><div class="h2">How to play</div>' +
+      "<p class=\"sub\">The aim of the game is to get everyone to guess your song as quickly as possible. Points are the seconds it takes, so more seconds means more points \u2013 but in this game the fewest points wins!</p><ol>" +
+      "<li>On your turn, pick Easy, Medium or Hard. Harder songs take points off your time.</li>" +
+      "<li>You'll see a song on your phone. Whistle it! Only you can see it \u2013 so don't show anyone else!</li>" +
+      "<li>Everyone else shouts (or types) guesses. The clock stops when the mic detects the correct answer.</li>" +
+      "<li>Stuck? Shuffle for a new song, but it costs 5 seconds. No guess in 60 seconds scores the full 60.</li>" +
+      "<li>After the last round, the lowest total wins.</li>" +
       '</ol><button class="btn" id="helpClose">Got it</button></div>';
     document.body.appendChild(o);
     $("#helpClose", o).onclick = function () { document.body.removeChild(o); };
