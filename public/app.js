@@ -260,6 +260,29 @@
     }).join("") + "</div>";
   }
 
+  var TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 10 18.5 20 6"/></svg>';
+
+  function packsHtml(s, isHost) {
+    var all = (s.packs || []).length === (s.selectedPacks || []).length;
+    var cards = (s.packs || []).map(function (p) {
+      var on = s.selectedPacks.indexOf(p.id) !== -1;
+      return '<button class="pack' + (on ? " on" : "") + (isHost ? "" : " ro") + '" data-id="' + p.id + '" aria-pressed="' + on +
+        '" style="background:' + p.colour + ";color:" + p.ink + '">' +
+        '<span class="tick">' + TICK_SVG + "</span>" +
+        '<span class="pn">' + esc(p.name) + '</span><span class="pb">' + esc(p.blurb) + '</span>' +
+        '<span class="pc">' + p.count + " songs</span></button>";
+    }).join("");
+    var need = s.rounds * s.players.length + 5;
+    var short = s.songsInPlay < need;
+    return '<div class="card stack"><div class="packhead"><div class="top">Song packs</div>' +
+      (isHost ? '<button class="packall" id="packAll">' + (all ? "Just Bangers" : "Select all") + "</button>" : "") + "</div>" +
+      '<div class="packs" id="packs">' + cards + "</div>" +
+      '<div class="packnote' + (short ? " bad" : "") + '" id="packNote">' +
+        (short ? "Only " + s.songsInPlay + " songs: tick more packs or lower the rounds"
+               : s.songsInPlay + " songs in play. No song is played twice.") + "</div>" +
+      (isHost ? "" : '<p class="note center">The host picks the packs</p>') + "</div>";
+  }
+
   function viewLobby(s) {
     var isHost = s.hostId === s.me;
     var turns = s.rounds * s.players.length;
@@ -277,6 +300,7 @@
             '<div class="note">Everyone joins at this web address with this code</div></div>' +
           '<div class="top">Players (' + s.players.length + " of " + s.maxPlayers + ")</div>" +
           '<div class="plist">' + list + "</div>" +
+          packsHtml(s, isHost) +
           '<div class="card stack">' +
             '<div class="top">Rounds</div>' +
             (isHost
@@ -288,7 +312,7 @@
           '<div class="stack" data-mic></div>' +
           '<div class="spacer"></div>' +
           (isHost
-            ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers ? " disabled" : "") + ">Start game</button>" +
+            ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
               (s.players.length < s.minPlayers ? '<p class="note center">Waiting for at least ' + s.minPlayers + " players</p>" : "")
             : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + " to start...</p>") +
           '<button id="helpBtn" class="btn ghost">How to play</button>' +
@@ -301,6 +325,23 @@
           $("#minus").onclick = function () { want = Math.max(1, want - 1); send({ t: "setRounds", rounds: want }); };
           $("#plus").onclick = function () { want = Math.min(10, want + 1); send({ t: "setRounds", rounds: want }); };
           $("#startBtn").onclick = function () { send({ t: "start" }); };
+          var sel = s.selectedPacks.slice(), allIds = s.packs.map(function (p) { return p.id; });
+          var sendPacks = function () { send({ t: "setPacks", packs: sel }); };
+          var cardsEl = document.querySelectorAll(".pack");
+          for (var c = 0; c < cardsEl.length; c++) {
+            cardsEl[c].onclick = function () {
+              var id = this.getAttribute("data-id"), at = sel.indexOf(id);
+              if (at === -1) { sel.push(id); }
+              else if (sel.length > 1) { sel.splice(at, 1); }
+              else { toast("Keep at least one pack ticked."); return; }
+              this.classList.toggle("on", sel.indexOf(id) !== -1);
+              sendPacks();
+            };
+          }
+          $("#packAll").onclick = function () {
+            if (sel.length === allIds.length) { sel = [allIds[0]]; } else { sel = allIds.slice(); }
+            sendPacks();
+          };
           var segs = document.querySelectorAll(".segb");
           for (var i = 0; i < segs.length; i++) {
             segs[i].onclick = function () { send({ t: "setLimit", limitMs: parseInt(this.getAttribute("data-ms"), 10) }); };
@@ -364,9 +405,9 @@
 
     // 1. Whistler choosing one of three songs
     if (T.stage === "choose" && isW && !T.difficulty) {
-      var offs = (T.options || []).map(function (o) {
+      var offs = (T.options || []).map(function (o, i) {
         var off = Math.round((1 - o.multiplier) * 100);
-        return '<button class="opt" data-d="' + o.difficulty + '"><span class="od">' + o.difficulty +
+        return '<button class="opt" data-i="' + i + '" data-d="' + o.difficulty + '"><span class="od">' + o.difficulty +
           (off ? " - " + off + "% off your time" : " - normal score") + '</span><span class="ot">' + esc(o.title) +
           '</span><span class="oa">' + esc(o.artist) + "</span></button>";
       }).join("");
@@ -380,7 +421,7 @@
         bind: function () {
           var ds = document.querySelectorAll(".opt");
           for (var i = 0; i < ds.length; i++) {
-            ds[i].onclick = function () { send({ t: "pickDifficulty", d: this.getAttribute("data-d") }); };
+            ds[i].onclick = function () { send({ t: "pickDifficulty", i: parseInt(this.getAttribute("data-i"), 10) }); };
           }
           bindSkip();
         }
