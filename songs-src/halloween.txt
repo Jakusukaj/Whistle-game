@@ -1,0 +1,42 @@
+# Halloween pack (flag H). Songs already elsewhere just gain the flag.
+Thriller | Michael Jackson | e | 1982 | H
+Ghostbusters | Ray Parker Jr. | e | 1984 | HF
+Monster Mash | Bobby Pickett | e | 1962 | H
+This Is Halloween | Danny Elfman | m | 1993 | HFD
+The Time Warp | Rocky Horror Picture Show | m | 1975 | HF | Time Warp
+I Put a Spell on You | Screamin' Jay Hawkins | m | 1956 | H
+Somebody's Watching Me | Rockwell | e | 1984 | H
+Bad Moon Rising | Creedence Clearwater Revival | e | 1969 | H
+Werewolves of London | Warren Zevon | e | 1978 | H
+Black Magic Woman | Santana | m | 1970 | H
+Season of the Witch | Donovan | m | 1966 | H
+Witchy Woman | Eagles | m | 1972 | H
+Running Up That Hill | Kate Bush | m | 1985 | H
+Highway to Hell | AC/DC | e | 1979 | H
+Hells Bells | AC/DC | m | 1980 | H
+Paint It Black | The Rolling Stones | e | 1966 | H
+Sympathy for the Devil | The Rolling Stones | m | 1968 | H
+Don't Fear the Reaper | Blue Oyster Cult | m | 1976 | H
+Ghost Town | The Specials | m | 1981 | H
+Spooky | Classics IV | m | 1968 | H
+Superstition | Stevie Wonder | e | 1972 | H
+Black Magic | Little Mix | m | 2015 | H
+Bury a Friend | Billie Eilish | h | 2019 | H
+Zombie | The Cranberries | m | 1994 | H
+Enter Sandman | Metallica | e | 1991 | H
+Welcome to My Nightmare | Alice Cooper | m | 1975 | H
+Dead Man's Party | Oingo Boingo | m | 1985 | H
+Disturbia | Rihanna | m | 2008 | H
+Dragula | Rob Zombie | m | 1998 | H
+Love Potion No. 9 | The Searchers | m | 1964 | H
+Boris the Spider | The Who | m | 1966 | H
+Spooky Scary Skeletons | Andrew Gold | m | 1996 | H
+Mad World | Tears for Fears | m | 1982 | H
+Ghost Riders in the Sky | Johnny Cash | e | 1979 | H
+The Phantom of the Opera | Andrew Lloyd Webber | h | 1986 | HD
+Halloween Theme | John Carpenter | m | 1978 | HF | Halloween
+Tubular Bells | Mike Oldfield | h | 1973 | HF | The Exorcist
+Psycho Theme | Bernard Herrmann | m | 1960 | HF | Psycho
+Jaws Theme | John Williams | e | 1975 | HF | Jaws
+Evil Woman | Electric Light Orchestra | m | 1975 | H
+Heads Will Roll | Yeah Yeah Yeahs | h | 2009 | H

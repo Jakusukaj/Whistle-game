@@ -103,26 +103,29 @@ async function mainScenario() {
   A.send({ t: "start" });
   await A.waitFor(function (s) { return s.phase === "turn"; }, "game started");
   await B.waitFor(function (s) { return s.phase === "turn"; }, "game started for B");
+  await C.waitFor(function (s) { return s.phase === "turn"; }, "game started for C");
   check("first turn belongs to the first player", A.state.turn.playerId === A.playerId);
   check("three turns scheduled", A.state.totalTurns === 3, A.state.totalTurns);
   check("no song before a difficulty is chosen", !A.state.turn.song && !B.state.turn.song);
 
+  check("whistler is offered three songs, one per difficulty", !!A.state.turn.options && A.state.turn.options.length === 3 &&
+    A.state.turn.options.map(function (o) { return o.difficulty; }).join() === "easy,medium,hard");
+  check("guessers are not offered songs", !B.state.turn.options && !C.state.turn.options);
+  check("the three offered songs are all different", new Set(A.state.turn.options.map(function (o) { return o.title; })).size === 3);
+  var offeredEasy = A.state.turn.options[0].title;
+
   B.send({ t: "pickDifficulty", d: "easy" }); await sleep(80);
-  check("a non-whistler cannot pick the difficulty", A.state.turn.difficulty === null);
+  check("a non-whistler cannot pick the song", A.state.turn.difficulty === null);
 
   A.send({ t: "pickDifficulty", d: "easy" });
   await A.waitFor(function (s) { return s.turn.difficulty === "easy"; }, "easy picked");
   await B.waitFor(function (s) { return s.turn.difficulty === "easy"; }, "easy seen by B");
-  check("whistler sees the song", !!(A.state.turn.song && A.state.turn.song.title));
+  check("whistler gets the song they were offered", A.state.turn.song.title === offeredEasy);
   check("guessers do NOT see the song", !B.state.turn.song && !C.state.turn.song);
   A.send({ t: "pickDifficulty", d: "hard" }); await sleep(80);
-  check("difficulty cannot be changed once chosen", A.state.turn.difficulty === "easy");
-
-  var firstSong = A.state.turn.song.title;
-  A.send({ t: "shuffle" });
-  await A.waitFor(function (s) { return s.turn.shuffles === 1; }, "shuffle");
-  check("shuffle gives a different song", A.state.turn.song.title !== firstSong);
-  check("shuffle keeps the same difficulty", A.state.turn.difficulty === "easy");
+  check("the choice cannot be changed once made", A.state.turn.difficulty === "easy");
+  A.send({ t: "shuffle" }); await sleep(80);
+  check("no shuffling before the clock starts", A.state.turn.shuffles === 0);
   var song = A.state.turn.song.title;
 
   A.send({ t: "ready" });
@@ -130,6 +133,18 @@ async function mainScenario() {
   await A.waitFor(stageIs("whistling"), "whistling");
   await B.waitFor(stageIs("whistling"), "whistling seen by B");
   check("clock is running for everyone", B.state.turn.runningSince !== null);
+
+  A.send({ t: "shuffle" });
+  await A.waitFor(function (s) { return s.turn.shuffles === 1; }, "shuffle");
+  check("shuffle locks the screen and hides the song", !!A.state.turn.lockUntil && !A.state.turn.song);
+  await B.waitFor(function (s) { return !!s.turn.lockUntil; }, "lock seen by B");
+  B.send({ t: "guess", alts: [song], typed: true }); await sleep(100);
+  check("guesses are ignored during the shuffle lock", A.stage() === "whistling");
+  await A.waitFor(function (s) { return !!s.turn.song; }, "song returns after the lock");
+  check("shuffle gives a different song", A.state.turn.song.title !== song);
+  check("shuffle keeps the same difficulty", A.state.turn.difficulty === "easy");
+  check("the clock kept running through the lock", A.state.turn.runningSince !== null);
+  song = A.state.turn.song.title;
 
   B.send({ t: "guess", alts: ["definitely not the song"], typed: true });
   await sleep(100);
@@ -166,8 +181,8 @@ async function mainScenario() {
   var res = B.state.turn.result;
   check("result is a correct guess", res.outcome === "correct");
   check("everyone sees the song at the reveal", res.song.title === song && C.state.turn.result.song.title === song);
-  var expected = Math.round(((res.timeMs / 1000) * 1 + 0.5) * 10) / 10;
-  check("score is time x multiplier plus the shuffle penalty", res.score === expected && res.score >= 0.5, res.score + " vs " + expected);
+  var expected = Math.round((Math.max(0, res.timeMs / 1000 - 0.5) * 1 + 0.5) * 10) / 10;
+  check("score is time x multiplier, with the shuffle lock counted in full", res.score === expected && res.score >= 0.5, res.score + " vs " + expected);
   check("score is added to the total", A.state.players.filter(function (p) { return p.id === A.playerId; })[0].total === res.score);
   check("guessers never saw the song before the reveal", B.songSeen.length === 0 && C.songSeen.length === 0, B.songSeen.join());
 
@@ -216,7 +231,7 @@ async function skipAndLeaveScenario() {
 
   var late = new Client(port, "Late"); await late.open;
   late.send({ t: "join", code: A.code, name: "Late" }); await sleep(80);
-  check("cannot join a game that has started", late.errors.indexOf("game_started") !== -1, late.errors);
+  check("a game in progress can be joined", late.errors.length === 0);
   late.close();
 
   B.send({ t: "skip" }); await sleep(80);

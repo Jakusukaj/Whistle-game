@@ -28,8 +28,9 @@ SONGS.forEach(function (s) {
 });
 check("every song title appears once in the library", dup === 0, dup);
 check("every song is in at least one real pack", badPack === 0, badPack);
-check("packs.js has 15 packs with names, and All Time Bangers is first", PACKS.length === 15 && PACKS[0].id === "bangers" && PACKS[0].name === "All Time Bangers");
-check("every pack has at least 50 songs", PACKS.every(function (p) { return SONGS.filter(function (s) { return s.packs.indexOf(p.id) !== -1; }).length >= 50; }));
+check("packs.js has 20 packs with names, and All Time Bangers is first", PACKS.length === 20 && PACKS[0].id === "bangers" && PACKS[0].name === "All Time Bangers");
+check("every pack has at least 30 songs", PACKS.every(function (p) { return SONGS.filter(function (s) { return s.packs.indexOf(p.id) !== -1; }).length >= 30; }));
+check("every pack has a group", PACKS.every(function (p) { return !!p.group; }));
 
 // --- overlap: a song in two ticked packs is in the pool once
 var g = newGame(2); var room = g.room;
@@ -50,8 +51,8 @@ check("empty selection ignored", room.packs.length === 2);
 g.m.handle(g.cs[0], { t: "setPacks", packs: ["nope", "rock"] });
 check("unknown pack ids dropped", room.packs.join() === "rock");
 g.m.handle(g.cs[0], { t: "setPacks", packs: ids });
-check("select all works", room.packs.length === 15 && g.cs[1].state.selectedPacks.length === 15);
-check("state carries pack catalogue with counts", g.cs[1].state.packs.length === 15 && g.cs[1].state.packs[0].count > 90 && g.cs[1].state.songsInPlay === SONGS.length);
+check("select all works", room.packs.length === 20 && g.cs[1].state.selectedPacks.length === 20);
+check("state carries pack catalogue with counts", g.cs[1].state.packs.length === 20 && g.cs[1].state.packs[0].count > 90 && g.cs[1].state.songsInPlay === SONGS.length);
 
 // --- too few songs refused
 var h = newGame(8);

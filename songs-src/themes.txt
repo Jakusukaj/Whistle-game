@@ -1,0 +1,115 @@
+# TV themes. Modern and UK first; iconic older or international ones only where everyone knows them.
+# Format: Title | Artist | e/m/h | year or - | flags | aliases   (year - and flag T makes the artist "TV theme")
+# --- UK soaps and dramas
+Coronation Street Theme | Eric Spear | e | - | T | Coronation Street;Corrie
+EastEnders Theme | Simon May | e | - | T | EastEnders;Eastenders Theme;Eastenders Doof Doof
+Emmerdale Theme | Tony Hatch | m | - | T | Emmerdale
+Hollyoaks Theme | Hollyoaks | m | - | T | Hollyoaks
+Casualty Theme | Casualty | m | - | T | Casualty
+Neighbours Theme | Tony Hatch | m | - | T | Neighbours;Neighbours Theme Tune
+Home and Away Theme | Mike Perjanik | m | - | T | Home and Away;Home and Away Theme Tune
+Downton Abbey Theme | John Lunn | m | - | T | Downton Abbey;Downton
+Red Right Hand | Nick Cave and the Bad Seeds | m | 1994 | RT | Peaky Blinders
+Line of Duty Theme | Carly Paradis | h | - | T | Line of Duty
+Sherlock Theme | David Arnold | h | - | T | Sherlock
+Doctor Who Theme | BBC | m | - | T | Doctor Who
+Call the Midwife Theme | Peter Salem | h | - | T | Call the Midwife
+Poldark Theme | Anne Dudley | m | - | T | Poldark
+Midsomer Murders Theme | Jim Parker | m | - | T | Midsomer Murders
+Poirot Theme | Christopher Gunning | m | - | T | Poirot
+Broadchurch Theme | Olafur Arnalds | h | - | T | Broadchurch
+The Crown Theme | Hans Zimmer | h | - | T | The Crown
+Only Fools and Horses Theme | John Sullivan | m | - | T | Only Fools and Horses;Hooky Street
+Blackadder Theme | Howard Goodall | m | - | T | Blackadder
+Father Ted Theme | Neil Hannon | m | - | T | Father Ted
+Mr. Bean Theme | Howard Goodall | m | - | T | Mr Bean;Mr. Bean
+The Vicar of Dibley Theme | Howard Goodall | m | - | T | The Vicar of Dibley;Vicar of Dibley
+Monty Python Theme | John Philip Sousa | e | - | T | Monty Python;Monty Python's Flying Circus;Liberty Bell
+# --- UK quiz, entertainment and sport
+The Chase Theme | Chase | m | - | T | The Chase
+Who Wants to Be a Millionaire Theme | Keith Strachan | m | - | T | Who Wants to Be a Millionaire;Millionaire
+Bargain Hunt Theme | Bargain Hunt | m | - | T | Bargain Hunt
+Pointless Theme | Pointless | m | - | T | Pointless
+Deal or No Deal Theme | Deal or No Deal | m | - | T | Deal or No Deal
+The Weakest Link Theme | Paul Farrer | m | - | T | The Weakest Link;Weakest Link
+Catchphrase Theme | Catchphrase | m | - | T | Catchphrase
+Family Fortunes Theme | Family Fortunes | m | - | T | Family Fortunes
+University Challenge Theme | Derek Bourgeois | m | - | T | University Challenge
+Mastermind Theme | Neil Richardson | m | - | T | Mastermind
+Dragons' Den Theme | Dragons Den | m | - | T | Dragons' Den;Dragons Den
+The Apprentice Theme | Apprentice | m | - | T | The Apprentice
+Antiques Roadshow Theme | Antiques Roadshow | e | - | T | Antiques Roadshow
+The Great British Bake Off Theme | Bake Off | m | - | T | Great British Bake Off;Bake Off
+Strictly Come Dancing Theme | Strictly | m | - | T | Strictly Come Dancing;Strictly
+Gladiators Theme | Gladiators | e | - | T | Gladiators
+Top Gear Theme | Top Gear | m | - | T | Top Gear
+Grand Designs Theme | Grand Designs | h | - | T | Grand Designs
+Match of the Day Theme | Barry Stoller | e | - | T | Match of the Day;MOTD
+Blue Peter Theme | Blue Peter | e | - | T | Blue Peter
+The Archers Theme | Arthur Wood | e | - | T | The Archers;Barwick Green
+Eurovision Theme | Charpentier | m | - | T | Eurovision
+Have I Got News for You Theme | Have I Got News for You | m | - | T | Have I Got News for You
+Taskmaster Theme | Taskmaster | m | - | T | Taskmaster
+# --- Kids
+Postman Pat Theme | Ken Barrie | e | - | T | Postman Pat
+Peppa Pig Theme | Peppa Pig | e | - | T | Peppa Pig
+Bluey Theme | Joff Bush | m | - | T | Bluey
+Paw Patrol Theme | Paw Patrol | m | - | T | Paw Patrol
+Hey Duggee Theme | Hey Duggee | e | - | T | Hey Duggee
+Teletubbies Theme | Teletubbies | e | - | T | Teletubbies
+In the Night Garden Theme | Andy Blythe | e | - | T | In the Night Garden
+Thomas the Tank Engine Theme | Mike O'Donnell | e | - | T | Thomas the Tank Engine;Thomas and Friends
+Can We Fix It? | Bob the Builder | e | 2000 | T | Bob the Builder;Can We Fix It
+Fireman Sam Theme | Ben Bailey Smith | e | - | T | Fireman Sam
+Wallace and Gromit Theme | Julian Nott | m | - | T | Wallace and Gromit
+The Wombles | The Wombles | e | 1974 | T | Wombles;The Wombles Theme
+Danger Mouse Theme | Danger Mouse | e | - | T | Danger Mouse
+Thunderbirds Theme | Barry Gray | m | - | T | Thunderbirds
+Horrible Histories Theme | Horrible Histories | m | - | T | Horrible Histories
+Balamory Theme | Balamory | e | - | T | Balamory
+# --- Big international and cartoon favourites
+Game of Thrones Theme | Ramin Djawadi | m | - | T | Game of Thrones
+Stranger Things Theme | Kyle Dixon | m | - | T | Stranger Things
+Succession Theme | Nicholas Britell | h | - | T | Succession
+The Mandalorian Theme | Ludwig Goransson | m | - | T | The Mandalorian;Mandalorian
+The Simpsons Theme | Danny Elfman | m | - | T | The Simpsons;Simpsons
+Scooby-Doo Theme | Hoyt Curtin | e | - | THM | Scooby Doo Theme;Scooby Doo;Scoobie Doo
+Pink Panther Theme | Henry Mancini | e | - | TF | The Pink Panther;Pink Panther
+SpongeBob SquarePants Theme | Painty the Pirate | e | - | T | SpongeBob;Spongebob Squarepants;SpongeBob SquarePants
+The Office Theme | The Scrantones | h | - | T | The Office;The Office US
+I'll Be There for You | The Rembrandts | e | 1995 | BT | Friends Theme;Friends
+The Big Bang Theory Theme | Barenaked Ladies | m | 2007 | T | Big Bang Theory;The Big Bang Theory
+Seinfeld Theme | Jonathan Wolff | m | - | T | Seinfeld
+Frasier Theme | Kelsey Grammer | m | - | T | Frasier;Tossed Salad and Scrambled Eggs
+Cheers Theme | Gary Portnoy | m | - | T | Where Everybody Knows Your Name;Cheers
+Happy Days Theme | Pratt and McClain | e | - | T | Happy Days
+The Fresh Prince of Bel-Air Theme | Will Smith | m | - | BT | Fresh Prince of Bel-Air;Fresh Prince
+The Sopranos Theme | Alabama 3 | m | 1997 | T | Woke Up This Morning;The Sopranos;Sopranos
+Curb Your Enthusiasm Theme | Luciano Michelini | m | - | T | Frolic;Curb Your Enthusiasm;Curb
+Family Guy Theme | Walter Murphy | m | - | T | Family Guy
+South Park Theme | Primus | m | - | T | South Park
+Rick and Morty Theme | Ryan Elder | h | - | T | Rick and Morty
+The X-Files Theme | Mark Snow | m | - | T | The X-Files;X-Files
+Twin Peaks Theme | Angelo Badalamenti | m | - | T | Twin Peaks
+Star Trek Theme | Alexander Courage | m | - | T | Star Trek
+Law and Order Theme | Mike Post | e | - | T | Law and Order;Law & Order
+The Twilight Zone Theme | Marius Constant | e | - | T | The Twilight Zone;Twilight Zone
+Batman Theme | Neal Hefti | e | - | T | Batman;Na Na Na Na Batman
+The Addams Family Theme | Vic Mizzy | e | - | THM | The Addams Family;Addams Family
+The Munsters Theme | Jack Marshall | e | - | TH | The Munsters;Munsters
+The Muppet Show Theme | Jim Henson | e | - | T | The Muppet Show;Muppet Show Theme
+Sesame Street Theme | Joe Raposo | e | - | T | Sesame Street
+The Flintstones Theme | Hoyt Curtin | e | - | T | The Flintstones;Flintstones
+The Jetsons Theme | Hoyt Curtin | e | - | T | The Jetsons;Jetsons
+Inspector Gadget Theme | Shuki Levy | e | - | T | Inspector Gadget
+DuckTales Theme | Mark Mueller | e | - | T | DuckTales;Duck Tales
+Pokemon Theme | Jason Paige | m | - | T | Gotta Catch 'Em All;Pokemon
+Mission: Impossible Theme | Lalo Schifrin | m | - | TF | Mission Impossible;Mission: Impossible
+James Bond Theme | Monty Norman | m | - | TF | James Bond;007
+The A-Team Theme | Mike Post | e | - | T | The A Team Theme;A-Team Theme
+Knight Rider Theme | Stu Phillips | m | - | T | Knight Rider
+Magnum P.I. Theme | Mike Post | m | - | T | Magnum P.I.;Magnum PI
+Miami Vice Theme | Jan Hammer | m | - | T | Miami Vice
+Dallas Theme | Jerrold Immel | m | - | T | Dallas
+M*A*S*H Theme | Johnny Mandel | m | - | T | Suicide Is Painless;MASH Theme
+Hawaii Five-0 Theme | Morton Stevens | m | - | T | Hawaii Five-0;Hawaii Five O

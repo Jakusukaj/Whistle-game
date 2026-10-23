@@ -1,0 +1,192 @@
+# Artist packs. Flag A = deeper cut: kept out of the decade packs. Flags L Beatles, O Bowie, G Gaga, K Talking Heads.
+# --- The Beatles
+Hey Jude | The Beatles | e | 1968 | L
+Yesterday | The Beatles | e | 1965 | L
+Let It Be | The Beatles | e | 1970 | L
+Yellow Submarine | The Beatles | e | 1966 | L
+All You Need Is Love | The Beatles | e | 1967 | L
+Twist and Shout | The Beatles | e | 1963 | L
+She Loves You | The Beatles | m | 1963 | L
+I Want to Hold Your Hand | The Beatles | m | 1963 | L
+Can't Buy Me Love | The Beatles | m | 1964 | L
+A Hard Day's Night | The Beatles | m | 1964 | L
+Help! | The Beatles | m | 1965 | L
+Ticket to Ride | The Beatles | m | 1965 | L
+Day Tripper | The Beatles | m | 1965 | L
+We Can Work It Out | The Beatles | m | 1965 | L
+Paperback Writer | The Beatles | m | 1966 | L
+Eleanor Rigby | The Beatles | m | 1966 | L
+Penny Lane | The Beatles | h | 1967 | L
+Strawberry Fields Forever | The Beatles | h | 1967 | L
+Hello, Goodbye | The Beatles | e | 1967 | L
+Lady Madonna | The Beatles | m | 1968 | L
+Revolution | The Beatles | m | 1968 | L
+Back in the U.S.S.R. | The Beatles | m | 1968 | L | Back in the USSR
+Ob-La-Di, Ob-La-Da | The Beatles | e | 1968 | L
+Blackbird | The Beatles | m | 1968 | L
+While My Guitar Gently Weeps | The Beatles | h | 1968 | L
+Get Back | The Beatles | e | 1969 | L
+Come Together | The Beatles | e | 1969 | L
+Here Comes the Sun | The Beatles | h | 1969 | L
+Something | The Beatles | h | 1969 | L
+Octopus's Garden | The Beatles | e | 1969 | L
+The Long and Winding Road | The Beatles | m | 1970 | L
+Don't Let Me Down | The Beatles | m | 1969 | L
+I Saw Her Standing There | The Beatles | m | 1963 | L
+Love Me Do | The Beatles | e | 1962 | L
+Please Please Me | The Beatles | m | 1963 | L
+From Me to You | The Beatles | m | 1963 | L
+With a Little Help from My Friends | The Beatles | h | 1967 | L
+Lucy in the Sky with Diamonds | The Beatles | m | 1967 | L
+A Day in the Life | The Beatles | h | 1967 | L
+When I'm Sixty-Four | The Beatles | e | 1967 | L | When I'm 64
+Michelle | The Beatles | m | 1965 | L
+Norwegian Wood | The Beatles | m | 1965 | L | Norwegian Wood This Bird Has Flown
+In My Life | The Beatles | m | 1965 | L
+I Feel Fine | The Beatles | m | 1964 | L
+Eight Days a Week | The Beatles | m | 1964 | L
+And I Love Her | The Beatles | m | 1964 | LA
+All My Loving | The Beatles | m | 1963 | L
+Drive My Car | The Beatles | m | 1965 | L
+Got to Get You into My Life | The Beatles | m | 1966 | LA
+Taxman | The Beatles | m | 1966 | LA
+Here, There and Everywhere | The Beatles | h | 1966 | LA
+The Fool on the Hill | The Beatles | m | 1967 | LA | Fool on the Hill
+I Am the Walrus | The Beatles | h | 1967 | L
+Magical Mystery Tour | The Beatles | m | 1967 | L
+Helter Skelter | The Beatles | m | 1968 | L
+Birthday | The Beatles | e | 1968 | L
+Dear Prudence | The Beatles | m | 1968 | LA
+The Ballad of John and Yoko | The Beatles | m | 1969 | LA
+Now and Then | The Beatles | m | 2023 | L
+Girl | The Beatles | m | 1965 | LA
+Nowhere Man | The Beatles | m | 1965 | LA
+Sgt. Pepper's Lonely Hearts Club Band | The Beatles | m | 1967 | LA | Sergeant Pepper
+Good Day Sunshine | The Beatles | e | 1966 | LA
+Across the Universe | The Beatles | m | 1970 | LA
+Maxwell's Silver Hammer | The Beatles | e | 1969 | LA
+Golden Slumbers | The Beatles | m | 1969 | LA
+Because | The Beatles | h | 1969 | LA
+Rain | The Beatles | m | 1966 | LA
+Hey Bulldog | The Beatles | m | 1969 | LA
+I Will | The Beatles | m | 1968 | LA
+Mother Nature's Son | The Beatles | m | 1968 | LA
+Two of Us | The Beatles | m | 1970 | LA
+You've Got to Hide Your Love Away | The Beatles | m | 1965 | LA
+Free as a Bird | The Beatles | h | 1995 | LA
+# --- David Bowie
+Space Oddity | David Bowie | m | 1969 | O
+Starman | David Bowie | m | 1972 | O
+Life on Mars? | David Bowie | h | 1971 | O | Life on Mars
+Changes | David Bowie | m | 1971 | O
+Ziggy Stardust | David Bowie | m | 1972 | O
+The Jean Genie | David Bowie | e | 1972 | O | Jean Genie
+Rebel Rebel | David Bowie | e | 1974 | O
+Diamond Dogs | David Bowie | m | 1974 | OA
+Young Americans | David Bowie | m | 1975 | O
+Fame | David Bowie | m | 1975 | O
+Golden Years | David Bowie | m | 1975 | OA
+Ashes to Ashes | David Bowie | m | 1980 | O
+Fashion | David Bowie | m | 1980 | O
+Let's Dance | David Bowie | e | 1983 | O
+China Girl | David Bowie | m | 1983 | O
+Modern Love | David Bowie | m | 1983 | O
+Under Pressure | Queen and David Bowie | e | 1981 | O
+"Heroes" | David Bowie | h | 1977 | O | Heroes
+Sound and Vision | David Bowie | m | 1977 | OA
+Boys Keep Swinging | David Bowie | m | 1979 | OA
+Blue Jean | David Bowie | m | 1984 | O
+Absolute Beginners | David Bowie | m | 1986 | O
+Dancing in the Street | David Bowie and Mick Jagger | m | 1985 | O
+Oh! You Pretty Things | David Bowie | m | 1971 | OA
+Queen Bitch | David Bowie | m | 1971 | OA
+Suffragette City | David Bowie | e | 1972 | O
+Moonage Daydream | David Bowie | m | 1972 | OA
+Five Years | David Bowie | h | 1972 | OA
+Rock 'n' Roll Suicide | David Bowie | m | 1972 | OA
+Drive-In Saturday | David Bowie | m | 1973 | OA
+Station to Station | David Bowie | h | 1976 | OA
+TVC 15 | David Bowie | m | 1976 | OA | TVC15
+Be My Wife | David Bowie | m | 1977 | OA
+Where Are We Now? | David Bowie | h | 2013 | OA | Where Are We Now
+Lazarus | David Bowie | h | 2016 | OA
+Blackstar | David Bowie | h | 2016 | OA
+Loving the Alien | David Bowie | m | 1985 | OA
+Day-In Day-Out | David Bowie | m | 1987 | OA
+The Man Who Sold the World | David Bowie | h | 1970 | O | Man Who Sold the World
+Kooks | David Bowie | m | 1971 | OA
+Little Wonder | David Bowie | m | 1997 | OA
+I'm Afraid of Americans | David Bowie | m | 1997 | OA
+Hallo Spaceboy | David Bowie | m | 1996 | OA
+Cat People (Putting Out Fire) | David Bowie | m | 1982 | OA | Cat People
+This Is Not America | David Bowie | m | 1985 | OA
+John, I'm Only Dancing | David Bowie | m | 1972 | OA
+Knock on Wood | David Bowie | m | 1974 | OA
+# --- Lady Gaga
+Just Dance | Lady Gaga | e | 2008 | G
+Poker Face | Lady Gaga | e | 2008 | G
+LoveGame | Lady Gaga | m | 2009 | G | Love Game
+Paparazzi | Lady Gaga | m | 2009 | G
+Bad Romance | Lady Gaga | h | 2009 | G
+Telephone | Lady Gaga | m | 2010 | G
+Alejandro | Lady Gaga | m | 2010 | G
+Born This Way | Lady Gaga | m | 2011 | G
+Judas | Lady Gaga | m | 2011 | G
+The Edge of Glory | Lady Gaga | m | 2011 | G | Edge of Glory
+You and I | Lady Gaga | m | 2011 | GA
+Marry the Night | Lady Gaga | m | 2011 | G
+Applause | Lady Gaga | m | 2013 | G
+Do What U Want | Lady Gaga | m | 2013 | GA
+G.U.Y. | Lady Gaga | m | 2014 | GA | GUY
+Million Reasons | Lady Gaga | m | 2016 | G
+Perfect Illusion | Lady Gaga | m | 2016 | GA
+Shallow | Lady Gaga and Bradley Cooper | m | 2018 | G
+Always Remember Us This Way | Lady Gaga | h | 2018 | GA
+I'll Never Love Again | Lady Gaga | h | 2018 | GA
+Stupid Love | Lady Gaga | m | 2020 | G
+Rain on Me | Lady Gaga and Ariana Grande | m | 2020 | G
+911 | Lady Gaga | m | 2020 | GA
+Hold My Hand | Lady Gaga | m | 2022 | G
+Bloody Mary | Lady Gaga | m | 2011 | GH
+Die With a Smile | Lady Gaga and Bruno Mars | m | 2024 | G
+Disease | Lady Gaga | m | 2024 | GA
+Abracadabra | Lady Gaga | m | 2025 | G
+Dance in the Dark | Lady Gaga | m | 2009 | GA
+Speechless | Lady Gaga | h | 2009 | GA
+Eh, Eh (Nothing Else I Can Say) | Lady Gaga | m | 2009 | GA | Eh Eh
+Joanne | Lady Gaga | m | 2016 | GA
+Gypsy | Lady Gaga | m | 2013 | GA
+# --- Talking Heads
+Psycho Killer | Talking Heads | m | 1977 | K
+Take Me to the River | Talking Heads | m | 1978 | K
+Once in a Lifetime | Talking Heads | m | 1980 | K
+Burning Down the House | Talking Heads | e | 1983 | K
+Road to Nowhere | Talking Heads | e | 1985 | K
+And She Was | Talking Heads | m | 1985 | K
+This Must Be the Place (Naive Melody) | Talking Heads | m | 1983 | K | This Must Be the Place;Naive Melody
+Life During Wartime | Talking Heads | m | 1979 | K
+Wild Wild Life | Talking Heads | m | 1986 | K
+Girlfriend Is Better | Talking Heads | m | 1983 | KA
+Slippery People | Talking Heads | m | 1983 | KA
+Houses in Motion | Talking Heads | m | 1980 | KA
+Crosseyed and Painless | Talking Heads | m | 1980 | KA
+I Zimbra | Talking Heads | h | 1979 | KA
+Heaven | Talking Heads | h | 1979 | KA
+Found a Job | Talking Heads | m | 1978 | KA
+Cities | Talking Heads | m | 1979 | KA
+Stay Up Late | Talking Heads | m | 1985 | KA
+Love Building on Fire | Talking Heads | m | 1977 | KA | Love Goes to Building on Fire
+Uh-Oh, Love Comes to Town | Talking Heads | m | 1977 | KA
+Pulled Up | Talking Heads | m | 1977 | KA
+(Nothing But) Flowers | Talking Heads | m | 1988 | KA | Nothing But Flowers
+Blind | Talking Heads | m | 1988 | KA
+Memories Can't Wait | Talking Heads | h | 1979 | KA
+Air | Talking Heads | h | 1979 | KA
+Mind | Talking Heads | m | 1979 | KA
+Don't Worry About the Government | Talking Heads | m | 1977 | KA
+Warning Sign | Talking Heads | m | 1978 | KA
+Artists Only | Talking Heads | m | 1978 | KA
+The Great Curve | Talking Heads | h | 1980 | KA
+Born Under Punches | Talking Heads | m | 1980 | KA
+Sax and Violins | Talking Heads | m | 1991 | KA
+Lifetime Piling Up | Talking Heads | m | 1992 | KA

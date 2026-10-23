@@ -5,6 +5,7 @@
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   var ws = null, connected = false, session = null, rejoining = false, pendingName = "";
+  var gameList = [], adminLogin = false, pickerOpen = false, pickerTab = "All", keepPickerScroll = true;
   var st = null, offset = 0, lastKey = null, wakeLock = null, prevStage = null, prevTurnId = null;
 
   try { session = JSON.parse(localStorage.getItem("whistle.session") || "null"); } catch (e) { session = null; }
@@ -47,6 +48,7 @@
     ws = new WebSocket(proto + "://" + location.host + "/ws");
     ws.onopen = function () {
       connected = true; setBanner("");
+      send({ t: "listRooms" });
       if (session) {
         rejoining = true;
         send({ t: "join", code: session.code, playerId: session.playerId, name: session.name });
@@ -72,9 +74,12 @@
       if (T && T.stage === "whistling" && (prevStage !== "whistling" || prevTurnId !== T.id)) { mic.lastSent = ""; }
       prevStage = T ? T.stage : null; prevTurnId = T ? T.id : null;
       render();
+    } else if (m.t === "rooms") {
+      gameList = m.rooms || [];
+      if (!st && !adminLogin && lastKey === "home") { var v = viewHome(); if (v.update) { v.update(); } }
     } else if (m.t === "joined") {
       session = { code: m.code, playerId: m.playerId, name: pendingName || (session && session.name) || "" };
-      saveSession(); rejoining = false; keepAwake();
+      saveSession(); rejoining = false; keepAwake(); adminLogin = false;
     } else if (m.t === "error") {
       if (rejoining && (m.code === "room_not_found" || m.code === "game_started")) {
         session = null; saveSession(); st = null; rejoining = false; lastKey = null;
@@ -212,8 +217,23 @@
     return '<div class="board">' + html + "</div>";
   }
 
+  function gamesHtml() {
+    if (!gameList.length) { return '<p class="note center">No games open yet. Ask someone to host one, then it will show up here.</p>'; }
+    return gameList.map(function (g) {
+      return '<button class="gamebtn" data-code="' + esc(g.code) + '"><span class="gh">' + esc(g.host) + "'s game</span>" +
+        '<span class="gs">' + g.players + (g.players === 1 ? " player" : " players") + (g.inProgress ? ", in progress" : ", waiting to start") + "</span></button>";
+    }).join("");
+  }
+
   function viewHome() {
     var name = ""; try { name = localStorage.getItem("whistle.name") || ""; } catch (e) {}
+    function nameVal() {
+      var n = $("#name").value.replace(/\s+/g, " ").trim();
+      if (!n) { toast("Enter your name first."); $("#name").focus(); return ""; }
+      try { localStorage.setItem("whistle.name", n); } catch (e) {}
+      pendingName = n;
+      return n;
+    }
     return {
       key: "home",
       html:
@@ -224,31 +244,70 @@
             '<label class="lbl" for="name">Your name</label>' +
             '<input id="name" class="input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Name" value="' + esc(name) + '">' +
             '<button id="hostBtn" class="btn">Host a game</button>' +
-            '<div class="or">or join a room</div>' +
-            '<input id="codeIn" class="input code-in" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="CODE">' +
-            '<button id="joinBtn" class="btn teal">Join room</button>' +
           "</div>" +
+          '<div class="card stack"><div class="top">Join a game</div><div class="stack" id="games">' + gamesHtml() + "</div></div>" +
           '<button id="helpBtn" class="link">How to play</button>' +
+          '<button id="adminDot" class="admindot" aria-label="Admin"></button>' +
         "</div>",
-      bind: function () {
-        function nameVal() {
-          var n = $("#name").value.replace(/\s+/g, " ").trim();
-          if (!n) { toast("Enter your name first."); $("#name").focus(); return ""; }
-          try { localStorage.setItem("whistle.name", n); } catch (e) {}
-          pendingName = n;
-          return n;
+      update: function () {
+        var g = $("#games"); if (!g) { return; }
+        g.innerHTML = gamesHtml();
+        var bs = g.querySelectorAll(".gamebtn");
+        for (var i = 0; i < bs.length; i++) {
+          bs[i].onclick = function () { var n = nameVal(); if (n) { send({ t: "join", code: this.getAttribute("data-code"), name: n }); } };
         }
+      },
+      bind: function () {
         $("#hostBtn").onclick = function () { var n = nameVal(); if (n) { send({ t: "create", name: n }); } };
-        $("#joinBtn").onclick = function () {
-          var n = nameVal(); if (!n) { return; }
-          var c = $("#codeIn").value.trim();
-          if (c.length < 4) { toast("Enter the 4 letter room code."); return; }
-          send({ t: "join", code: c, name: n });
-        };
-        $("#codeIn").oninput = function () { this.value = this.value.toUpperCase().replace(/[^A-Z]/g, ""); };
         $("#helpBtn").onclick = showHelp;
+        $("#adminDot").onclick = function () { adminLogin = true; render(); };
       }
     };
+  }
+
+  function viewAdminLogin() {
+    return {
+      key: "adminlogin",
+      html:
+        '<div class="screen">' +
+          '<div class="logo small">Admin</div>' +
+          '<p class="tag">Test mode. Play a whole game on your own.</p>' +
+          '<div class="card stack">' +
+            '<label class="lbl" for="apw">Password</label>' +
+            '<input id="apw" class="input" type="password" autocomplete="off" placeholder="Password">' +
+            '<button id="aGo" class="btn">Enter admin mode</button>' +
+          "</div>" +
+          '<button id="aBack" class="btn ghost">Back</button>' +
+        "</div>",
+      bind: function () {
+        var go = function () { send({ t: "createAdmin", password: $("#apw").value }); };
+        $("#aGo").onclick = go;
+        $("#apw").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
+        $("#aBack").onclick = function () { adminLogin = false; render(); };
+      }
+    };
+  }
+
+  // Strip along the top while in admin mode: pick which test player to view as.
+  var adminHtmlCache = "";
+  function refreshAdmin() {
+    var bar = document.getElementById("adminBar");
+    if (!st || !st.admin) {
+      if (bar) { bar.parentNode.removeChild(bar); }
+      document.body.classList.remove("admin"); adminHtmlCache = ""; return;
+    }
+    var a = st.admin;
+    var html = '<span class="atag">ADMIN</span><div class="achips">' + a.players.map(function (p) {
+      return '<button class="achip' + (p.id === a.as ? " on" : "") + '" data-id="' + esc(p.id) + '">' + esc(p.name) + "</button>";
+    }).join("") + "</div>" + (a.canAdd ? '<button class="aact" id="aAdd">+ Player</button>' : "") + '<button class="aact" id="aExit">Exit</button>';
+    document.body.classList.add("admin");
+    if (!bar) { bar = document.createElement("div"); bar.id = "adminBar"; document.body.appendChild(bar); adminHtmlCache = ""; }
+    if (html === adminHtmlCache) { return; }
+    adminHtmlCache = html; bar.innerHTML = html;
+    var cs = bar.querySelectorAll(".achip");
+    for (var i = 0; i < cs.length; i++) { cs[i].onclick = function () { send({ t: "adminAs", id: this.getAttribute("data-id") }); }; }
+    var add = document.getElementById("aAdd"); if (add) { add.onclick = function () { send({ t: "adminAddBot" }); }; }
+    document.getElementById("aExit").onclick = function () { adminHtmlCache = ""; pickerOpen = false; leaveRoom(); };
   }
 
   var LEN_LABEL = { 30000: "30s", 60000: "1 min", 90000: "1 min 30", 120000: "2 min" };
@@ -260,27 +319,77 @@
     }).join("") + "</div>";
   }
 
-  var TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 10 18.5 20 6"/></svg>';
+  // One bold icon per pack, drawn in the same navy-outline style as the rest of the app.
+  var IC = 'viewBox="0 0 64 64" fill="none" stroke="#1b3447" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"';
+  var PACK_ICON = {
+    bangers: '<svg ' + IC + '><polygon points="32,5 39,24 59,24 43,36 49,57 32,45 15,57 21,36 5,24 25,24" fill="#fff"/></svg>',
+    sixties: '<svg ' + IC + '><circle cx="32" cy="32" r="24" fill="#fff"/><path d="M32 8V56M32 32L15 49M32 32L49 49"/></svg>',
+    seventies: '<svg ' + IC + '><path d="M32 4V12"/><circle cx="32" cy="36" r="22" fill="#fff"/><path d="M14 28H50M10 36H54M14 44H50M32 14V58"/><ellipse cx="32" cy="36" rx="10" ry="22"/></svg>',
+    eighties: '<svg ' + IC + '><rect x="6" y="14" width="52" height="36" rx="5" fill="#fff"/><circle cx="22" cy="30" r="6"/><circle cx="42" cy="30" r="6"/><path d="M17 50L21 41H43L47 50M22 30H42"/></svg>',
+    nineties: '<svg ' + IC + '><circle cx="32" cy="32" r="25" fill="#fff"/><circle cx="32" cy="32" r="8"/><circle cx="32" cy="32" r="2" fill="#1b3447"/><path d="M16 20A19 19 0 0 1 26 13"/></svg>',
+    noughties: '<svg ' + IC + '><rect x="16" y="5" width="32" height="54" rx="7" fill="#fff"/><rect x="21" y="11" width="22" height="16" rx="3"/><circle cx="32" cy="43" r="10"/><circle cx="32" cy="43" r="3" fill="#1b3447"/></svg>',
+    tens: '<svg ' + IC + '><rect x="17" y="5" width="30" height="54" rx="7" fill="#fff"/><path d="M32 40C25 34 24 27 29 26C31 25.5 32 27 32 28C32 27 33 25.5 35 26C40 27 39 34 32 40Z" fill="#fff"/><path d="M27 53H37"/></svg>',
+    today: '<svg ' + IC + '><path d="M30 5Q33 29 57 32Q33 35 30 59Q27 35 3 32Q27 29 30 5Z" fill="#fff"/><path d="M50 8V18M45 13H55"/></svg>',
+    rock: '<svg ' + IC + '><polygon points="37,4 14,36 28,36 24,60 50,26 35,26" fill="#fff"/></svg>',
+    party: '<svg ' + IC + '><path d="M8 56L22 22L42 42Z" fill="#fff"/><path d="M30 18Q34 8 42 12M46 28Q56 26 58 34M40 8V4M52 18L57 14"/><circle cx="48" cy="46" r="2"/><circle cx="26" cy="9" r="2"/></svg>',
+    soul: '<svg ' + IC + '><circle cx="32" cy="32" r="25" fill="#1b3447"/><circle cx="32" cy="32" r="16" stroke="#fff" stroke-width="1.5"/><circle cx="32" cy="32" r="8" fill="#fff"/><circle cx="32" cy="32" r="2" fill="#1b3447"/></svg>',
+    tv: '<svg ' + IC + '><path d="M24 17L16 6M40 17L48 6M18 51L16 58M46 51L48 58"/><rect x="6" y="17" width="52" height="34" rx="6" fill="#fff"/><rect x="12" y="23" width="30" height="22" rx="4"/><circle cx="50" cy="28" r="2.5"/><circle cx="50" cy="38" r="2.5"/></svg>',
+    film: '<svg ' + IC + '><rect x="8" y="26" width="48" height="30" rx="3" fill="#fff"/><path d="M8 24L56 12L58 20L10 32Z" fill="#fff"/><path d="M20 21L26 29M32 18L38 26M44 15L50 23"/><path d="M22 40H42"/></svg>',
+    disney: '<svg ' + IC + '><rect x="6" y="26" width="12" height="30" fill="#fff"/><rect x="46" y="26" width="12" height="30" fill="#fff"/><rect x="16" y="32" width="32" height="24" fill="#fff"/><rect x="25" y="14" width="14" height="18" fill="#fff"/><path d="M25 14L32 4L39 14M6 26L12 16L18 26M46 26L52 16L58 26M27 56V48A5 5 0 0 1 37 48V56"/></svg>',
+    halloween: '<svg ' + IC + '><ellipse cx="32" cy="37" rx="24" ry="19" fill="#fff"/><path d="M32 18Q24 37 32 56M32 18Q40 37 32 56"/><path d="M32 18Q31 11 37 7"/><path d="M20 34L27 34L23.5 27ZM37 34L44 34L40.5 27ZM21 44L27 48L32 43L37 48L43 44"/></svg>',
+    xmas: '<svg ' + IC + '><path d="M32 5L46 24H38L52 43H12L26 24H18Z" fill="#fff"/><rect x="27" y="43" width="10" height="12" fill="#fff"/><circle cx="26" cy="36" r="2.5"/><circle cx="38" cy="31" r="2.5"/><circle cx="32" cy="17" r="2"/></svg>',
+    beatles: '<svg ' + IC + '><circle cx="32" cy="16" r="7" fill="#fff"/><ellipse cx="32" cy="40" rx="15" ry="19" fill="#fff"/><path d="M32 23V59M28 10L23 3M36 10L41 3M17 30L6 25M17 41L5 41M18 51L8 58M47 30L58 25M47 41L59 41M46 51L56 58"/></svg>',
+    bowie: '<svg ' + IC + '><circle cx="32" cy="32" r="14" fill="#fff"/><ellipse cx="32" cy="32" rx="28" ry="8" transform="rotate(-20 32 32)"/><path d="M12 8V18M7 13H17M52 46V56M47 51H57"/></svg>',
+    gaga: '<svg ' + IC + '><polygon points="32,58 7,26 17,9 47,9 57,26" fill="#fff"/><path d="M7 26H57M17 9L26 26L32 58L38 26L47 9M26 26L32 9L38 26"/></svg>',
+    talkingheads: '<svg ' + IC + '><path d="M10 6H38A8 8 0 0 1 46 14V24A8 8 0 0 1 38 32H24L14 40V32H10A8 8 0 0 1 2 24V14A8 8 0 0 1 10 6Z" fill="#fff"/><path d="M28 34H54A8 8 0 0 1 62 42V50A8 8 0 0 1 54 58H50V64L42 58H28A8 8 0 0 1 20 50V42A8 8 0 0 1 28 34Z" fill="#fff" transform="translate(-4 -6)"/></svg>'
+  };
 
-  function packsHtml(s, isHost) {
-    var all = (s.packs || []).length === (s.selectedPacks || []).length;
-    var cards = (s.packs || []).map(function (p) {
-      var on = s.selectedPacks.indexOf(p.id) !== -1;
-      return '<button class="pack' + (on ? " on" : "") + (isHost ? "" : " ro") + '" data-id="' + p.id + '" aria-pressed="' + on +
-        '" style="background:' + p.colour + ";color:" + p.ink + '">' +
-        '<span class="tick">' + TICK_SVG + "</span>" +
-        '<span class="pn">' + esc(p.name) + '</span><span class="pb">' + esc(p.blurb) + '</span>' +
-        '<span class="pc">' + p.count + " songs</span></button>";
-    }).join("");
-    var need = s.rounds * s.players.length + 5;
-    var short = s.songsInPlay < need;
+  var TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 10 18.5 20 6"/></svg>';
+  var GROUPS = ["Start here", "Decades", "Genres", "Screen", "Seasonal", "Artists"];
+  var TABS = ["All", "Decades", "Genres", "Screen", "Seasonal", "Artists"];
+
+  function packCard(p, on, ro) {
+    return '<button class="pack' + (on ? " on" : "") + (ro ? " ro" : "") + (p.group === "Start here" ? " hero" : "") + '" data-id="' + p.id + '" aria-pressed="' + on +
+      '" style="background:' + p.colour + ";color:" + p.ink + '">' +
+      '<span class="tick">' + TICK_SVG + "</span>" +
+      '<span class="pico">' + (PACK_ICON[p.id] || "") + "</span>" +
+      '<span class="pn">' + esc(p.name) + '</span><span class="pb">' + esc(p.blurb) + '</span>' +
+      '<span class="pc">' + p.count + " songs</span></button>";
+  }
+
+  // The lobby shows a short summary of the chosen packs. The full picker opens on top.
+  function packsSummaryHtml(s, isHost) {
+    var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
+    var chips = on.slice(0, 5).map(function (p) {
+      return '<span class="pchip" style="background:' + p.colour + ";color:" + p.ink + '"><span class="pci">' + (PACK_ICON[p.id] || "") + "</span>" + esc(p.name) + "</span>";
+    }).join("") + (on.length > 5 ? '<span class="pchip more">+' + (on.length - 5) + " more</span>" : "");
+    var need = s.rounds * s.players.length + 5, short = s.songsInPlay < need;
     return '<div class="card stack"><div class="packhead"><div class="top">Song packs</div>' +
-      (isHost ? '<button class="packall" id="packAll">' + (all ? "Just Bangers" : "Select all") + "</button>" : "") + "</div>" +
-      '<div class="packs" id="packs">' + cards + "</div>" +
-      '<div class="packnote' + (short ? " bad" : "") + '" id="packNote">' +
+      '<button class="packall" id="openPacks">' + (isHost ? "Choose packs" : "See packs") + "</button></div>" +
+      '<div class="pchips">' + chips + "</div>" +
+      '<div class="packnote' + (short ? " bad" : "") + '">' +
         (short ? "Only " + s.songsInPlay + " songs: tick more packs or lower the rounds"
-               : s.songsInPlay + " songs in play. No song is played twice.") + "</div>" +
-      (isHost ? "" : '<p class="note center">The host picks the packs</p>') + "</div>";
+               : s.songsInPlay + " songs in play. No song is played twice.") + "</div></div>";
+  }
+
+  function pickerHtml(s, isHost) {
+    var all = s.packs.length === s.selectedPacks.length;
+    var body = GROUPS.map(function (g) {
+      if (pickerTab !== "All" && g !== pickerTab) { return ""; }
+      var ps = s.packs.filter(function (p) { return p.group === g; });
+      if (!ps.length) { return ""; }
+      return '<div class="pgroup"><div class="top">' + esc(g === "Start here" ? "Start here" : g) + '</div><div class="packs' + (g === "Start here" ? " one" : "") + '">' +
+        ps.map(function (p) { return packCard(p, s.selectedPacks.indexOf(p.id) !== -1, !isHost); }).join("") + "</div></div>";
+    }).join("");
+    var tabs = TABS.map(function (t) { return '<button class="ptab' + (t === pickerTab ? " on" : "") + '" data-tab="' + t + '">' + t + "</button>"; }).join("");
+    return '<div class="picker" id="picker"><div class="pwrap">' +
+      '<div class="phead"><div class="ptitle">Song packs</div>' +
+        (isHost ? '<button class="packall" id="packAll">' + (all ? "Just Bangers" : "Select all") + "</button>" : "") + "</div>" +
+      '<div class="ptabs">' + tabs + "</div>" +
+      '<div class="pbody">' + body + (isHost ? "" : '<p class="note center">The host picks the packs</p>') + "</div>" +
+      '<div class="pfoot"><div class="pcount"><b>' + s.selectedPacks.length + "</b> of " + s.packs.length + " packs, <b>" + s.songsInPlay + "</b> songs</div>" +
+        '<button class="btn" id="pkDone">Done</button></div>' +
+    "</div></div>";
   }
 
   function viewLobby(s) {
@@ -295,12 +404,13 @@
       key: "lobby",
       html:
         '<div class="screen">' +
-          '<div class="top">Room code</div>' +
-          '<div class="card codecard"><div class="code" id="roomCode">' + esc(s.code) + "</div>" +
-            '<div class="note">Everyone joins at this web address with this code</div></div>' +
+          '<div class="top">Game lobby</div>' +
+          '<div class="card codecard"><div class="gname">' + esc(pname(s, s.hostId)) + "'s game</div>" +
+            '<span id="roomCode" hidden>' + esc(s.code) + "</span>" +
+            '<div class="note">Everyone else opens this web page and taps your game to join</div></div>' +
           '<div class="top">Players (' + s.players.length + " of " + s.maxPlayers + ")</div>" +
           '<div class="plist">' + list + "</div>" +
-          packsHtml(s, isHost) +
+          packsSummaryHtml(s, isHost) +
           '<div class="card stack">' +
             '<div class="top">Rounds</div>' +
             (isHost
@@ -316,32 +426,44 @@
               (s.players.length < s.minPlayers ? '<p class="note center">Waiting for at least ' + s.minPlayers + " players</p>" : "")
             : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + " to start...</p>") +
           '<button id="helpBtn" class="btn ghost">How to play</button>' +
-          '<button id="leaveBtn" class="link">Leave room</button>' +
+          '<button id="leaveBtn" class="link">Leave game</button>' +
+          (pickerOpen ? pickerHtml(s, isHost) : "") +
         "</div>",
       bind: function () {
         $("#helpBtn").onclick = showHelp;
+        $("#openPacks").onclick = function () { pickerOpen = true; pickerTab = "All"; keepPickerScroll = false; render(); };
+        if (pickerOpen) {
+          $("#pkDone").onclick = function () { pickerOpen = false; render(); };
+          var tabEls = document.querySelectorAll(".ptab");
+          for (var t = 0; t < tabEls.length; t++) {
+            tabEls[t].onclick = function () { pickerTab = this.getAttribute("data-tab"); keepPickerScroll = false; render(); };
+          }
+          if (isHost) {
+            var sel = s.selectedPacks.slice(), allIds = s.packs.map(function (p) { return p.id; });
+            var sendPacks = function () { send({ t: "setPacks", packs: sel }); };
+            var cardsEl = document.querySelectorAll(".pack");
+            for (var c = 0; c < cardsEl.length; c++) {
+              cardsEl[c].onclick = function () {
+                var id = this.getAttribute("data-id"), at = sel.indexOf(id);
+                if (at === -1) { sel.push(id); }
+                else if (sel.length > 1) { sel.splice(at, 1); }
+                else { toast("Keep at least one pack ticked."); return; }
+                this.classList.toggle("on", sel.indexOf(id) !== -1);
+                this.setAttribute("aria-pressed", sel.indexOf(id) !== -1);
+                sendPacks();
+              };
+            }
+            $("#packAll").onclick = function () {
+              if (sel.length === allIds.length) { sel = [allIds[0]]; } else { sel = allIds.slice(); }
+              sendPacks();
+            };
+          }
+        }
         if (isHost) {
           var want = s.rounds;
           $("#minus").onclick = function () { want = Math.max(1, want - 1); send({ t: "setRounds", rounds: want }); };
           $("#plus").onclick = function () { want = Math.min(10, want + 1); send({ t: "setRounds", rounds: want }); };
           $("#startBtn").onclick = function () { send({ t: "start" }); };
-          var sel = s.selectedPacks.slice(), allIds = s.packs.map(function (p) { return p.id; });
-          var sendPacks = function () { send({ t: "setPacks", packs: sel }); };
-          var cardsEl = document.querySelectorAll(".pack");
-          for (var c = 0; c < cardsEl.length; c++) {
-            cardsEl[c].onclick = function () {
-              var id = this.getAttribute("data-id"), at = sel.indexOf(id);
-              if (at === -1) { sel.push(id); }
-              else if (sel.length > 1) { sel.splice(at, 1); }
-              else { toast("Keep at least one pack ticked."); return; }
-              this.classList.toggle("on", sel.indexOf(id) !== -1);
-              sendPacks();
-            };
-          }
-          $("#packAll").onclick = function () {
-            if (sel.length === allIds.length) { sel = [allIds[0]]; } else { sel = allIds.slice(); }
-            sendPacks();
-          };
           var segs = document.querySelectorAll(".segb");
           for (var i = 0; i < segs.length; i++) {
             segs[i].onclick = function () { send({ t: "setLimit", limitMs: parseInt(this.getAttribute("data-ms"), 10) }); };
@@ -611,7 +733,10 @@
   // ---------------------------------------------------------------- render
   function render() {
     var view;
-    if (!st) { view = viewHome(); }
+    if (st && st.phase !== "lobby") { pickerOpen = false; }
+    var pb = document.querySelector(".pbody"), pTop = pb ? pb.scrollTop : 0;
+    if (!st && adminLogin) { view = viewAdminLogin(); }
+    else if (!st) { view = viewHome(); }
     else if (st.phase === "lobby") { view = viewLobby(st); }
     else if (st.phase === "turn" && st.turn) { view = viewTurn(st); }
     else { view = viewOver(st); }
@@ -623,8 +748,13 @@
       if (view.bind) { view.bind(); }
       if (view.update) { view.update(); }
     }
+    var nb = document.querySelector(".pbody");
+    if (nb && pTop && keepPickerScroll) { nb.scrollTop = pTop; }
+    keepPickerScroll = true;
+    document.body.classList.toggle("noscroll", pickerOpen);
     refreshMic();
     refreshTop();
+    refreshAdmin();
   }
 
   // The clock and countdown run locally between server messages.
@@ -681,6 +811,7 @@
   // ------------------------------------------------------------------ boot
   connect();
   setInterval(function () { send({ t: "ping" }); }, 20000);
+  setInterval(function () { if (!st && !adminLogin) { send({ t: "listRooms" }); } }, 3000);
   render();
   requestAnimationFrame(tick);
 })();

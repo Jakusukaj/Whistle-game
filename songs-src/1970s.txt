@@ -1,0 +1,205 @@
+Let It Be | The Beatles | e | 1970 | BR
+Bohemian Rhapsody | Queen | h | 1975 | BR
+We Will Rock You | Queen | e | 1977 | BPR
+We Are the Champions | Queen | m | 1977 | BPR
+Another One Bites the Dust | Queen | e | 1980 | PR
+Don't Stop Me Now | Queen | h | 1979 | BR
+Somebody to Love | Queen | h | 1976 | R
+Killer Queen | Queen | m | 1974 | R
+Under Pressure | Queen and David Bowie | e | 1981 | R
+Dancing Queen | ABBA | m | 1976 | BP
+Mamma Mia | ABBA | e | 1975 | PD
+Waterloo | ABBA | e | 1974 | P
+Money Money Money | ABBA | h | 1976 | P
+Take a Chance on Me | ABBA | m | 1977 | P
+Fernando | ABBA | m | 1976 | 
+Super Trouper | ABBA | m | 1980 | P
+Gimme! Gimme! Gimme! | ABBA | m | 1979 | P | Gimme Gimme Gimme
+Knowing Me Knowing You | ABBA | m | 1976 | 
+SOS | ABBA | m | 1975 | 
+Chiquitita | ABBA | m | 1979 | 
+Hotel California | Eagles | h | 1976 | BR
+Take It Easy | Eagles | m | 1972 | R
+Desperado | Eagles | h | 1973 | 
+Stairway to Heaven | Led Zeppelin | h | 1971 | R
+Whole Lotta Love | Led Zeppelin | m | 1969 | R
+Kashmir | Led Zeppelin | m | 1975 | R
+Black Dog | Led Zeppelin | m | 1971 | R
+Smoke on the Water | Deep Purple | e | 1972 | BR
+Highway Star | Deep Purple | m | 1972 | R
+Paranoid | Black Sabbath | m | 1970 | R
+Iron Man | Black Sabbath | e | 1970 | R
+Layla | Derek and the Dominos | m | 1970 | R
+Free Bird | Lynyrd Skynyrd | m | 1973 | R
+Sweet Home Alabama | Lynyrd Skynyrd | e | 1974 | PR
+Go Your Own Way | Fleetwood Mac | m | 1977 | R
+Dreams | Fleetwood Mac | m | 1977 | 
+Don't Stop | Fleetwood Mac | m | 1977 | 
+Rhiannon | Fleetwood Mac | m | 1975 | 
+The Chain | Fleetwood Mac | m | 1977 | R
+Everywhere | Fleetwood Mac | m | 1987 | 
+Stayin' Alive | Bee Gees | m | 1977 | BP | Staying Alive
+Night Fever | Bee Gees | m | 1977 | P
+How Deep Is Your Love | Bee Gees | h | 1977 | 
+Tragedy | Bee Gees | h | 1979 | P
+Jive Talkin' | Bee Gees | m | 1975 | P
+I Will Survive | Gloria Gaynor | m | 1978 | BP
+Don't Leave Me This Way | Thelma Houston | h | 1976 | PS
+Le Freak | Chic | m | 1978 | P
+Good Times | Chic | m | 1979 | P
+Y.M.C.A. | Village People | e | 1978 | BP | YMCA
+In the Navy | Village People | e | 1979 | P
+Macho Man | Village People | e | 1978 | P
+Disco Inferno | The Trammps | m | 1976 | P
+Boogie Wonderland | Earth, Wind and Fire | m | 1979 | PS
+September | Earth, Wind and Fire | m | 1978 | BPS
+Let's Groove | Earth, Wind and Fire | m | 1981 | PS
+That's the Way (I Like It) | KC and the Sunshine Band | e | 1975 | P | That's the Way I Like It
+Get Down Tonight | KC and the Sunshine Band | m | 1975 | P
+Ain't No Stopping Us Now | McFadden and Whitehead | m | 1979 | PS
+Car Wash | Rose Royce | m | 1976 | PS
+Rapper's Delight | The Sugarhill Gang | m | 1979 | P
+Hot Stuff | Donna Summer | m | 1979 | P
+I Feel Love | Donna Summer | m | 1977 | P
+Love to Love You Baby | Donna Summer | m | 1975 | 
+Dancing in the Moonlight | King Harvest | e | 1972 | 
+Mighty Quinn | Manfred Mann | e | 1968 | 
+Rock the Boat | The Hues Corporation | m | 1974 | P
+Get Up Stand Up | Bob Marley | e | 1973 | 
+No Woman No Cry | Bob Marley | e | 1974 | 
+Three Little Birds | Bob Marley | e | 1977 | B
+One Love | Bob Marley | e | 1977 | 
+Redemption Song | Bob Marley | e | 1980 | 
+Is This Love | Bob Marley | m | 1978 | 
+Buffalo Soldier | Bob Marley | e | 1983 | 
+Superstition | Stevie Wonder | m | 1972 | S
+Sir Duke | Stevie Wonder | m | 1976 | PS
+I Wish | Stevie Wonder | m | 1976 | S
+Isn't She Lovely | Stevie Wonder | m | 1976 | S
+Signed Sealed Delivered I'm Yours | Stevie Wonder | m | 1970 | S
+Higher Ground | Stevie Wonder | m | 1973 | S
+Let's Get It On | Marvin Gaye | m | 1973 | S
+What's Going On | Marvin Gaye | m | 1971 | S
+Sexual Healing | Marvin Gaye | m | 1982 | S
+Ain't No Sunshine | Bill Withers | e | 1971 | S
+Lean on Me | Bill Withers | e | 1972 | BS
+Lovely Day | Bill Withers | m | 1977 | S
+Use Me | Bill Withers | m | 1972 | S
+Let's Stay Together | Al Green | m | 1971 | S
+Love and Happiness | Al Green | m | 1972 | S
+Can't Get Enough of Your Love, Babe | Barry White | h | 1974 | S | Can't Get Enough of Your Love
+You're the First, the Last, My Everything | Barry White | h | 1974 | S
+Papa Was a Rollin' Stone | The Temptations | m | 1972 | S
+Ain't Too Proud to Beg | The Temptations | m | 1966 | S
+ABC | The Jackson 5 | m | 1970 | S
+I'll Be There | The Jackson 5 | h | 1970 | S
+Easy | Commodores | m | 1977 | S
+Brick House | Commodores | m | 1977 | PS
+Three Times a Lady | Commodores | m | 1978 | S
+Lady Marmalade | Labelle | m | 1974 | PS
+Midnight Train to Georgia | Gladys Knight and the Pips | h | 1973 | S
+Love Train | The O'Jays | m | 1972 | PS
+Shaft | Isaac Hayes | m | 1971 | FS | Theme from Shaft
+Tiny Dancer | Elton John | m | 1971 | B
+Rocket Man | Elton John | m | 1972 | 
+Your Song | Elton John | h | 1970 | 
+Candle in the Wind | Elton John | h | 1973 | 
+Crocodile Rock | Elton John | m | 1972 | P
+Goodbye Yellow Brick Road | Elton John | m | 1973 | 
+Bennie and the Jets | Elton John | m | 1973 | 
+Philadelphia Freedom | Elton John | m | 1975 | 
+Don't Go Breaking My Heart | Elton John and Kiki Dee | m | 1976 | P
+Imagine | John Lennon | e | 1971 | B
+Instant Karma | John Lennon | m | 1970 | 
+Jealous Guy | John Lennon | m | 1971 | 
+Maggie May | Rod Stewart | m | 1971 | 
+Sailing | Rod Stewart | m | 1975 | 
+Da Ya Think I'm Sexy | Rod Stewart | m | 1978 | P
+You Wear It Well | Rod Stewart | m | 1972 | 
+Angie | The Rolling Stones | m | 1973 | 
+Brown Sugar | The Rolling Stones | m | 1971 | R
+Honky Tonk Women | The Rolling Stones | e | 1969 | R
+Miss You | The Rolling Stones | m | 1978 | 
+Life on Mars? | David Bowie | h | 1971 | | Life on Mars
+Space Oddity | David Bowie | h | 1969 | 
+Starman | David Bowie | m | 1972 | 
+Ziggy Stardust | David Bowie | m | 1972 | R
+Heroes | David Bowie | m | 1977 | R
+Rebel Rebel | David Bowie | m | 1974 | R
+Let's Dance | David Bowie | m | 1983 | P
+Fame | David Bowie | m | 1975 | 
+Ashes to Ashes | David Bowie | m | 1980 | 
+Changes | David Bowie | m | 1971 | 
+Metal Guru | T. Rex | m | 1972 | R
+Get It On | T. Rex | m | 1971 | R | Bang a Gong
+20th Century Boy | T. Rex | m | 1973 | R
+Cum On Feel the Noize | Slade | m | 1973 | PR
+Merry Xmas Everybody | Slade | m | 1973 | X
+Mama Weer All Crazee Now | Slade | m | 1972 | R
+Blockbuster | Sweet | m | 1973 | R
+Ballroom Blitz | Sweet | m | 1973 | PR
+Fox on the Run | Sweet | m | 1975 | R
+Mr Blue Sky | Electric Light Orchestra | m | 1977 | B | Mr. Blue Sky
+Livin' Thing | Electric Light Orchestra | m | 1976 | 
+Telephone Line | Electric Light Orchestra | m | 1976 | 
+Don't Bring Me Down | Electric Light Orchestra | m | 1979 | R
+Hold the Line | Toto | m | 1978 | R
+Rosanna | Toto | h | 1982 | R
+Africa | Toto | m | 1982 | BR
+Boogie Oogie Oogie | A Taste of Honey | m | 1978 | P
+Dancing in the Dark | Bruce Springsteen | h | 1984 | R
+Born to Run | Bruce Springsteen | m | 1975 | R
+Thunder Road | Bruce Springsteen | m | 1975 | R
+Jungleland | Bruce Springsteen | h | 1975 | R
+American Pie | Don McLean | m | 1971 | B
+Vincent | Don McLean | h | 1971 | 
+Piano Man | Billy Joel | m | 1973 | B
+Just the Way You Are | Billy Joel | h | 1977 | 
+Only the Good Die Young | Billy Joel | m | 1977 | R
+Scenes from an Italian Restaurant | Billy Joel | h | 1977 | 
+Uptown Girl | Billy Joel | m | 1983 | P
+We Didn't Start the Fire | Billy Joel | m | 1989 | 
+Take Me Home, Country Roads | John Denver | e | 1971 | BP | Country Roads
+Annie's Song | John Denver | h | 1974 | 
+Leaving on a Jet Plane | John Denver | e | 1969 | 
+Sunshine on My Shoulders | John Denver | e | 1971 | 
+Bridge over Troubled Water | Simon and Garfunkel | h | 1970 | 
+Cecilia | Simon and Garfunkel | e | 1970 | P
+Fifty Ways to Leave Your Lover | Paul Simon | m | 1975 | | 50 Ways to Leave Your Lover
+You Can Call Me Al | Paul Simon | m | 1986 | P
+Graceland | Paul Simon | m | 1986 | 
+Mother and Child Reunion | Paul Simon | m | 1972 | 
+Bad Moon Rising | Creedence Clearwater Revival | e | 1969 | R
+Proud Mary | Creedence Clearwater Revival | m | 1969 | R
+Fortunate Son | Creedence Clearwater Revival | m | 1969 | R
+Have You Ever Seen the Rain | Creedence Clearwater Revival | e | 1971 | R
+Lookin' Out My Back Door | Creedence Clearwater Revival | e | 1970 | 
+Down on the Corner | Creedence Clearwater Revival | e | 1969 | 
+Green River | Creedence Clearwater Revival | m | 1969 | 
+Long Train Runnin' | The Doobie Brothers | m | 1973 | R
+Listen to the Music | The Doobie Brothers | m | 1972 | R
+Black Water | The Doobie Brothers | m | 1974 | 
+What a Fool Believes | The Doobie Brothers | h | 1978 | 
+Lyin' Eyes | Eagles | m | 1975 | 
+Dust in the Wind | Kansas | m | 1977 | 
+Carry On Wayward Son | Kansas | m | 1976 | R
+More Than a Feeling | Boston | m | 1976 | R
+Peace of Mind | Boston | m | 1976 | R
+Baba O'Riley | The Who | m | 1971 | R
+Won't Get Fooled Again | The Who | m | 1971 | R
+Behind Blue Eyes | The Who | m | 1971 | R
+Sultans of Swing | Dire Straits | m | 1978 | R
+Money for Nothing | Dire Straits | m | 1985 | R
+Walk of Life | Dire Straits | e | 1985 | R
+Romeo and Juliet | Dire Straits | m | 1981 | 
+Brothers in Arms | Dire Straits | m | 1985 | 
+Roxanne | The Police | m | 1978 | R
+Message in a Bottle | The Police | m | 1979 | R
+Every Breath You Take | The Police | e | 1983 | BR
+Walking on the Moon | The Police | m | 1979 | 
+Can't Stand Losing You | The Police | m | 1978 | 
+Don't Stand So Close to Me | The Police | m | 1980 | R
+Every Little Thing She Does Is Magic | The Police | m | 1981 | 
+Wuthering Heights | Kate Bush | h | 1978 | 
+Running Up That Hill | Kate Bush | m | 1985 | 
+Wild Horses | The Rolling Stones | m | 1971 | 

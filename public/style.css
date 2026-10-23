@@ -187,21 +187,70 @@ body.danger .orb::before, body.danger .orb::after { border-color: #fff; }
 .segb.on { background: var(--navy); color: #fff; box-shadow: 3px 3px 0 var(--red); }
 .lastbanner { appearance: none; -webkit-appearance: none; width: 100%; margin-top: 8px; padding: 12px; border: 3px solid var(--navy); border-radius: 12px; background: var(--yellow); color: var(--navy); font: 900 14px "Montserrat", sans-serif; cursor: pointer; box-shadow: 3px 3px 0 var(--navy); }
 
-/* song packs */
+/* join list */
+.gamebtn { appearance: none; -webkit-appearance: none; width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border: 3px solid var(--navy); border-radius: 14px; box-shadow: 4px 4px 0 var(--navy); background: var(--teal); color: var(--navy); font-family: "Montserrat", sans-serif; cursor: pointer; }
+.gamebtn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--navy); }
+.gamebtn .gh { font-weight: 900; font-style: italic; font-size: 22px; text-transform: uppercase; line-height: 1.1; }
+.gamebtn .gs { font-weight: 700; font-size: 13px; }
+.gname { font-weight: 900; font-style: italic; font-size: 30px; line-height: 1.1; text-transform: uppercase; text-align: center; overflow-wrap: anywhere; }
+
+/* admin mode */
+.admindot { position: fixed; right: 12px; bottom: 12px; width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 0; background: var(--navy); opacity: .18; cursor: pointer; }
+.logo.small { font-size: 44px; }
+#adminBar { position: fixed; top: 0; left: 0; right: 0; z-index: 60; display: flex; align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top)) 10px 8px; background: var(--navy); color: #fff; }
+#adminBar .atag { font-weight: 900; font-size: 11px; letter-spacing: .1em; background: var(--red); border-radius: 6px; padding: 4px 7px; flex: none; }
+#adminBar .achips { display: flex; gap: 6px; overflow-x: auto; flex: 1; scrollbar-width: none; }
+#adminBar .achips::-webkit-scrollbar { display: none; }
+.achip, .aact { appearance: none; -webkit-appearance: none; flex: none; border: 2px solid #fff; border-radius: 999px; background: transparent; color: #fff; font: 800 12px "Montserrat", sans-serif; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+.achip.on { background: #fff; color: var(--navy); }
+.aact { border-radius: 8px; border-color: var(--teal); color: var(--teal); }
+body.admin #app { padding-top: 64px; }
+body.noscroll { overflow: hidden; }
+
+/* song packs: summary in the lobby */
 .packhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .packall { appearance: none; -webkit-appearance: none; border: 3px solid var(--navy); border-radius: 10px; background: #fff; color: var(--navy); font: 800 13px "Montserrat", sans-serif; padding: 7px 12px; cursor: pointer; }
 .packall:active { transform: translate(2px, 2px); }
+.pchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pchip { display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--navy); border-radius: 999px; padding: 4px 10px 4px 6px; font-weight: 800; font-size: 13px; }
+.pchip.more { background: #fff; color: var(--navy); padding-left: 10px; }
+.pci { width: 22px; height: 22px; display: inline-flex; }
+.pci svg { width: 100%; height: 100%; }
+.packnote { text-align: center; font-weight: 800; font-size: 13px; }
+.packnote.bad { color: var(--red); }
+
+/* full-screen pack picker */
+.picker { position: fixed; inset: 0; z-index: 50; background: var(--pink); display: flex; justify-content: center; }
+body.admin .picker { top: 52px; }
+.picker::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(27, 52, 71, .08) 1px, transparent 1px), linear-gradient(90deg, rgba(27, 52, 71, .08) 1px, transparent 1px); background-size: 40px 40px; }
+.pwrap { position: relative; width: 100%; max-width: 460px; display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.phead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: max(14px, env(safe-area-inset-top)) 18px 8px; }
+.ptitle { font-weight: 900; font-style: italic; font-size: 28px; text-transform: uppercase; }
+.ptabs { display: flex; gap: 8px; overflow-x: auto; padding: 4px 18px 10px; scrollbar-width: none; }
+.ptabs::-webkit-scrollbar { display: none; }
+.ptab { appearance: none; -webkit-appearance: none; flex: none; border: 3px solid var(--navy); border-radius: 999px; background: #fff; color: var(--navy); font: 800 14px "Montserrat", sans-serif; padding: 8px 14px; cursor: pointer; }
+.ptab.on { background: var(--navy); color: #fff; }
+.pbody { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 6px 18px 18px; display: flex; flex-direction: column; gap: 18px; }
+.pgroup { display: flex; flex-direction: column; gap: 10px; }
+.pfoot { display: flex; align-items: center; gap: 12px; padding: 12px 18px max(14px, env(safe-area-inset-bottom)); background: var(--paper); border-top: 3px solid var(--navy); }
+.pfoot .pcount { flex: 1; font-weight: 700; font-size: 13px; line-height: 1.3; }
+.pfoot .btn { flex: none; width: auto; padding-left: 28px; padding-right: 28px; }
+
+/* pack cards */
 .packs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.pack { position: relative; appearance: none; -webkit-appearance: none; text-align: left; display: flex; flex-direction: column; gap: 6px; min-height: 126px; padding: 14px 12px 12px; border: 3px solid var(--navy); border-radius: 16px; box-shadow: 4px 4px 0 var(--navy); font-family: "Montserrat", sans-serif; cursor: pointer; opacity: .88; }
+.packs.one { grid-template-columns: 1fr; }
+.pack { position: relative; appearance: none; -webkit-appearance: none; text-align: left; display: flex; flex-direction: column; gap: 4px; min-height: 164px; padding: 12px 12px 12px; border: 3px solid var(--navy); border-radius: 16px; box-shadow: 4px 4px 0 var(--navy); font-family: "Montserrat", sans-serif; cursor: pointer; overflow: hidden; opacity: .9; }
+.pack.hero { min-height: 0; flex-direction: column; padding-right: 90px; }
+.pack.hero .pico { position: absolute; right: 12px; top: 50%; margin-top: -32px; margin-bottom: 0; }
 .pack.ro { cursor: default; }
 .pack.on { opacity: 1; border-width: 4px; box-shadow: 0 0 0 4px #fff, 0 0 0 7px var(--navy); }
 .pack:not(.ro):active { transform: translate(2px, 2px); }
-.pack .pn { font-weight: 900; font-size: 18px; line-height: 1.1; padding-right: 36px; }
+.pack .pico { width: 58px; height: 58px; margin-bottom: 4px; display: block; }
+.pack .pico svg { width: 100%; height: 100%; display: block; }
+.pack .pn { font-weight: 900; font-size: 18px; line-height: 1.1; }
 .pack .pb { font-weight: 700; font-size: 13px; line-height: 1.25; }
-.pack .pc { margin-top: auto; font-weight: 800; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
-.pack .tick { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--navy); background: rgba(255, 255, 255, .55); display: flex; align-items: center; justify-content: center; }
-.pack .tick svg { width: 18px; height: 18px; display: none; }
+.pack .pc { margin-top: auto; padding-top: 4px; font-weight: 800; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.pack .tick { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--navy); background: rgba(255, 255, 255, .55); display: flex; align-items: center; justify-content: center; }
+.pack .tick svg { width: 19px; height: 19px; display: none; }
 .pack.on .tick { background: var(--navy); }
 .pack.on .tick svg { display: block; }
-.packnote { text-align: center; font-weight: 800; font-size: 13px; }
-.packnote.bad { color: var(--red); }

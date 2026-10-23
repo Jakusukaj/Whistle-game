@@ -33,6 +33,7 @@ var DEFAULTS = {
   sdMaxRounds: 3,
   minPlayers: 2,
   maxPlayers: 8,
+  adminPassword: process.env.ADMIN_PASSWORD || "bean",
   defaultRounds: 5,
   minRounds: 1,
   maxRounds: 10,
@@ -112,7 +113,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
       return { id: p.id, name: p.name, connected: p.connected, total: round1(p.total), last: p.last, turns: p.turns };
     }),
     packs: PACKS.map(function (p) {
-      return { id: p.id, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
+      return { id: p.id, group: p.group, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
     }),
     selectedPacks: room.packs.slice(),
     songsInPlay: this.poolFor(room).length,
@@ -127,8 +128,58 @@ RoomManager.prototype.broadcast = function (room) {
   room.lastActive = this.now();
   for (var i = 0; i < room.players.length; i++) {
     var p = room.players[i];
-    if (p.conn) { p.conn.send({ t: "state", state: this.viewFor(room, p.id) }); }
+    if (!p.conn) { continue; }
+    if (room.admin && p.id === room.admin.pid) {
+      // The admin sees the game as whichever test player they are "viewing as",
+      // with host controls, so one person can walk through every screen.
+      var as = findPlayer(room, room.admin.as) ? room.admin.as : p.id;
+      var v = this.viewFor(room, as);
+      v.hostId = as;
+      v.admin = {
+        as: as,
+        canAdd: room.phase === "lobby" && room.players.length < this.opts.maxPlayers,
+        players: room.players.filter(function (q) { return !q.sitOut; }).map(function (q) { return { id: q.id, name: q.name }; })
+      };
+      p.conn.send({ t: "state", state: v });
+    } else {
+      p.conn.send({ t: "state", state: this.viewFor(room, p.id) });
+    }
   }
+};
+
+// Games people can join from the home screen (no code needed).
+RoomManager.prototype.listRooms = function () {
+  var out = [];
+  for (var code in this.rooms) {
+    var r = this.rooms[code];
+    if (r.admin || r.sd || r.phase === "gameover") { continue; }
+    var host = findPlayer(r, r.hostId);
+    var count = r.players.filter(function (p) { return !p.sitOut; }).length;
+    if (!host || count >= this.opts.maxPlayers) { continue; }
+    out.push({ code: r.code, host: host.name, players: count, inProgress: r.phase === "turn" });
+  }
+  return out;
+};
+
+// Admin / test mode: a room with test players, driven by one person.
+RoomManager.prototype.createAdmin = function (conn, msg) {
+  var pw = String(msg.password == null ? "" : msg.password).trim().toLowerCase();
+  if (pw !== String(this.opts.adminPassword).toLowerCase()) { return err(conn, "bad_password", "Wrong password."); }
+  this.create(conn, { name: "Admin" });
+  var room = this.rooms[conn.roomCode];
+  if (!room) { return; }
+  room.admin = { pid: room.hostId, as: room.hostId };
+  this.addBot(room); this.addBot(room);
+  this.broadcast(room);
+};
+
+RoomManager.prototype.addBot = function (room) {
+  if (room.players.length >= this.opts.maxPlayers) { return null; }
+  var n = 1, name;
+  do { name = "Test " + n++; } while (room.players.some(function (p) { return p.name === name; }));
+  var p = this.addPlayer(room, name);
+  p.bot = true; p.connected = true;
+  return p;
 };
 
 // ---------------------------------------------------------------- entry point
@@ -136,6 +187,8 @@ RoomManager.prototype.handle = function (conn, msg) {
   if (!msg || typeof msg.t !== "string") { return; }
   if (msg.t === "ping") { return conn.send({ t: "pong" }); }
   if (msg.t === "create") { return this.create(conn, msg); }
+  if (msg.t === "createAdmin") { return this.createAdmin(conn, msg); }
+  if (msg.t === "listRooms") { return conn.send({ t: "rooms", rooms: this.listRooms() }); }
   if (msg.t === "join") { return this.join(conn, msg); }
 
   var room = conn.roomCode ? this.rooms[conn.roomCode] : null;
@@ -143,6 +196,22 @@ RoomManager.prototype.handle = function (conn, msg) {
   var me = findPlayer(room, conn.playerId);
   if (!me) { return err(conn, "room_not_found", "You are not in this room."); }
   var isHost = room.hostId === me.id;
+
+  if (room.admin && me.id === room.admin.pid) {
+    if (msg.t === "leave") { return this.closeAdmin(room, conn); }
+    if (msg.t === "adminAs") {
+      if (findPlayer(room, msg.id)) { room.admin.as = msg.id; this.broadcast(room); }
+      return;
+    }
+    if (msg.t === "adminAddBot") {
+      if (room.phase === "lobby") { this.addBot(room); this.broadcast(room); }
+      return;
+    }
+    // Everything else is done as the test player being viewed.
+    var as = findPlayer(room, room.admin.as);
+    if (as) { me = as; }
+    isHost = true;
+  }
 
   switch (msg.t) {
     case "setRounds":  return isHost ? this.setRounds(room, msg) : err(conn, "not_host", "Only the host can do that.");
@@ -238,6 +307,13 @@ RoomManager.prototype.scheduleLatePlayer = function (room, p) {
     room.turns.splice(last + 1, 0, { playerId: p.id, round: r, sd: false });
   }
   for (r = 1; r < cur; r++) { room.turns.push({ playerId: p.id, round: room.rounds, sd: false }); }
+};
+
+RoomManager.prototype.closeAdmin = function (room, conn) {
+  conn.roomCode = null; conn.playerId = null;
+  room.players.forEach(function (p) { if (p.conn) { p.conn.roomCode = null; p.conn.playerId = null; p.conn = null; } });
+  if (room.turn) { this.clearTimers(room.turn); }
+  delete this.rooms[room.code];
 };
 
 RoomManager.prototype.promoteHost = function (room) {
@@ -648,7 +724,7 @@ RoomManager.prototype.sweep = function () {
   var now = this.now();
   for (var code in this.rooms) {
     var room = this.rooms[code];
-    var anyone = room.players.some(function (p) { return p.connected; });
+    var anyone = room.players.some(function (p) { return p.connected && !p.bot; });
     if ((!anyone && now - room.lastActive > this.opts.roomIdleMs) || now - room.createdAt > this.opts.roomMaxAgeMs) {
       this.clearTimers(room.turn);
       delete this.rooms[code];

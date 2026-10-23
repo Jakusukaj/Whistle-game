@@ -1,0 +1,123 @@
+# Title | Artist | difficulty (e/m/h) | year | flags (B bangers, R rock, P party, S soul, F film, D disney/musical, X xmas, T tv) | optional aliases separated by ;
+Hey Jude | The Beatles | e | 1968 | BR
+Yesterday | The Beatles | e | 1965 | B
+Yellow Submarine | The Beatles | e | 1966 | B
+Twist and Shout | The Beatles | e | 1963 | BPR
+She Loves You | The Beatles | m | 1963 | B
+I Want to Hold Your Hand | The Beatles | e | 1963 | R
+Can't Buy Me Love | The Beatles | e | 1964 | R
+Love Me Do | The Beatles | e | 1962 | 
+Help! | The Beatles | m | 1965 | R
+A Hard Day's Night | The Beatles | m | 1964 | R
+All You Need Is Love | The Beatles | e | 1967 | B
+Penny Lane | The Beatles | m | 1967 | 
+Eleanor Rigby | The Beatles | e | 1966 | 
+Here Comes the Sun | The Beatles | m | 1969 | B
+Come Together | The Beatles | m | 1969 | R
+Get Back | The Beatles | e | 1969 | R
+Ob-La-Di Ob-La-Da | The Beatles | e | 1968 | P | Obladi Oblada
+Day Tripper | The Beatles | e | 1965 | R
+Octopus's Garden | The Beatles | e | 1969 | 
+Hello Goodbye | The Beatles | e | 1967 | 
+With a Little Help from My Friends | The Beatles | m | 1967 | 
+Satisfaction | The Rolling Stones | e | 1965 | BR | I Can't Get No Satisfaction
+Paint It Black | The Rolling Stones | m | 1966 | R
+Jumpin' Jack Flash | The Rolling Stones | m | 1968 | R
+Sympathy for the Devil | The Rolling Stones | m | 1968 | R
+Ruby Tuesday | The Rolling Stones | m | 1967 | 
+Get Off of My Cloud | The Rolling Stones | m | 1965 | R
+You Really Got Me | The Kinks | m | 1964 | R
+All Day and All of the Night | The Kinks | m | 1964 | R
+Sunny Afternoon | The Kinks | e | 1966 | 
+Waterloo Sunset | The Kinks | m | 1967 | 
+My Generation | The Who | m | 1965 | R
+Pinball Wizard | The Who | m | 1969 | R
+Substitute | The Who | m | 1966 | R
+Like a Rolling Stone | Bob Dylan | m | 1965 | R
+Blowin' in the Wind | Bob Dylan | e | 1963 | 
+The Times They Are a-Changin' | Bob Dylan | e | 1964 | 
+Mr. Tambourine Man | The Byrds | m | 1965 | R | Mr Tambourine Man
+The Sound of Silence | Simon and Garfunkel | e | 1965 | | Sounds of Silence
+Mrs. Robinson | Simon and Garfunkel | m | 1968 | | Mrs Robinson
+The Boxer | Simon and Garfunkel | m | 1969 | 
+Good Vibrations | The Beach Boys | h | 1966 | 
+God Only Knows | The Beach Boys | h | 1966 | 
+Surfin' USA | The Beach Boys | e | 1963 | P | Surfing USA
+Wouldn't It Be Nice | The Beach Boys | m | 1966 | 
+California Girls | The Beach Boys | m | 1965 | 
+I Get Around | The Beach Boys | m | 1964 | 
+My Girl | The Temptations | e | 1964 | BS
+Stop! In the Name of Love | The Supremes | e | 1965 | S | Stop in the Name of Love
+You Can't Hurry Love | The Supremes | e | 1966 | S
+Baby Love | The Supremes | e | 1964 | S
+Where Did Our Love Go | The Supremes | m | 1964 | S
+I Heard It Through the Grapevine | Marvin Gaye | m | 1968 | S
+Dancing in the Street | Martha and the Vandellas | m | 1964 | PS
+Heat Wave | Martha and the Vandellas | m | 1963 | S | Heatwave
+My Guy | Mary Wells | m | 1964 | S
+The Tracks of My Tears | Smokey Robinson | m | 1965 | S | Tracks of My Tears
+Ain't No Mountain High Enough | Marvin Gaye and Tammi Terrell | m | 1967 | S
+Reach Out I'll Be There | The Four Tops | m | 1966 | S
+I Can't Help Myself | The Four Tops | m | 1965 | S | Sugar Pie Honey Bunch
+I Want You Back | The Jackson 5 | m | 1969 | S
+(Sittin' On) The Dock of the Bay | Otis Redding | e | 1968 | BS | Dock of the Bay;Sitting on the Dock of the Bay
+Respect | Aretha Franklin | m | 1967 | BS
+Chain of Fools | Aretha Franklin | m | 1967 | S
+(You Make Me Feel Like) A Natural Woman | Aretha Franklin | h | 1967 | S | Natural Woman
+Mustang Sally | Wilson Pickett | m | 1966 | PS
+In the Midnight Hour | Wilson Pickett | m | 1965 | S
+Soul Man | Sam and Dave | m | 1967 | S
+When a Man Loves a Woman | Percy Sledge | m | 1966 | S
+Try a Little Tenderness | Otis Redding | h | 1966 | S
+I Got You (I Feel Good) | James Brown | m | 1965 | PS | I Feel Good
+Stand by Me | Ben E. King | e | 1961 | BS
+What a Wonderful World | Louis Armstrong | e | 1967 | 
+Can't Help Falling in Love | Elvis Presley | e | 1961 | B
+Suspicious Minds | Elvis Presley | m | 1969 | 
+Return to Sender | Elvis Presley | e | 1962 | 
+Viva Las Vegas | Elvis Presley | m | 1964 | P
+In the Ghetto | Elvis Presley | m | 1969 | 
+Oh, Pretty Woman | Roy Orbison | e | 1964 | R | Pretty Woman
+Crying | Roy Orbison | h | 1961 | 
+Wild Thing | The Troggs | e | 1966 | PR
+Sunshine of Your Love | Cream | e | 1967 | R
+Purple Haze | Jimi Hendrix | m | 1967 | R
+All Along the Watchtower | Jimi Hendrix | m | 1968 | R
+Hey Joe | Jimi Hendrix | m | 1966 | R
+White Rabbit | Jefferson Airplane | m | 1967 | R
+Light My Fire | The Doors | m | 1967 | R
+Born to Be Wild | Steppenwolf | m | 1968 | R
+Gimme Some Lovin' | The Spencer Davis Group | m | 1966 | R | Give Me Some Loving
+The House of the Rising Sun | The Animals | m | 1964 | R | House of the Rising Sun
+Brown Eyed Girl | Van Morrison | e | 1967 | BR
+Sweet Caroline | Neil Diamond | e | 1969 | BP
+Daydream Believer | The Monkees | e | 1967 | P
+I'm a Believer | The Monkees | e | 1966 | P
+Last Train to Clarksville | The Monkees | m | 1966 | 
+A Whiter Shade of Pale | Procol Harum | m | 1967 | R
+Build Me Up Buttercup | The Foundations | e | 1968 | P
+Those Were the Days | Mary Hopkin | e | 1968 | 
+Delilah | Tom Jones | m | 1968 | P
+It's Not Unusual | Tom Jones | m | 1965 | P
+Downtown | Petula Clark | m | 1964 | 
+Son of a Preacher Man | Dusty Springfield | m | 1968 | 
+Monday Monday | The Mamas and the Papas | m | 1966 | 
+California Dreamin' | The Mamas and the Papas | m | 1965 | | California Dreaming
+Do Wah Diddy Diddy | Manfred Mann | e | 1964 | P
+Hi Ho Silver Lining | Jeff Beck | e | 1967 | P
+Telstar | The Tornados | e | 1962 | 
+Apache | The Shadows | e | 1960 | 
+Wipe Out | The Surfaris | e | 1963 | P
+Green Onions | Booker T and the MGs | e | 1962 | 
+The Twist | Chubby Checker | e | 1960 | P
+Let's Twist Again | Chubby Checker | e | 1961 | P
+The Locomotion | Little Eva | e | 1962 | P
+Be My Baby | The Ronettes | m | 1963 | 
+Leader of the Pack | The Shangri-Las | m | 1964 | 
+Moon River | Andy Williams | e | 1961 | 
+The Girl from Ipanema | Stan Getz | m | 1964 | 
+Fly Me to the Moon | Frank Sinatra | m | 1964 | 
+Strangers in the Night | Frank Sinatra | m | 1966 | 
+Itsy Bitsy Teenie Weenie Yellow Polkadot Bikini | Brian Hyland | e | 1960 | P
+Pretty Flamingo | Manfred Mann | m | 1966 | 
+Not Fade Away | The Rolling Stones | e | 1964 | R
