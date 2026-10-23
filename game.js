@@ -13,8 +13,14 @@
 
 var crypto = require("crypto");
 var SONGS = require("./songs.js");
+var PACKS = require("./packs.js");
 var Matcher = require("./matcher.js");
 Matcher.useSongs(SONGS);
+
+var PACK_COUNTS = {};
+SONGS.forEach(function (s) { (s.packs || []).forEach(function (id) { PACK_COUNTS[id] = (PACK_COUNTS[id] || 0) + 1; }); });
+var PACK_IDS = PACKS.map(function (p) { return p.id; });
+var SONG_BUFFER = 5; // spare songs a game needs beyond one per turn (shuffles, tie-breaks)
 
 var DEFAULTS = {
   limitMs: 60000,        // a turn that nobody guesses scores this
@@ -88,9 +94,8 @@ RoomManager.prototype.viewFor = function (room, pid) {
     var locked = t.lockUntil && t.lockUntil > this.now();
     if (locked) { tv.lockUntil = t.lockUntil; }
     if (isW && t.options && t.stage === "choose" && !t.difficulty) {
-      tv.options = ["easy", "medium", "hard"].map(function (d) {
-        var o = t.options[d];
-        return { difficulty: d, multiplier: self.opts.multipliers[d], title: o.title, artist: o.artist };
+      tv.options = t.options.map(function (o) {
+        return { difficulty: o.difficulty, multiplier: self.opts.multipliers[o.difficulty], title: o.song.title, artist: o.song.artist };
       });
     }
     if (isW && t.song && t.stage !== "reveal" && !locked) { tv.song = { title: t.song.title, artist: t.song.artist }; }
@@ -106,6 +111,11 @@ RoomManager.prototype.viewFor = function (room, pid) {
     players: room.players.filter(function (p) { return !p.sitOut; }).map(function (p) {
       return { id: p.id, name: p.name, connected: p.connected, total: round1(p.total), last: p.last, turns: p.turns };
     }),
+    packs: PACKS.map(function (p) {
+      return { id: p.id, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
+    }),
+    selectedPacks: room.packs.slice(),
+    songsInPlay: this.poolFor(room).length,
     turn: tv,
     winners: room.winners || null,
     tieBreakWon: !!room.tieBreakWon,
@@ -141,7 +151,8 @@ RoomManager.prototype.handle = function (conn, msg) {
     case "skip":       return isHost ? this.skip(room) : err(conn, "not_host", "Only the host can do that.");
     case "playAgain":  return isHost ? this.playAgain(room) : err(conn, "not_host", "Only the host can do that.");
     case "setLimit":   return isHost ? this.setLimit(room, msg) : err(conn, "not_host", "Only the host can do that.");
-    case "addRound":   return isHost ? this.addRound(room) : err(conn, "not_host", "Only the host can do that.");
+    case "setPacks":   return isHost ? this.setPacks(room, msg) : err(conn, "not_host", "Only the host can do that.");
+    case "addRound":   return isHost ? this.addRound(room, conn) : err(conn, "not_host", "Only the host can do that.");
     case "cancelGame": return isHost ? this.cancelGame(room) : err(conn, "not_host", "Only the host can do that.");
     case "pickDifficulty": return this.pickDifficulty(room, me, msg);
     case "shuffle":    return this.shuffle(room, me);
@@ -173,7 +184,7 @@ RoomManager.prototype.create = function (conn, msg) {
   var room = {
     code: this.makeCode(), hostId: null, players: [], phase: "lobby",
     rounds: this.opts.defaultRounds, limitMs: this.opts.limitMs, turns: [], turnPos: -1, turn: null, turnCounter: 0,
-    used: {}, sd: null, winners: null, tieBreakWon: false,
+    packs: ["bangers"], used: {}, sd: null, winners: null, tieBreakWon: false,
     createdAt: this.now(), lastActive: this.now()
   };
   var p = this.addPlayer(room, name);
@@ -277,10 +288,37 @@ RoomManager.prototype.setLimit = function (room, msg) {
   this.broadcast(room);
 };
 
+// Songs the room can use: every song in at least one ticked pack. Each song is
+// a single entry in the library, so a song that sits in several ticked packs is
+// still only here once.
+RoomManager.prototype.poolFor = function (room) {
+  return SONGS.filter(function (s) {
+    for (var i = 0; i < s.packs.length; i++) { if (room.packs.indexOf(s.packs[i]) !== -1) { return true; } }
+    return false;
+  });
+};
+
+RoomManager.prototype.unusedCount = function (room) {
+  return this.poolFor(room).filter(function (s) { return !room.used[s.title]; }).length;
+};
+
+// Host ticks packs in the lobby. At least one pack must stay ticked.
+RoomManager.prototype.setPacks = function (room, msg) {
+  if (room.phase !== "lobby" || !Array.isArray(msg.packs)) { return; }
+  var chosen = PACK_IDS.filter(function (id) { return msg.packs.indexOf(id) !== -1; });
+  if (!chosen.length) { return; }
+  room.packs = chosen;
+  this.broadcast(room);
+};
+
 // Host adds one more round while the final round is being played.
-RoomManager.prototype.addRound = function (room) {
+RoomManager.prototype.addRound = function (room, conn) {
   if (room.phase !== "turn" || room.sd || !room.turn || room.turn.sd) { return; }
   if (room.turn.round !== room.rounds) { return; }
+  var extra = room.players.filter(function (p) { return !p.sitOut; }).length;
+  if (this.unusedCount(room) < extra + SONG_BUFFER) {
+    return err(conn, "too_few_songs", "Not enough unplayed songs left in the chosen packs for another round.");
+  }
   room.rounds++;
   for (var i = 0; i < room.players.length; i++) {
     if (!room.players[i].sitOut) { room.turns.push({ playerId: room.players[i].id, round: room.rounds, sd: false }); }
@@ -292,6 +330,10 @@ RoomManager.prototype.start = function (room, conn) {
   if (room.phase !== "lobby") { return; }
   if (room.players.length < this.opts.minPlayers) {
     return err(conn, "too_few", "You need at least " + this.opts.minPlayers + " players.");
+  }
+  var need = room.players.length * room.rounds + SONG_BUFFER;
+  if (this.poolFor(room).length < need) {
+    return err(conn, "too_few_songs", "These packs only have " + this.poolFor(room).length + " songs, and this game needs about " + need + ". Tick more packs or lower the rounds.");
   }
   room.players.forEach(function (p) { p.total = 0; p.last = null; p.turns = 0; });
   room.turns = [];
@@ -331,36 +373,51 @@ RoomManager.prototype.beginTurn = function (room, t) {
   if (t.sd) {
     turn.difficulty = this.opts.sdDifficulty;
     turn.multiplier = this.opts.multipliers[turn.difficulty];
-    this.drawSong(room, turn);
+    if (!this.drawSong(room, turn)) { return this.endEarly(room); }
   } else {
     // The whistler is offered one song at each difficulty and picks one.
-    var self = this;
-    turn.options = {};
-    ["easy", "medium", "hard"].forEach(function (d) { turn.options[d] = self.drawFrom(room, d, []); });
+    // If a difficulty has run out of unplayed songs, a song of another
+    // difficulty fills the card, labelled with its own difficulty.
+    var self = this, taken = [];
+    turn.options = [];
+    ["easy", "medium", "hard"].forEach(function (d) {
+      var song = self.drawFrom(room, d, taken);
+      if (song) { taken.push(song.title); turn.options.push({ difficulty: song.difficulty, song: song }); }
+    });
+    if (!turn.options.length) { return this.endEarly(room); }
   }
   this.broadcast(room);
 };
 
-// Pick a random song of one difficulty that has not been used yet in this room.
-// (Marks nothing as used; the caller does that once a song is actually chosen.)
+// Pick a random song of one difficulty from the ticked packs that has not been
+// played in this game. A song is never repeated: if the difficulty has run out,
+// an unplayed song of another difficulty is used, and if nothing is left it
+// returns null. (Marks nothing as used; the caller does that.)
 RoomManager.prototype.drawFrom = function (room, difficulty, avoid) {
-  function pool() {
-    return SONGS.filter(function (s) {
-      return s.difficulty === difficulty && !room.used[s.title] && avoid.indexOf(s.title) === -1;
-    });
-  }
-  var p = pool();
-  if (!p.length) {
-    SONGS.forEach(function (s) { if (s.difficulty === difficulty) { delete room.used[s.title]; } });
-    p = pool();
-  }
-  return p[Math.floor(this.random() * p.length)];
+  var pool = this.poolFor(room).filter(function (s) {
+    return !room.used[s.title] && avoid.indexOf(s.title) === -1;
+  });
+  var same = pool.filter(function (s) { return s.difficulty === difficulty; });
+  var from = same.length ? same : pool;
+  if (!from.length) { return null; }
+  return from[Math.floor(this.random() * from.length)];
 };
 
+// New song for a turn at the turn's difficulty. Returns false if none are left.
 RoomManager.prototype.drawSong = function (room, turn) {
   var pick = this.drawFrom(room, turn.difficulty, turn.song ? [turn.song.title] : []);
+  if (!pick) { return false; }
   room.used[pick.title] = true;
   turn.song = pick;
+  return true;
+};
+
+// The ticked packs ran out of unplayed songs: finish the game with the current standings.
+RoomManager.prototype.endEarly = function (room) {
+  var min = Infinity;
+  room.players.forEach(function (p) { if (!p.sitOut && p.total < min) { min = p.total; } });
+  var ids = room.players.filter(function (p) { return !p.sitOut && round1(p.total) === round1(min); }).map(function (p) { return p.id; });
+  this.gameOver(room, ids, false);
 };
 
 RoomManager.prototype.currentTurnFor = function (room, me, stages) {
@@ -370,14 +427,20 @@ RoomManager.prototype.currentTurnFor = function (room, me, stages) {
   return t;
 };
 
-// The whistler taps one of the three offered songs (msg.d is its difficulty).
+// The whistler taps one of the offered songs (msg.i is its position; msg.d, a
+// difficulty, is also accepted and picks the first card of that difficulty).
 RoomManager.prototype.pickDifficulty = function (room, me, msg) {
   var t = this.currentTurnFor(room, me, ["choose"]);
   if (!t || t.difficulty || !t.options) { return; }
-  if (!this.opts.multipliers.hasOwnProperty(msg.d) || !t.options[msg.d]) { return; }
-  t.difficulty = msg.d;
-  t.multiplier = this.opts.multipliers[msg.d];
-  t.song = t.options[msg.d];
+  var opt = null, k;
+  if (typeof msg.i === "number" && msg.i >= 0 && msg.i < t.options.length && msg.i % 1 === 0) { opt = t.options[msg.i]; }
+  else if (typeof msg.d === "string") {
+    for (k = 0; k < t.options.length; k++) { if (t.options[k].difficulty === msg.d) { opt = t.options[k]; break; } }
+  }
+  if (!opt) { return; }
+  t.difficulty = opt.difficulty;
+  t.multiplier = this.opts.multipliers[opt.difficulty];
+  t.song = opt.song;
   room.used[t.song.title] = true;
   this.broadcast(room);
 };
@@ -388,9 +451,9 @@ RoomManager.prototype.shuffle = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling"]);
   if (!t || !t.difficulty || (t.lockUntil && t.lockUntil > this.now())) { return; }
   var self = this, id = t.id, ms = this.opts.shufflePenaltyS * 1000;
+  if (!this.drawSong(room, t)) { return; } // no unplayed songs left: nothing to shuffle to
   t.shuffles++;
   t.lockUntil = this.now() + ms;
-  this.drawSong(room, t);
   if (t.timers.lock) { clearTimeout(t.timers.lock); }
   t.timers.lock = setTimeout(function () {
     if (room.turn && room.turn.id === id) { self.broadcast(room); }
