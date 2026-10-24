@@ -285,3 +285,6 @@ body.admin .scrim { top: 44px; }
 .lrow .chev { flex: none; }
 .lrow__c { flex: none; }
 .lrow--static { cursor: default; }
+.lrow--top { align-items: flex-start; }
+.lrow--top .lrow__c, .lrow--top .chev { margin-top: 2px; }
+.lrow__list { white-space: normal; overflow: visible; line-height: 16px; }

@@ -510,10 +510,23 @@
     if (room) { var r = rankingList(s); return r.length ? "Leading: " + r.slice(0, 3).map(function (x) { return x.p.name; }).join(", ") : "No votes yet"; }
     return packSummaryLine(on);
   }
+  function songsDetail(s) {
+    if (s.packMode === "room") {
+      return rankingList(s).map(function (x) { return x.p.name + " (" + x.n + ")"; }).join(", ");
+    }
+    return s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; }).map(function (p) { return p.name; }).join(", ");
+  }
+  function songsTitle(s) {
+    var n = s.selectedPacks.length;
+    if (s.packMode === "room") { var r = rankingList(s).length; return r ? r + (r === 1 ? " pack voted for" : " packs voted for") : "No votes yet"; }
+    return n ? n + (n === 1 ? " pack" : " packs") : "No packs chosen yet";
+  }
   function songsRowHtml(s, isHost) {
     var room = s.packMode === "room";
     var cue = room ? (s.myPackVotes.length ? "Change votes" : "Vote") : isHost ? "Choose" : "See";
-    return '<button class="lrow" id="openPacks"><span class="lrow__t"><span class="label">Songs' + (room ? ", room picks" : "") + '</span><span class="title">' + esc(songsLine(s)) + '</span></span><span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
+    var d = songsDetail(s);
+    return '<button class="lrow lrow--top" id="openPacks"><span class="lrow__t"><span class="label">Songs' + (room ? ", room picks" : "") + '</span><span class="title">' + esc(songsTitle(s)) + "</span>" +
+      (d ? '<span class="small lrow__list">' + esc(d) + "</span>" : "") + '</span><span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
   }
   function settingsText(s) {
     return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
