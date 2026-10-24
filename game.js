@@ -267,7 +267,8 @@ RoomManager.prototype.handle = function (conn, msg) {
     // Everything else is done as the test player being viewed.
     var as = findPlayer(room, room.admin.as);
     if (as) { me = as; }
-    isHost = true;
+    // Viewing as a bot is a true guest view: host-only actions are refused until the admin switches back.
+    isHost = room.hostId === me.id;
   }
 
   switch (msg.t) {
