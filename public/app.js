@@ -96,7 +96,9 @@
       if (invite) { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} }
       if (copyOnJoin) { copyOnJoin = false; deliverLink(m.code); }
     } else if (m.t === "error") {
-      if (rejoining && (m.code === "room_not_found" || m.code === "game_started")) {
+      if (m.code === "removed") {
+        session = null; saveSession(); st = null; rejoining = false; lastKey = null; toast("The host removed you from the game."); render();
+      } else if (rejoining && (m.code === "room_not_found" || m.code === "game_started")) {
         session = null; saveSession(); st = null; rejoining = false; lastKey = null;
         toast("That game has ended."); render();
       } else {
@@ -194,6 +196,11 @@
         if (i > (mic.base || 0) && e.results[i - 1] && e.results[i - 1][0]) {
           alts.push(e.results[i - 1][0].transcript + " " + alts[0]);
         }
+        // Loud or excited speech often comes back in pieces, so also try the last
+        // few phrases joined together.
+        if (i - 2 >= (mic.base || 0) && e.results[i - 2] && e.results[i - 1]) {
+          alts.push(e.results[i - 2][0].transcript + " " + e.results[i - 1][0].transcript + " " + alts[0]);
+        }
         var key = alts.join("|");
         if (key === mic.lastSent) { continue; }
         mic.lastSent = key;
@@ -213,7 +220,7 @@
           if (mic.want && mic.rec === rec) {
             try { micLaunch(); } catch (err) { mic.state = "stopped"; refreshMic(); }
           }
-        }, 250);
+        }, 60);
       }
     };
     try { rec.start(); } catch (err) { mic.state = "stopped"; refreshMic(); }
@@ -244,14 +251,7 @@
   }
 
   function micRowHtml() {
-    switch (mic.state) {
-      case "unsupported": return '<span class="dot off"></span><span class="t-title title">Typing only on this phone</span>';
-      case "starting": return '<span class="dot off"></span><span class="t-title title">Starting mic</span>';
-      case "on": return '<span class="dot"></span><span class="t-title title">Mic connected</span><button id="micOffBtn" class="txt">Turn off</button>';
-      case "blocked": return '<span class="dot off"></span><span class="t-title title">Mic not connected</span><button id="micBtn" class="btn sm line">Connect now</button>' +
-        '<p class="small" style="flex-basis:100%">Allow the microphone for this site in your browser settings, then reload. You can still type guesses.</p>';
-      default: return '<span class="dot off"></span><span class="t-title title">Mic not connected</span><button id="micBtn" class="btn sm line">Connect now</button>';
-    }
+    return mic.state === "blocked" ? '<p class="small">Mic blocked. Allow the microphone for this site in your browser settings, then reload. You can still type guesses.</p>' : "";
   }
   function micStop() {
     mic.want = false;
@@ -262,7 +262,7 @@
   function refreshMic() {
     var boxes = document.querySelectorAll("[data-mic]");
     for (var i = 0; i < boxes.length; i++) {
-      boxes[i].innerHTML = boxes[i].getAttribute("data-mic") === "row" ? micRowHtml() : micHtml();
+      boxes[i].innerHTML = boxes[i].getAttribute("data-mic") === "note" ? micRowHtml() : micHtml();
       var b = $("#micBtn", boxes[i]);
       if (b) { b.onclick = micStart; }
       var o = $("#micOffBtn", boxes[i]);
@@ -656,8 +656,15 @@
     var isHost = s.hostId === s.me;
     var turns = s.rounds * s.players.length;
     var cells = s.players.map(function (p) {
+      var mine = p.id === s.me, away = !p.connected;
+      var lab = away ? "Away" : mine ? (mic.state === "on" ? "Mic on" : mic.typeMode || mic.state === "unsupported" ? "Keyboard" : "Mic off") : micLabel(p);
+      var on = lab === "Mic on", kb = lab === "Keyboard";
+      var act = "";
+      if (mine && !s.admin && SR && mic.state !== "on" && mic.state !== "starting" && mic.state !== "blocked") { act = '<button class="mon" data-act="mic">Turn on</button>'; }
+      else if (mine && !s.admin && mic.state === "on") { act = '<button class="mon" data-act="micoff">Turn off</button>'; }
+      else if (isHost && away) { act = '<button class="mon" data-act="rm" data-id="' + esc(p.id) + '">Remove</button>'; }
       return '<div class="pcell">' + avatarHtml(s, p, "avatar--md") + '<span class="pn"><span class="title">' + esc(p.name) +
-        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="label">' + micLabel(p) + "</span></span></div>";
+        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="mstat"><i class="mdot' + (on ? " on" : kb ? " kb" : "") + '"></i><span class="label">' + lab + "</span>" + act + "</span></span></div>";
     }).join("");
     return {
       key: "lobby", field: "pink",
@@ -669,7 +676,7 @@
           '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + inviteRowHtml(s) + "</div>" +
           '<div class="spacer"></div>' +
           (isHost ? "" : '<p class="headline waiting">Waiting for ' + esc(pname(s, s.hostId)) + " to start</p><div class=\"spacer\"></div>") +
-          '<div class="micline micst" data-mic="row"></div>' +
+          '<div class="micline micst" data-mic="note"></div>' +
           (isHost
             ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers || !s.selectedPacks.length || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
               (startNote(s, turns) ? '<p class="small center startnote">' + esc(startNote(s, turns)) + "</p>" : "")
@@ -682,6 +689,15 @@
       bind: function () {
         $("#helpBtn").onclick = showHelp;
         $("#copyLink").onclick = function () { copyText(linkFor(s.code), false); };
+        var mons = document.querySelectorAll(".mon");
+        for (var mi = 0; mi < mons.length; mi++) {
+          mons[mi].onclick = function () {
+            if (this.getAttribute("data-act") === "mic") { mic.typeMode = false; micStart(); return; }
+            if (this.getAttribute("data-act") === "micoff") { micStop(); render(); return; }
+            var id = this.getAttribute("data-id");
+            confirmDialog("Remove " + pname(s, id) + "?", "They are taken out of the game. They can join again from the link.", "Remove", true, function () { send({ t: "removePlayer", id: id }); });
+          };
+        }
         var sr = $("#openSettings");
         if (sr) { sr.onclick = function () { settingsOpen = true; render(); }; }
         if (settingsOpen && isHost) {
@@ -803,11 +819,21 @@
     var canSkip = st && st.turn && st.turn.stage !== "reveal";
     o.innerHTML = '<div class="scrim" id="hmScrim"></div><div class="sheet"><span class="label">Host controls</span>' +
       (canSkip ? '<button id="skipBtn" class="btn btn--outline">Skip this turn</button>' : "") +
+      (st ? st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
+        return '<button class="btn btn--outline rmp" data-id="' + esc(p.id) + '">Remove ' + esc(p.name) + (p.connected ? "" : " (away)") + "</button>";
+      }).join("") : "") +
       '<button id="endBtn" class="btn btn--outline">End game</button>' +
       '<button class="txt" id="hmClose" style="align-self:center">Close</button></div>';
     document.body.appendChild(o);
     var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
     $("#hmClose", o).onclick = close; $("#hmScrim", o).onclick = close;
+    var rms = o.querySelectorAll(".rmp");
+    for (var ri = 0; ri < rms.length; ri++) {
+      rms[ri].onclick = function () {
+        var id = this.getAttribute("data-id"); close();
+        confirmDialog("Remove " + pname(st, id) + "?", "They are taken out of the game. They can join again from the link.", "Remove", true, function () { send({ t: "removePlayer", id: id }); });
+      };
+    }
     var sk = $("#skipBtn", o);
     if (sk) { sk.onclick = function () { close(); confirmDialog("Skip this turn?", "Nobody scores for it.", "Skip turn", false, function () { send({ t: "skip" }); }); }; }
     $("#endBtn", o).onclick = function () {
@@ -962,7 +988,7 @@
       return {
         key: "ready-" + T.id, field: "ground",
         html: '<div class="screen">' + topBar(s) + songBlock(T, "Your song to perform") +
-          '<p class="small">Only you can see this. Tap Ready and a 3, 2, 1 countdown starts for everyone.</p>' +
+          '<p class="small">Only you can see this. Do not whistle yet. Tap Ready and a 3, 2, 1 countdown starts for everyone; whistle when it ends.</p>' +
           '<div class="spacer"></div>' +
           '<button id="readyBtn" class="btn">Ready</button>' + skipHtml(s) + "</div>",
         bind: function () {
@@ -978,7 +1004,7 @@
         key: "wait-" + T.id, field: "ground",
         html: '<div class="screen">' + topBar(s) +
           '<div class="mid"><h1 class="headline">' + esc(who) + (T.difficulty ? " is getting ready" : " is choosing a song") + "</h1>" +
-          '<p class="small">' + (T.difficulty ? "A 3, 2, 1 countdown starts as soon as they tap Ready." : "Get ready to guess. Say the title out loud or type it.") + "</p>" +
+          '<p class="small">' + (T.difficulty ? "A 3, 2, 1 countdown starts as soon as they tap Ready. No whistling until it ends." : "Get ready to guess. Say the title out loud or type it.") + "</p>" +
           '<div class="micline" data-mic></div></div>' + skipHtml(s) + "</div>",
         bind: bindSkip
       };
@@ -990,7 +1016,7 @@
         key: "cd-" + T.id, field: "green",
         html: '<div class="screen">' + topBar(s) +
           '<div class="cdwrap"><div class="cdcircle"><div class="numeral" id="cd">3</div></div></div>' +
-          '<h1 class="headline center">' + (isW ? "Get ready to whistle" : "Get ready to guess " + esc(who)) + "</h1>" +
+          '<h1 class="headline center">' + (isW ? "Wait for the end of the countdown, then whistle" : "Get ready to guess " + esc(who)) + "</h1>" +
           skipHtml(s) + "</div>",
         bind: bindSkip
       };
@@ -1186,8 +1212,14 @@
         '<button id="awardSkip" class="txt" style="align-self:center">Skip</button></div>',
       bind: function () {
         clearTimeout(awardState.timer);
-        awardState.timer = setTimeout(function () { awardAdvance(st); }, 2600);
-        $("#awardNext").onclick = function () { awardAdvance(st); };
+        var left = 5, nb = $("#awardNext"), base = nb.textContent;
+        var tickA = function () {
+          if (left <= 0) { awardAdvance(st); return; }
+          nb.textContent = base + " (" + left + ")"; left--;
+          awardState.timer = setTimeout(tickA, 1000);
+        };
+        tickA();
+        nb.onclick = function () { awardAdvance(st); };
         $("#awardSkip").onclick = function () { clearTimeout(awardState.timer); awardState.done = true; render(); };
       }
     };
@@ -1211,11 +1243,13 @@
         '<div class="stack"><div class="label">Final scores</div>' + standingsHtml(s, bonuses, s.winners, { bonus: true }) + "</div>" +
         (bonuses.length ? '<p class="small">Bonus points from the awards are included.' + (s.bonusCapped ? " A big lead cannot be overturned by bonuses." : "") + "</p>" : "") +
         '<div class="spacer"></div>' +
+        (s.endAwards && s.endAwards.length ? '<button id="awardsBtn" class="btn btn--outline">View awards</button>' : "") +
         (isHost ? '<button id="againBtn" class="btn">Play again</button>' : '<p class="title center">Waiting for ' + esc(pname(s, s.hostId)) + "</p>") +
         '<button id="leaveBtn" class="txt" style="align-self:center">Leave room</button></div>',
       bind: function () {
         var a = $("#againBtn"); if (a) { a.onclick = function () { send({ t: "playAgain" }); }; }
         $("#leaveBtn").onclick = leaveRoom;
+        var aw = $("#awardsBtn"); if (aw) { aw.onclick = function () { awardState.idx = 0; awardState.done = false; render(); }; }
       }
     };
   }
@@ -1224,8 +1258,8 @@
     var o = document.createElement("div");
     o.className = "sheetwrap";
     var steps = [
-      "Whistle it. Only you can see the song.",
-      "Everyone else shouts or types guesses. The quicker they get it, the more it is worth.",
+      "Whistle it only once the countdown ends. Only you can see the song.",
+      "Everyone else says the title out loud. Your phone microphone should pick it up by itself. If it does not, tap Type instead and type the guess, or the whistler can tap Someone got it.",
       "Say who got it. You and everyone you name earn points."
     ];
     o.innerHTML = '<div class="scrim" id="helpScrim"></div><div class="sheet"><span class="label">How to play</span>' +
@@ -1236,6 +1270,55 @@
     document.body.appendChild(o);
     var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
     $("#helpClose", o).onclick = close; $("#helpScrim", o).onclick = close;
+  }
+
+
+  // ------------------------------------------------------- first-time tips
+  var newbie = null, tipSeen = {}, askedPlayed = false;
+  try { var np = localStorage.getItem("ttt_played"); newbie = np === "yes" ? false : np === "no" ? true : null; } catch (e) {}
+  var TIPS = {
+    lobby: "Everyone joins from the link. The host picks the songs and taps Start when all of you are in.",
+    ready: "Only you can see the song. Do not whistle until the countdown ends.",
+    wait: "The whistler is picking a song. Get ready to say the title out loud.",
+    cd: "Whistle only when the countdown ends.",
+    w: "Whistle the tune. When someone gets it, tap Someone got it and say who.",
+    g: "Say the song title out loud, or type it. Your phone mic should pick it up by itself.",
+    reveal: "Points go to the whistler and to everyone who named the song."
+  };
+  function tipFor(key) {
+    if (/^ready-/.test(key)) { return "ready"; }
+    if (/^wait-/.test(key)) { return "wait"; }
+    if (/^cd-/.test(key)) { return "cd"; }
+    if (/^w-/.test(key)) { return "w"; }
+    if (/^g-/.test(key)) { return "g"; }
+    if (/^reveal-/.test(key)) { return "reveal"; }
+    if (key === "lobby") { return "lobby"; }
+    return null;
+  }
+  function askPlayed() {
+    askedPlayed = true;
+    var o = document.createElement("div");
+    o.className = "sheetwrap";
+    o.innerHTML = '<div class="scrim"></div><div class="sheet"><span class="label">Welcome</span><p class="title">Have you played before?</p>' +
+      '<p class="small">If not, short tips appear on each screen.</p><button class="btn" id="pYes">Yes</button><button class="btn btn--outline" id="pNo">No</button></div>';
+    document.body.appendChild(o);
+    var done = function (v) { newbie = !v; try { localStorage.setItem("ttt_played", v ? "yes" : "no"); } catch (e) {} if (o.parentNode) { o.parentNode.removeChild(o); } render(); };
+    $("#pYes", o).onclick = function () { done(true); };
+    $("#pNo", o).onclick = function () { done(false); };
+  }
+  function refreshTip() {
+    var old = document.getElementById("tipbubble"); if (old) { old.parentNode.removeChild(old); }
+    document.body.classList.remove("hastip");
+    if (!st || st.admin) { return; }
+    if (newbie === null) { if (!askedPlayed) { askPlayed(); } return; }
+    if (!newbie) { return; }
+    var id = tipFor(lastKey || ""); if (!id || tipSeen[id]) { return; }
+    var b = document.createElement("button");
+    b.id = "tipbubble"; b.className = "tipbubble"; b.setAttribute("aria-label", "Dismiss tip");
+    b.innerHTML = '<span class="label">Tip</span><span class="small">' + esc(TIPS[id]) + "</span>";
+    b.onclick = function () { tipSeen[id] = true; document.body.classList.remove("hastip"); if (b.parentNode) { b.parentNode.removeChild(b); } };
+    document.body.appendChild(b);
+    document.body.classList.add("hastip");
   }
 
   // ---------------------------------------------------------------- render
@@ -1276,6 +1359,7 @@
     refreshTop();
     refreshAdmin();
     syncBg();
+    refreshTip();
   }
 
   // Keep the page behind the app (overscroll, notch) the same colour as the current field.

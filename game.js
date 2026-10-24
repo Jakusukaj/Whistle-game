@@ -295,6 +295,7 @@ RoomManager.prototype.handle = function (conn, msg) {
     case "askHint":    return this.askHint(room, me);
     case "addRound":   return isHost ? this.addRound(room, conn) : err(conn, "not_host", "Only the host can do that.");
     case "cancelGame": return isHost ? this.cancelGame(room) : err(conn, "not_host", "Only the host can do that.");
+    case "removePlayer": return isHost ? this.removePlayer(room, me, msg) : err(conn, "not_host", "Only the host can do that.");
     case "refreshOptions": return this.refreshOptions(room, me);
     case "pickDifficulty": return this.pickDifficulty(room, me, msg);
     case "shuffle":    return this.shuffle(room, me);
@@ -358,6 +359,7 @@ RoomManager.prototype.join = function (conn, msg) {
 
   if (msg.playerId) {
     var existing = findPlayer(room, msg.playerId);
+    if (existing && existing.removed) { return err(conn, "removed", "The host removed you from this game."); }
     if (existing) {
       this.attach(room, existing, conn);
       conn.send({ t: "joined", code: room.code, playerId: existing.id });
@@ -370,7 +372,15 @@ RoomManager.prototype.join = function (conn, msg) {
   var name = cleanName(msg.name);
   if (!name) { return err(conn, "bad_name", "Enter a name first."); }
   for (var i = 0; i < room.players.length; i++) {
-    if (room.players[i].name.toLowerCase() === name.toLowerCase()) { return err(conn, "name_taken", "That name is taken in this room."); }
+    var same = room.players[i];
+    if (same.removed || same.name.toLowerCase() !== name.toLowerCase()) { continue; }
+    // Someone who dropped out and comes back under the same name takes their place again.
+    if (!same.connected && !same.bot) {
+      this.attach(room, same, conn);
+      conn.send({ t: "joined", code: room.code, playerId: same.id });
+      return this.broadcast(room);
+    }
+    return err(conn, "name_taken", "That name is taken in this room.");
   }
   if (room.players.length >= this.opts.maxPlayers) { return err(conn, "full", "That room is full."); }
   var p = this.addPlayer(room, name);
@@ -420,6 +430,27 @@ RoomManager.prototype.disconnect = function (conn) {
   p.conn = null; p.connected = false;
   conn.roomCode = null; conn.playerId = null;
   this.promoteHost(room);
+  this.broadcast(room);
+};
+
+// The host removes a player, usually one who has dropped out and is not coming back.
+RoomManager.prototype.removePlayer = function (room, me, msg) {
+  var t = findPlayer(room, msg.id);
+  if (!t || t.id === me.id || t.removed) { return; }
+  var wasWhistler = room.turn && room.turn.playerId === t.id && room.turn.stage !== "reveal";
+  if (t.conn) { t.conn.send({ t: "error", code: "removed", message: "The host removed you from this game." }); t.conn.roomCode = null; t.conn.playerId = null; t.conn = null; }
+  t.connected = false;
+  if (room.phase === "lobby") {
+    room.players = room.players.filter(function (p) { return p.id !== t.id; });
+    delete room.packVotes[t.id];
+    this.recomputePacks(room);
+  } else {
+    t.removed = true; t.sitOut = true;
+    var pos = room.turnPos;
+    room.turns = room.turns.filter(function (x, i) { return i <= pos || x.playerId !== t.id; });
+    if (room.turn && room.turn.hintAsks) { room.turn.hintAsks = room.turn.hintAsks.filter(function (id) { return id !== t.id; }); }
+    if (room.phase === "turn" && wasWhistler) { return this.finishTurn(room, "skipped"); }
+  }
   this.broadcast(room);
 };
 
@@ -782,9 +813,16 @@ RoomManager.prototype.guess = function (room, me, conn, msg) {
   this.pause(t);
   t.stage = "confirming";
   t.pending = { heard: Matcher.heardPhrase(r.guess, t.song, { typed: typed }) || r.guess, from: me.id };
-  t.timers.confirm = setTimeout(function () {
-    if (room.turn && room.turn.id === id && room.turn.stage === "confirming") { self.confirmGuess(room, null, false, true); }
-  }, this.opts.confirmMs);
+  var arm = function () {
+    t.timers.confirm = setTimeout(function () {
+      if (!room.turn || room.turn.id !== id || room.turn.stage !== "confirming") { return; }
+      // A present human whistler may take as long as they like to pick who got it.
+      var w = findPlayer(room, room.turn.playerId);
+      if (w && w.connected && !w.bot) { return arm(); }
+      self.confirmGuess(room, null, false, true);
+    }, self.opts.confirmMs);
+  };
+  arm();
   this.broadcast(room);
 };
 

@@ -362,3 +362,16 @@ body.admin .scrim { top: 44px; }
 /* The colour fills the whole screen, including behind the browser bars. */
 html, body { min-height: 100%; }
 #bgfill { position: fixed; top: -100px; left: 0; right: 0; bottom: -100px; z-index: -1; background: var(--ground); transition: background-color 220ms var(--ease); pointer-events: none; }
+
+/* player tile mic state */
+.mstat { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mdot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 1px var(--ink); flex: none; }
+.mdot.on { background: var(--green); }
+.mdot.kb { background: var(--sunk); }
+.mstat .label { font-size: 11px; letter-spacing: .1em; }
+.mon { font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; text-decoration: underline; text-underline-offset: 3px; padding: 6px 4px; margin: -6px 0; }
+.pcell .pn .title { white-space: nowrap; }
+
+.tipbubble { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 40; display: flex; flex-direction: column; gap: 4px; text-align: left; background: var(--ink); color: var(--ground); border-radius: 16px; padding: 12px 16px; max-width: 420px; margin: 0 auto; }
+.tipbubble .small, .tipbubble .label { color: inherit; }
+body.hastip #app { padding-bottom: 96px; }
