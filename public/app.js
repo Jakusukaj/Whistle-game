@@ -837,19 +837,27 @@
     var canSkip = st && st.turn && st.turn.stage !== "reveal";
     o.innerHTML = '<div class="scrim" id="hmScrim"></div><div class="sheet"><span class="label">Host controls</span>' +
       (canSkip ? '<button id="skipBtn" class="btn btn--outline">Skip this turn</button>' : "") +
-      (st ? st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
-        return '<button class="btn btn--outline rmp" data-id="' + esc(p.id) + '">Remove ' + esc(p.name) + (p.connected ? "" : " (away)") + "</button>";
-      }).join("") : "") +
+      (st && st.players.length > 1 ? '<button id="rmBtn" class="btn btn--outline">Remove player</button>' : "") +
       '<button id="endBtn" class="btn btn--outline">End game</button>' +
       '<button class="txt" id="hmClose" style="align-self:center">Close</button></div>';
     document.body.appendChild(o);
     var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
     $("#hmClose", o).onclick = close; $("#hmScrim", o).onclick = close;
-    var rms = o.querySelectorAll(".rmp");
-    for (var ri = 0; ri < rms.length; ri++) {
-      rms[ri].onclick = function () {
-        var id = this.getAttribute("data-id"); close();
-        confirmDialog("Remove " + pname(st, id) + "?", "They are taken out of the game. They can join again from the link.", "Remove", true, function () { send({ t: "removePlayer", id: id }); });
+    var rb = $("#rmBtn", o);
+    if (rb) {
+      rb.onclick = function () {
+        o.querySelector(".sheet").innerHTML = '<span class="label">Remove a player</span>' +
+          st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
+            return '<button class="btn btn--outline rmp" data-id="' + esc(p.id) + '">' + esc(p.name) + (p.connected ? "" : " (away)") + "</button>";
+          }).join("") + '<button class="txt" id="rmBack" style="align-self:center">Back</button>';
+        $("#rmBack", o).onclick = function () { close(); openHostMenu(); };
+        var rms = o.querySelectorAll(".rmp");
+        for (var ri = 0; ri < rms.length; ri++) {
+          rms[ri].onclick = function () {
+            var id = this.getAttribute("data-id"); close();
+            confirmDialog("Remove " + pname(st, id) + "?", "They are taken out of the game. They can join again from the link.", "Remove", true, function () { send({ t: "removePlayer", id: id }); });
+          };
+        }
       };
     }
     var sk = $("#skipBtn", o);
@@ -898,6 +906,8 @@
   function syncAskBtn(t) {
     var b = $("#askHintBtn"); if (!b) { return; }
     var done = t.hints >= 3, asked = !!t.iAsked;
+    b.hidden = done;
+    if (done) { return; }
     var cue = t.hints ? "Hint " + t.hints + " of 3" : "No hints yet";
     setAction("askHintBtn", cue, done ? "Asked" : asked ? "Asked" : "Ask",
       done ? "No more hints" : asked ? "Hint asked" : "Ask for a hint",
@@ -985,7 +995,7 @@
         key: "choose-" + T.id, field: "ground",
         html: '<div class="screen">' + topBar(s) +
           '<div class="head"><h1 class="headline">Pick a song</h1>' +
-          '<p class="small">A harder song earns bonus points. Only you can see these. Keep your screen to yourself.</p></div>' +
+          '<p class="small">A harder song earns bonus points. Only you can see these. The 3, 2, 1 countdown starts as soon as you pick.</p></div>' +
           '<div class="stack">' + offs + "</div>" +
           (T.canRefresh ? '<button id="refreshBtn" class="btn btn--outline">Refresh options</button>' +
             '<p class="small center">Don\'t know any of these? Refresh once for three new songs.</p>' : "") +
@@ -1028,13 +1038,14 @@
       };
     }
 
-    // 4. Countdown for everyone
+    // 4. Countdown for everyone. The whistler sees the song they picked.
     if (T.stage === "countdown") {
       return {
         key: "cd-" + T.id, field: "green",
         html: '<div class="screen">' + topBar(s) +
+          (isW && T.song ? songBlock(T, "Your song to perform") : "") +
           '<div class="cdwrap"><div class="cdcircle"><div class="numeral" id="cd">3</div></div></div>' +
-          '<h1 class="headline center">' + (isW ? "Wait for the end of the countdown, then whistle" : "Get ready to guess " + esc(who)) + "</h1>" +
+          '<h1 class="headline center">' + (isW ? "Whistle when it ends" : "Get ready to guess " + esc(who)) + "</h1>" +
           skipHtml(s) + "</div>",
         bind: bindSkip
       };
@@ -1356,10 +1367,9 @@
   var TIPS = {
     lobbyHost: "Start when everyone is in. Keep your mic on so we can hear guesses.",
     lobby: "The host starts the game when everyone is in. Keep your mic on so we can hear guesses.",
-    ready: "Whistle the tune with no words. Tap Ready when you are set.",
     wait: "Say the song title out loud when you think you know it. You can type it instead.",
     cd: "Get ready to say the title out loud when the whistling starts.",
-    cdw: "Take a breath, then whistle the tune clearly. Shuffles and hints cost points.",
+    cdw: "Whistle the tune clearly, with no words, once the countdown ends. Shuffles and hints cost points.",
     w: "Tap Someone got it when a guess is right. Shuffles and hints cost points.",
     g: "Shout your guess, or tap Type instead. The faster you guess, the more you score.",
     reveal: "The whistler earns the full score. Each guesser earns half."

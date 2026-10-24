@@ -120,16 +120,14 @@ async function mainScenario() {
   A.send({ t: "pickDifficulty", d: "easy" });
   await A.waitFor(function (s) { return s.turn.difficulty === "easy"; }, "easy picked");
   await B.waitFor(function (s) { return s.turn.difficulty === "easy"; }, "easy seen by B");
+  check("picking the song starts the countdown by itself", A.state.turn.stage === "countdown" || A.state.turn.stage === "whistling");
   check("whistler gets the song they were offered", A.state.turn.song.title === offeredEasy);
   check("guessers do NOT see the song", !B.state.turn.song && !C.state.turn.song);
   A.send({ t: "pickDifficulty", d: "hard" }); await sleep(80);
   check("the choice cannot be changed once made", A.state.turn.difficulty === "easy");
-  A.send({ t: "shuffle" }); await sleep(80);
+  A.send({ t: "shuffle" }); await sleep(30);
   check("no shuffling before the clock starts", A.state.turn.shuffles === 0);
   var song = A.state.turn.song.title;
-
-  A.send({ t: "ready" });
-  await B.waitFor(stageIs("countdown"), "countdown seen by B");
   await A.waitFor(stageIs("whistling"), "whistling");
   await B.waitFor(stageIs("whistling"), "whistling seen by B");
   check("clock is running for everyone", B.state.turn.runningSince !== null);

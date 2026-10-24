@@ -93,7 +93,6 @@ function phone(port, name) {
     await until(function () { return W.q("#songTitle") && W.q("#songTitle").textContent; }, 3000, "song shown to whistler");
     var title = W.q("#songTitle").textContent;
     check("turn " + turn + ": song title present", title.length > 1);
-    W.click("#readyBtn");
     await until(function () { return W.q("#bigtime") && others.every(function (p) { return p.q("#toType") || p.q("#ginput"); }); }, 3000, "whistling started");
     if (turn === 1) {
       check("guesser sees the mic and the type instead button", !!others[0].q("#orb") && /Type instead/i.test(others[0].text()));

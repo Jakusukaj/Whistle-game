@@ -735,6 +735,8 @@ RoomManager.prototype.pickDifficulty = function (room, me, msg) {
   t.multiplier = this.opts.multipliers[opt.difficulty];
   t.song = opt.song;
   room.used[t.song.title] = true;
+  // Picking a song starts the countdown straight away, so there is no extra Ready tap.
+  if (this.opts.autoReady !== false && !(t.adminDrives)) { return this.ready(room, me); }
   this.broadcast(room);
 };
 
