@@ -368,3 +368,12 @@ body.danger #app .wh-progress>i{background:var(--ink)}
 .wh-packrow{min-height:44px}
 .packnote{margin-top:0;line-height:16px;align-items:center}
 .wh-prow{padding:8px var(--space-5)}
+
+/* Short cards: a 44px radius pinches the content, so use a softer radius and even padding. */
+.wh-setting,.wh-card:not(.songcard):not(.scorecard),.wh-list:not(.board),.wh-game,.wh-empty{border-radius:32px}
+.wh-setting{padding:20px 24px;min-height:0}
+.wh-setting--col{padding:20px 24px 24px;gap:14px}
+.wh-card{padding:24px}
+.wh-card.wh-stack{gap:14px}
+.wh-prow{padding:10px 24px}
+.wh-seg{padding:5px}
