@@ -1289,30 +1289,27 @@
     var AV = function (n, k) { return '<span class="avatar pc pc' + k + ' avatar--md">' + n.charAt(0) + "</span>"; };
     var TAP = function (x, y, d) { return '<i class="hv-tap" style="left:' + x + 'px;top:' + y + 'px;animation-delay:' + d + 'ms"></i>'; };
     var scenes = [
-      { ms: 5000, role: "e", chip: "The game", head: "One person whistles.<br>Everyone else listens and guesses.", text: "Take turns. The quicker the guess, the more points.", bg: FIELD_BG.pink, ink: true,
-        mock: '<div class="m-top">Maya\'s game</div><div class="m-sub">4 of 8 players are in</div><div class="m-tiles">' +
-          [["Maya", 0, "Host"], ["Theo", 1], ["Priya", 2], ["Sam", 3]].map(function (p) { return '<div class="m-tile">' + AV(p[0], p[1]) + "<b>" + p[0] + "</b></div>"; }).join("") + '</div><div class="m-spacer"></div><div class="m-btn">Start game</div>' },
+      { ms: 5000, full: true, chip: "How to play", head: "One person whistles.<br>Everyone else listens and guesses.", text: "Take turns. The quicker the guess, the more points.", bg: FIELD_BG.orange },
       { ms: 5400, role: "w", chip: "Your turn to whistle", head: "Pick a song", text: "Only you can see it. Harder songs earn bonus points.", bg: FIELD_BG.ground,
-        mock: '<div class="m-top">Pick a song</div><div class="m-cards">' +
+        mock: '<div class="m-cards">' +
           '<div class="m-card"><span>Easy</span><b>Dancing Queen</b><i>ABBA</i></div>' +
           '<div class="m-card m-pick"><span>Medium</span><b>Wonderwall</b><i>Oasis</i></div>' +
           '<div class="m-card"><span>Hard</span><b>Rolling in the Deep</b><i>Adele</i></div></div>' + TAP(300, 215, 1900) },
       { ms: 5000, role: "e", chip: "Everyone", head: "The countdown starts", text: "It starts as soon as the song is picked. Do not whistle until it ends.", bg: FIELD_BG.green,
-        mock: '<div class="m-spacer"></div><div class="m-disc"><div class="m-num" data-seq="3,2,1,Go" data-step="1000">3</div></div><div class="m-spacer"></div><div class="m-head">Whistle when it ends</div>' },
+        mock: '<div class="m-disc"><div class="m-num" data-seq="3,2,1,Go" data-step="1000">3</div></div>' },
       { ms: 6200, role: "w", chip: "Your turn to whistle", head: "Whistle the tune", text: "No words. Shuffling the song and giving hints both cost points.", bg: FIELD_BG.green,
-        mock: '<div class="m-label">Your song to perform</div><div class="m-song">Dancing Queen</div><div class="m-art">ABBA</div><div class="m-spacer"></div><div class="m-timer" data-timer="42">42</div><div class="m-label">Seconds left</div><div class="m-spacer"></div>' +
+        mock: '<div><div class="m-label">Your song to perform</div><div class="m-song">Dancing Queen</div><div class="m-art">ABBA</div></div><div class="m-timer" data-timer="42">42</div>' +
           '<div class="m-two"><div class="m-mini"><span>Song</span><b>Shuffle</b></div><div class="m-mini"><span>0 of 3</span><b>Give hint</b></div></div><div class="m-btn">Someone got it</div>' },
       { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is whistling. Your phone mic should pick it up by itself. If it does not, tap Type instead.", bg: FIELD_BG.green,
-        mock: '<div class="m-label">Round 1 of 5, Theo is whistling</div><div class="m-timer m-sm" data-timer="38">38</div><div class="m-label">Seconds left</div><div class="m-spacer"></div>' +
-          '<div class="m-orbwrap"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
-          '<div class="m-say"><span>You say</span><b>Dancing Queen</b></div></div><div class="m-head">Listening</div><div class="m-link">Type instead</div><div class="m-spacer"></div>' },
+        mock: '<div class="m-orbwrap"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
+          '<div class="m-say"><span>You say</span><b>Dancing Queen</b></div></div><div class="m-head">Listening</div><div class="m-link">Type instead</div>' },
       { ms: 5600, role: "w", chip: "Your turn to whistle", head: "Say who got it", text: "When someone gets it, tap Someone got it. Tick everyone who named the song, then confirm.", bg: FIELD_BG.ground,
-        mock: '<div class="m-label">Who got it</div><div class="m-sub">Tap everyone who got it right.</div><div class="m-rows">' +
-          '<div class="m-row m-on">' + AV("Theo", 1) + '<b>Theo</b><em>Got it</em></div><div class="m-row">' + AV("Priya", 2) + '<b>Priya</b></div><div class="m-row">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="m-spacer"></div><div class="m-btn">Confirm</div>' + TAP(80, 120, 1500) },
+        mock: '<div class="m-rows">' +
+          '<div class="m-row m-on">' + AV("Theo", 1) + '<b>Theo</b><em>Got it</em></div><div class="m-row">' + AV("Priya", 2) + '<b>Priya</b></div><div class="m-row">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="m-btn">Confirm</div>' + TAP(80, 135, 1500) },
       { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The whistler earns the full score. Each guesser earns half.", bg: FIELD_BG.blue, light: true,
-        mock: '<div class="m-label">The song was</div><div class="m-song">Dancing Queen</div><div class="m-art">ABBA</div><div class="m-big" data-count="917" data-ms="1600">0</div><div class="m-label">Guessed in 12.4s</div><div class="m-sub2">Maya scores<br>Theo named it and earns 459</div>' },
+        mock: '<div class="m-big" data-count="917" data-ms="1600">0</div><div class="m-label">Guessed in 12.4s</div><div class="m-sub2">Maya scores<br>Theo named it and earns 459</div>' },
       { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards add bonus points at the end.", bg: FIELD_BG.pink,
-        mock: '<div class="m-label">Final scores</div><div class="m-rows">' +
+        mock: '<div class="m-rows">' +
           '<div class="m-row m-light"><b class="m-rk">1</b>' + AV("Maya", 0) + '<b>Maya</b><em>2,140</em></div><div class="m-row m-light"><b class="m-rk">2</b>' + AV("Theo", 1) + '<b>Theo</b><em>1,820</em></div><div class="m-row m-light"><b class="m-rk">3</b>' + AV("Priya", 2) + '<b>Priya</b><em>1,310</em></div></div>' }
     ];
     var o = document.createElement("div");
@@ -1332,9 +1329,8 @@
       var wrap = stage.querySelector(".hv-phone"), scr = stage.querySelector(".hv-screen"); if (!wrap || !scr) { return; }
       // The screen fills the whole frame: fixed 390 logical width, and as much logical height as the frame has.
       var w = wrap.clientWidth, h = wrap.clientHeight, k = w / 390, lh = h / k;
-      if (lh < 600) { lh = 600; k = h / lh; }
       scr.style.width = "390px"; scr.style.height = lh + "px";
-      scr.style.transform = "scale(" + k + ")"; scr.style.left = ((w - 390 * k) / 2) + "px"; scr.style.top = "0px";
+      scr.style.transform = "scale(" + k + ")"; scr.style.left = "0px"; scr.style.top = "0px";
     };
     window.addEventListener("resize", fit);
     try { document.querySelector('meta[name="theme-color"]').setAttribute("content", DARK); document.documentElement.style.background = DARK; document.body.style.background = DARK; var bf = document.getElementById("bgfill"); if (bf) { bf.style.background = DARK; } } catch (e) {}
@@ -1344,9 +1340,15 @@
       if (n >= scenes.length) { close(); return; }
       idx = Math.max(0, n);
       var sc = scenes[idx];
+      var bgc = sc.full ? sc.bg : DARK;
+      o.style.background = bgc; o.classList.toggle("hv-full", !!sc.full);
+      try { document.querySelector('meta[name="theme-color"]').setAttribute("content", bgc); document.documentElement.style.background = bgc; document.body.style.background = bgc; var bf2 = document.getElementById("bgfill"); if (bf2) { bf2.style.background = bgc; } } catch (e) {}
+      if (sc.full) {
+        stage.innerHTML = '<div class="hv-fullslide"><p class="hv-role e">' + sc.chip + '</p><h1 class="hv-fhead">' + sc.head + '</h1><p class="hv-ftext">' + sc.text + "</p></div>";
+      } else
       stage.innerHTML = '<div class="hv-words"><p class="hv-role ' + sc.role + '">' + sc.chip + '</p><h1 class="hv-head">' + sc.head + '</h1><p class="hv-text">' + sc.text + '</p></div>' +
         '<div class="hv-phone"><div class="hv-screen' + (sc.light ? " m-lt" : "") + '" style="background:' + sc.bg + '">' + sc.mock + "</div></div>";
-      fit();
+      if (!sc.full) { fit(); }
       for (var b = 0; b < bars.length; b++) { bars[b].style.transition = "none"; bars[b].style.width = b < idx ? "100%" : "0%"; }
       void o.offsetWidth;
       bars[idx].style.transition = "width " + sc.ms + "ms linear"; bars[idx].style.width = "100%";

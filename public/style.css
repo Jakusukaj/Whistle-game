@@ -451,3 +451,17 @@ html, body { min-height: 100%; }
 @keyframes hvTap { 0% { opacity: 0; transform: scale(1.6); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.8); } }
 @media (prefers-reduced-motion: reduce) { .hv-role, .hv-head, .hv-text, .hv-phone, .m-say, .m-row.m-on em { animation: none; opacity: 1; transform: none; } .hv-orb i, .hv-tap { animation: none; } .m-pick { animation: none; background: #111; color: #ECEAE4; } .m-row.m-on { animation: none; background: #111; color: #ECEAE4; } }
 #askHintBtn[hidden] { display: none !important; }
+
+/* centred focal UI inside the frame */
+.hv-screen { justify-content: center; align-items: stretch; gap: 22px; padding: 22px; }
+.hv-screen .m-spacer { display: none; }
+.hv-screen .m-disc { margin: 0 auto; }
+.hv-screen .m-orbwrap { margin-bottom: 4px; }
+.hv-screen .m-big, .hv-screen .m-timer { text-align: left; }
+.hv.hv-full { color: #111; }
+.hv.hv-full .hv-bars span { background: rgba(17,17,17,.2); } .hv.hv-full .hv-bars i { background: #111; } .hv.hv-full .hv-x { color: #111; }
+.hv-fullslide { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px; padding-bottom: 40px; }
+.hv-fhead { font-size: 50px; line-height: 1; letter-spacing: -.035em; font-weight: 800; margin: 0; animation: hvIn 600ms 150ms both cubic-bezier(.2,.8,.2,1); }
+.hv-ftext { font-size: 22px; line-height: 28px; font-weight: 600; margin: 0; animation: hvIn 600ms 450ms both cubic-bezier(.2,.8,.2,1); }
+.hv-fullslide .hv-role { background: #111; color: #ECEAE4; }
+.hv-screen .m-art { margin-top: 6px; } .hv-screen .m-song { margin-top: 6px; }
