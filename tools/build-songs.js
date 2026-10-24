@@ -73,7 +73,9 @@ fs.readFileSync(path.join(dir, "_years.txt"), "utf8").split("\n").forEach(functi
 Object.keys(songs).forEach(function (k) { if (songs[k].year === null && hintYears[k]) { songs[k].hintYear = hintYears[k]; } });
 
 // Pop Off Diva: these artists are in the pack automatically. Other songs join with the V flag.
+var DIVA_GAGA_SKIP = ["disease","joanne","perfect illusion","dance in the dark","speechless","gypsy","bloody mary","eh eh nothing else i can say","911","do what u want","i ll never love again","always remember us this way"];
 var DIVA = new RegExp("\\b(" + [
+  "lady gaga",
   "beyonce", "britney spears", "madonna", "kylie minogue", "dua lipa", "taylor swift", "rihanna", "katy perry", "ariana grande",
   "adele", "lizzo", "whitney houston", "mariah carey", "christina aguilera", "spice girls", "little mix", "girls aloud", "sugababes",
   "doja cat", "sabrina carpenter", "chappell roan", "olivia rodrigo", "billie eilish", "miley cyrus", "shakira", "cher", "cyndi lauper",
@@ -115,7 +117,7 @@ fs.readdirSync(dir).filter(function (f) { return /^hints.*\.txt$/.test(f); }).so
 function packsFor(s) {
   var out = [], y = s.year, f = s.flags;
   if (f.indexOf("B") !== -1) { out.push("bangers"); }
-  if (f.indexOf("V") !== -1 || (DIVA.test(M.normalise(s.artist)) || M.normalise(s.artist) === "pink")) { out.push("diva"); }
+  if (f.indexOf("V") !== -1 || ((DIVA.test(M.normalise(s.artist)) && !(/gaga/.test(M.normalise(s.artist)) && DIVA_GAGA_SKIP.indexOf(M.normalise(s.title)) !== -1)) || M.normalise(s.artist) === "pink")) { out.push("diva"); }
   if (y !== null && f.indexOf("A") === -1) {
     if (y >= 1960 && y <= 1969) { out.push("sixties"); }
     if (y >= 1970 && y <= 1979) { out.push("seventies"); }
