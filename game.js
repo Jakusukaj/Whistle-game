@@ -733,7 +733,7 @@ RoomManager.prototype.guess = function (room, me, conn, msg) {
   if (room.phase !== "turn" || !t || t.stage !== "whistling" || t.playerId === me.id) { return; }
   if (this.now() < t.cooldownUntil) { return; }
   var typed = !!msg.typed;
-  var alts = (Array.isArray(msg.alts) ? msg.alts : []).slice(0, 5)
+  var alts = (Array.isArray(msg.alts) ? msg.alts : []).slice(0, 8)
     .map(function (a) { return String(a == null ? "" : a).slice(0, 120); })
     .filter(function (a) { return a.length > 0; });
   if (!alts.length) { return; }

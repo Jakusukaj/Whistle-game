@@ -137,9 +137,43 @@
     return !STOP[t] && !WEAK[t] && !SHARED[t] && t.length >= 4;
   }
 
+  // A rough "how does it sound" key, so a speech engine's spelling of a regional
+  // accent still lines up with the real word. It folds together the common
+  // northern English habits: a dropped h ("eart" for "heart"), "th" said as f,
+  // v said as f, a dropped t between vowels ("bu'er"), "-in" for "-ing", and the
+  // flat vowels (all vowels become one sound, so "bus" and "boos" match). Only
+  // used for spoken guesses, and only against distinctive title words, and the
+  // whistler still confirms every guess.
+  function soundKey(w) {
+    w = String(w).toLowerCase();
+    w = w.replace(/^h/, "").replace(/^wh/, "w").replace(/^kn/, "n").replace(/^wr/, "r")
+      .replace(/ing$/, "in").replace(/ph/g, "f").replace(/th/g, "f").replace(/v/g, "f")
+      .replace(/gh/g, "").replace(/ck/g, "k").replace(/q/g, "k").replace(/c(?=[aou]|$)/g, "k")
+      .replace(/c/g, "s").replace(/x/g, "ks").replace(/z/g, "s")
+      .replace(/e$/, "").replace(/([aeiouy])t(?=[aeiouy])/g, "$1")
+      .replace(/[aeiouy]+/g, "a").replace(/(.)\1+/g, "$1");
+    return w;
+  }
+
+  function soundsLike(g, t) {
+    if (g.length < 3 || t.length < 4) { return false; }
+    if (Math.abs(g.length - t.length) > 3) { return false; }
+    var kg = soundKey(g), kt = soundKey(t);
+    if (kg.length < 2 || kt.length < 3) { return false; }
+    if (kg === kt) { return true; }
+    return Math.min(kg.length, kt.length) >= 6 && levenshtein(kg, kt) <= 1;
+  }
+
   function wordMatches(g, t, typed) {
     if (g === t) { return true; }
+    if (!typed) {
+      // Spoken only: "-in" for "-ing" ("rollin"), and "th" said as f ("free"
+      // for "three", "bruvver" style swaps are left to the sound key).
+      if (t.length > 3 && /th/.test(t) && g === t.replace(/th/g, "f")) { return true; }
+    }
     if (VOCAB[g]) { return false; }
+    if (!typed && t.length > 4 && /ing$/.test(t) && g === t.slice(0, -1)) { return true; }
+    if (!typed && isStrong(t) && soundsLike(g, t)) { return true; }
     var min = Math.min(g.length, t.length);
     var tol = min >= 9 ? 2 : (min >= 5 ? 1 : 0);
     if (typed && !isStrong(t)) { tol = min >= 9 ? 2 : (min >= 2 ? 1 : 0); }
@@ -149,13 +183,14 @@
       levenshtein(g, t) <= 1;
   }
 
-  function evaluate(guessTokens, titleTokens, typed) {
+  function evaluate(guessTokens, titleTokens, typed, joined) {
     var hit = [], strongIdx = [], i;
     for (i = 0; i < titleTokens.length; i++) {
       var t = titleTokens[i], found = false;
       for (var j = 0; j < guessTokens.length; j++) {
         if (wordMatches(guessTokens[j], t, typed)) { found = true; break; }
       }
+      if (!found && joined && joined.indexOf(t) !== -1) { found = true; }
       hit.push(found);
       if (isStrong(t)) { strongIdx.push(i); }
     }
@@ -191,11 +226,21 @@
     return { matched: ok, score: score, matchedWords: matchedWords };
   }
 
+  // Speech engines often split one word in two ("wonder wall" for "wonderwall").
+  // For spoken guesses, also offer each pair of neighbouring words joined up.
+  function withJoined(gt, typed) {
+    if (typed || gt.length < 2) { return gt; }
+    var out = [];
+    for (var i = 0; i + 1 < gt.length; i++) { out.push(gt[i] + gt[i + 1]); }
+    return out;
+  }
+
   // guess: string. song: song object ({title, aliases}) or a plain title string.
   // options.typed: true for typed guesses (more forgiving of typos).
   function matchTitle(guess, song, options) {
     var typed = !!(options && options.typed);
     var gt = tokens(guess);
+    var joined = withJoined(gt, typed);
     var empty = { matched: false, score: 0, matchedWords: [] };
     if (!gt.length || !song) { return empty; }
     var titles = typeof song === "string" ? [song] : [song.title].concat(song.aliases || []);
@@ -203,7 +248,7 @@
     for (var i = 0; i < titles.length; i++) {
       var tt = tokens(titles[i]);
       if (!tt.length) { continue; }
-      var r = evaluate(gt, tt, typed);
+      var r = evaluate(gt, tt, typed, joined);
       if ((r.matched && !best.matched) || (r.matched === best.matched && r.score > best.score)) {
         best = r;
       }
@@ -265,7 +310,7 @@
   var api = {
     heardPhrase: heardPhrase,
     matchTitle: matchTitle, matchAny: matchAny, useSongs: useSongs,
-    normalise: normalise, tokens: tokens
+    normalise: normalise, tokens: tokens, soundKey: soundKey
   };
   if (typeof module !== "undefined" && module.exports) { module.exports = api; }
   root.Matcher = api;

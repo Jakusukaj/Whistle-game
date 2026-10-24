@@ -128,7 +128,7 @@
 
   function micLaunch() {
     var rec = new SR();
-    rec.lang = "en-GB"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 3;
+    rec.lang = "en-GB"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 5;
     mic.rec = rec; mic.state = "starting";
     var startTimer = setTimeout(function () {
       if (mic.rec === rec && mic.state === "starting") { mic.state = "stopped"; refreshMic(); }
@@ -146,6 +146,11 @@
       for (i = e.resultIndex; i < e.results.length; i++) {
         var alts = [];
         for (k = 0; k < e.results[i].length; k++) { alts.push(e.results[i][k].transcript); }
+        // Also try this phrase joined to the one before it, in case the engine
+        // split a title in two ("blinding" then "lights").
+        if (i > (mic.base || 0) && e.results[i - 1] && e.results[i - 1][0]) {
+          alts.push(e.results[i - 1][0].transcript + " " + alts[0]);
+        }
         var key = alts.join("|");
         if (key === mic.lastSent) { continue; }
         mic.lastSent = key;
