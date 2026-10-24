@@ -244,13 +244,15 @@ p, h1, h2, h3 { text-wrap: balance; }
 .adot { width: 8px; height: 8px; border-radius: 999px; border: 1.5px solid var(--ink); }
 .adot.on { background: var(--ink); }
 
-/* admin strip */
-.admin { position: fixed; top: 0; left: 0; right: 0; z-index: 80; background: var(--ink); color: var(--light); display: flex; align-items: center; gap: 8px; padding: 6px 12px; overflow-x: auto; }
-.admin .atag { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
-.admin .achips { display: flex; gap: 4px; }
-.admin button { min-height: 32px; padding: 0 10px; border-radius: var(--r-sm); background: var(--light); color: var(--ink); font-size: 12px; font-weight: 600; white-space: nowrap; }
-.admin button.on, .admin button.aon { background: var(--yellow); }
-body.admin #app { padding-top: 44px; }
+/* admin strip: sits above the page in the flow, not over it */
+.adminbar { position: sticky; top: 0; z-index: 80; height: 44px; flex: none; background: var(--ink); color: var(--light); display: flex; align-items: center; gap: 8px; padding: 0 12px; overflow-x: auto; white-space: nowrap; }
+.adminbar .atag { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.adminbar .achips { display: flex; gap: 4px; }
+.adminbar button { min-height: 32px; padding: 0 10px; border-radius: var(--r-sm); background: var(--light); color: var(--ink); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.adminbar button.on, .adminbar button.aon { background: var(--yellow); }
+body.admin .screen { min-height: calc(100vh - 44px); min-height: calc(100dvh - 44px); padding-top: 16px; }
+body.admin .picker { top: 44px; }
+body.admin .scrim { top: 44px; }
 
 /* small phones */
 @media (max-height: 760px) {

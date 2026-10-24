@@ -370,7 +370,7 @@
       return '<button class="achip' + (p.id === a.as ? " on" : "") + '" data-id="' + esc(p.id) + '">' + esc(p.name) + "</button>";
     }).join("") + "</div>" + (a.canAdd ? '<button id="aAdd">+ Player</button>' : "") + '<button id="aAuto" class="' + (a.autoplay ? "aon" : "") + '">Bots ' + (a.autoplay ? "on" : "off") + "</button>" + '<button id="aExit">Exit</button>';
     document.body.classList.add("admin");
-    if (!bar) { bar = document.createElement("div"); bar.id = "adminBar"; bar.className = "admin"; document.body.appendChild(bar); adminHtmlCache = ""; }
+    if (!bar) { bar = document.createElement("div"); bar.id = "adminBar"; bar.className = "adminbar"; document.body.insertBefore(bar, app); adminHtmlCache = ""; }
     if (html === adminHtmlCache) { return; }
     adminHtmlCache = html; bar.innerHTML = html;
     var cs = bar.querySelectorAll(".achip");
