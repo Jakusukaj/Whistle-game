@@ -35,6 +35,12 @@ var DEFAULTS = {
   maxPoints: 1000,       // a guess at 0s is worth this before the multiplier
   guesserShare: 0.5,     // each named guesser earns this share of the whistler's points
   revealMs: 13000,       // reveal animation plus the 5 second countdown, then the game moves on (0 turns it off)
+  // End-of-game awards. Each gives bonus points, scaled to the game length. A
+  // bonus can never lift a player past someone who was clearly ahead (more than
+  // closeGap points, scaled the same way) before the bonuses were counted.
+  awardBonus: { whistler: 250, guesser: 250, quickest: 150, streak: 150, daredevil: 150 },
+  maxBonus: 400,
+  closeGap: 300,
   sdDifficulty: "medium",
   sdMaxRounds: 3,
   minPlayers: 2,
@@ -148,7 +154,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
     players: room.players.filter(function (p) { return !p.sitOut; }).map(function (p) {
-      return { id: p.id, name: p.name, connected: p.connected, total: p.total, last: p.last, turns: p.turns, mic: p.mic || null };
+      return { id: p.id, name: p.name, connected: p.connected, total: p.total, last: p.last, turns: p.turns, mic: p.mic || null, bonus: p.bonus || 0 };
     }),
     packs: PACKS.map(function (p) {
       return { id: p.id, group: p.group, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
@@ -160,6 +166,8 @@ RoomManager.prototype.viewFor = function (room, pid) {
     songsInPlay: this.poolFor(room).length,
     turn: tv,
     winners: room.winners || null,
+    endAwards: room.endAwards || null,
+    bonusCapped: !!room.bonusCapped,
     tieBreakWon: !!room.tieBreakWon,
     multipliers: this.opts.multipliers
   };
@@ -540,6 +548,8 @@ RoomManager.prototype.start = function (room, conn) {
     }
   }
   room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
+  room.stats = {}; room.endAwards = null; room.bonusCapped = false;
+  room.players.forEach(function (p) { p.bonus = 0; });
   room.phase = "turn";
   this.advance(room);
 };
@@ -627,6 +637,7 @@ RoomManager.prototype.drawSong = function (room, turn) {
 
 // The ticked packs ran out of unplayed songs: finish the game with the current standings.
 RoomManager.prototype.endEarly = function (room) {
+  this.applyEndBonuses(room);
   var top = -Infinity;
   room.players.forEach(function (p) { if (!p.sitOut && p.total > top) { top = p.total; } });
   var ids = room.players.filter(function (p) { return !p.sitOut && p.total === top; }).map(function (p) { return p.id; });
@@ -814,6 +825,17 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
       awards.push({ id: id, points: Math.round(score * self.opts.guesserShare), role: "guesser" });
     });
   }
+  if (!t.sd) {
+    var ws = statFor(room, t.playerId);
+    ws.whistles++; ws.whistlePts += score;
+    if (outcome === "correct") {
+      ws.solved++; ws.streak++;
+      if (ws.streak > ws.bestStreak) { ws.bestStreak = ws.streak; }
+      if (timeMs < ws.bestTimeMs) { ws.bestTimeMs = timeMs; }
+      if (t.difficulty === "hard") { ws.hardSolved++; }
+      awards.forEach(function (a) { if (a.role === "guesser") { statFor(room, a.id).guessed++; } });
+    } else { ws.streak = 0; }
+  }
   t.stage = "reveal";
   t.pending = null;
   t.result = {
@@ -846,6 +868,73 @@ RoomManager.prototype.next = function (room) {
   this.advance(room);
 };
 
+// ------------------------------------------------------ end-of-game awards
+function statFor(room, id) {
+  if (!room.stats) { room.stats = {}; }
+  if (!room.stats[id]) {
+    room.stats[id] = { whistles: 0, solved: 0, streak: 0, bestStreak: 0, bestTimeMs: Infinity, hardSolved: 0, guessed: 0, whistlePts: 0 };
+  }
+  return room.stats[id];
+}
+
+// Work out the awards, hand out the bonus points, and keep the bonuses from
+// overturning a lead that was clear before they were counted. Runs once a game.
+RoomManager.prototype.applyEndBonuses = function (room) {
+  if (room.endAwards) { return; }
+  var self = this, o = this.opts, pool = room.players.filter(function (p) { return !p.sitOut; });
+  var scale = Math.min(1.5, Math.max(0.6, 0.5 + room.rounds / 10));
+  function amt(n) { return Math.round(n * scale / 10) * 10; }
+  var defs = [];
+  function pickBest(key, title, score, detail, min) {
+    var best = null, ids = [];
+    pool.forEach(function (p) {
+      var v = score(statFor(room, p.id));
+      if (v === null || v < min) { return; }
+      if (best === null || v > best + 1e-9) { best = v; ids = [p.id]; } else if (Math.abs(v - best) < 1e-9) { ids.push(p.id); }
+    });
+    if (ids.length) { defs.push({ key: key, title: title, bonus: amt(o.awardBonus[key]), winners: ids.map(function (id) { return { id: id, detail: detail(statFor(room, id)) }; }) }); }
+  }
+  pickBest("whistler", "Best whistler", function (st) { return st.whistles ? st.whistlePts / st.whistles : null; },
+    function (st) { return "Averaged " + Math.round(st.whistlePts / st.whistles) + " points a whistle"; }, 1);
+  pickBest("guesser", "Best guesser", function (st) { return st.guessed; },
+    function (st) { return "Named " + st.guessed + (st.guessed === 1 ? " song" : " songs"); }, 1);
+  pickBest("quickest", "Quickest tune", function (st) { return st.solved ? -st.bestTimeMs : null; },
+    function (st) { return "Solved in " + (Math.round(st.bestTimeMs / 100) / 10) + " seconds"; }, -Infinity);
+  pickBest("streak", "On a roll", function (st) { return st.bestStreak; },
+    function (st) { return st.bestStreak + " solved in a row"; }, 2);
+  pickBest("daredevil", "Daredevil", function (st) { return st.hardSolved; },
+    function (st) { return st.hardSolved + " hard " + (st.hardSolved === 1 ? "song" : "songs") + " solved"; }, 2);
+  // Desired bonus per player, capped.
+  var want = {};
+  defs.forEach(function (d) { d.winners.forEach(function (w) { want[w.id] = (want[w.id] || 0) + d.bonus; }); });
+  var maxB = Math.round(o.maxBonus * scale / 10) * 10, gap = Math.round(o.closeGap * scale);
+  Object.keys(want).forEach(function (id) { if (want[id] > maxB) { want[id] = maxB; } });
+  // Settle from the top down: nobody may finish above someone who led them by
+  // more than the gap, so a big lead survives the bonuses.
+  var order = pool.slice().sort(function (a, b) { return b.total - a.total; });
+  var final = {}, got = {}, capped = false;
+  order.forEach(function (p) {
+    var w = want[p.id] || 0, cap = Infinity;
+    order.forEach(function (a) {
+      if (a === p || final[a.id] === undefined) { return; }
+      if (a.total - p.total > gap) { cap = Math.min(cap, final[a.id] - p.total - 1); }
+    });
+    var b = Math.max(0, Math.min(w, cap));
+    if (b < w) { capped = true; }
+    got[p.id] = b; final[p.id] = p.total + b;
+  });
+  // Share each player's allowed bonus across their awards in proportion.
+  defs.forEach(function (d) {
+    d.winners.forEach(function (w) {
+      var wantP = want[w.id] || 0;
+      w.bonus = wantP ? Math.round(d.bonus * (got[w.id] || 0) / wantP) : 0;
+    });
+  });
+  pool.forEach(function (p) { p.bonus = got[p.id] || 0; p.total += p.bonus; });
+  room.bonusCapped = capped;
+  room.endAwards = defs;
+};
+
 // ------------------------------------------------------ tie-break and the end
 RoomManager.prototype.afterTurns = function (room) {
   var i, ids;
@@ -857,6 +946,7 @@ RoomManager.prototype.afterTurns = function (room) {
     room.sd.contenders = winners; room.sd.round++; room.sd.scores = {};
     return this.queueSuddenDeath(room);
   }
+  this.applyEndBonuses(room);
   var top = -Infinity;
   room.players.forEach(function (p) { if (p.total > top) { top = p.total; } });
   ids = room.players.filter(function (p) { return p.total === top; }).map(function (p) { return p.id; });
@@ -884,7 +974,8 @@ RoomManager.prototype.gameOver = function (room, winnerIds, viaTieBreak) {
 RoomManager.prototype.resetToLobby = function (room) {
   this.clearTimers(room.turn);
   room.players = room.players.filter(function (p) { return p.connected; });
-  room.players.forEach(function (p) { p.total = 0; p.last = null; p.turns = 0; p.sitOut = false; });
+  room.players.forEach(function (p) { p.total = 0; p.last = null; p.turns = 0; p.bonus = 0; p.sitOut = false; });
+  room.stats = {}; room.endAwards = null; room.bonusCapped = false;
   room.phase = "lobby"; room.turn = null; room.turns = []; room.turnPos = -1;
   room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {};
   this.promoteHost(room);

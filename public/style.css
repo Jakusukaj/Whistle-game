@@ -560,3 +560,13 @@ p,.wh-sub,.wh-note,.wh-help,.wh-pack__desc,.wh-setting__sub,.packnote,.packline,
 .wh-pack .wh-tick{top:22px;right:22px}
 .wh-empty{padding:34px 32px}
 .codecard{padding:6px 10px}
+
+/* End-of-game awards */
+.awardcard { margin-top: 28px; }
+.awardcard__k { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 12px; opacity: .8; }
+.awardcard__who { font-size: 44px; line-height: 1.05; margin: 0 0 12px; letter-spacing: -.02em; }
+.awardcard__d { font-size: 15px; margin: 0 0 20px; opacity: .85; }
+.awardcard__p { font-size: 34px; font-weight: 800; margin: 0; letter-spacing: -.01em; }
+.adots { display: flex; gap: 8px; margin-top: 28px; }
+.adot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .25; display: block; }
+.adot.on { opacity: 1; }

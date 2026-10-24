@@ -945,8 +945,54 @@
     return out;
   }
 
+  // End-of-game awards: shown one at a time, then the final scores.
+  var awardState = { key: null, idx: 0, done: false, timer: null };
+
+  function awardsKey(s) { return s.code + "|" + (s.endAwards || []).map(function (d) { return d.key + d.winners.map(function (w) { return w.id; }).join(","); }).join(";"); }
+
+  function awardAdvance(s) {
+    clearTimeout(awardState.timer);
+    if (awardState.idx + 1 >= (s.endAwards || []).length) { awardState.done = true; } else { awardState.idx++; }
+    render();
+  }
+
+  function awardCardHtml(s) {
+    var d = s.endAwards[awardState.idx];
+    var names = d.winners.map(function (w) { return esc(pname(s, w.id)); });
+    var who = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names[names.length - 1] : names[0];
+    var got = d.winners[0].bonus;
+    var detail = d.winners.length === 1 ? esc(d.winners[0].detail) : "Shared award";
+    var dots = s.endAwards.map(function (_, i) { return '<i class="adot' + (i === awardState.idx ? " on" : "") + '"></i>'; }).join("");
+    return '<div class="awardcard"><p class="awardcard__k">' + esc(d.title) + '</p><h1 class="awardcard__who">' + who + "</h1>" +
+      '<p class="awardcard__d">' + detail + "</p>" +
+      '<p class="awardcard__p">' + (got > 0 ? "+" + pts(got) + " points" + (d.winners.length > 1 ? " each" : "") : "Bonus held back to keep the lead") + "</p></div>" +
+      '<div class="adots">' + dots + "</div>";
+  }
+
+  function viewAwards(s) {
+    return {
+      key: "awards", field: "sun",
+      html: '<div class="screen" id="awardScreen">' +
+        '<div class="wh-topbar"><div class="wh-topbar__title">Awards</div></div>' + awardCardHtml(s) +
+        '<div class="spacer"></div>' +
+        '<button id="awardNext" class="wh-btn wh-btn--block">' + (awardState.idx + 1 >= s.endAwards.length ? "See final scores" : "Next award") + "</button>" +
+        '<button id="awardSkip" class="wh-btn wh-btn--ghost">Skip</button></div>',
+      bind: function () {
+        clearTimeout(awardState.timer);
+        awardState.timer = setTimeout(function () { awardAdvance(st); }, 3600);
+        $("#awardNext").onclick = function () { awardAdvance(st); };
+        $("#awardSkip").onclick = function () { clearTimeout(awardState.timer); awardState.done = true; render(); };
+      }
+    };
+  }
+
   function viewOver(s) {
+    var k = awardsKey(s);
+    if (awardState.key !== k) { awardState.key = k; awardState.idx = 0; awardState.done = false; }
+    if (s.endAwards && s.endAwards.length && !awardState.done) { return viewAwards(s); }
+    clearTimeout(awardState.timer);
     var isHost = s.hostId === s.me;
+    var bonuses = s.players.filter(function (p) { return p.bonus > 0; }).map(function (p) { return { id: p.id, points: p.bonus }; });
     var names = (s.winners || []).map(function (id) { return pname(s, id); });
     var head = names.length > 1 ? "It's a draw: " + names.map(esc).join(" and ") : esc(names[0] || "Nobody") + " wins";
     return {
@@ -957,7 +1003,8 @@
         '<div class="wh-topbar"><div class="wh-topbar__title">Game over</div></div>' +
         '<h1 class="wh-title">' + head + "</h1>" +
         (s.tieBreakWon ? '<p class="wh-sub">Settled in a tie-break.</p>' : "") +
-        '<h2 class="wh-over">Final scores</h2>' + standingsHtml(s, null, s.winners) +
+        '<h2 class="wh-over">Final scores</h2>' + standingsHtml(s, bonuses, s.winners) +
+        (bonuses.length ? '<p class="wh-sub">Bonus points from the awards are included.' + (s.bonusCapped ? " A big lead cannot be overturned by bonuses." : "") + "</p>" : "") +
         '<div class="spacer"></div>' +
         (isHost ? '<button id="againBtn" class="wh-btn wh-btn--block">Play again</button>' : '<p class="wh-sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") +
         '<button id="leaveBtn" class="wh-btn wh-btn--ghost">Leave room</button></div>',
@@ -976,7 +1023,7 @@
       "Whistle it. Only you can see the song.",
       "Everyone else shouts or types guesses. The quicker they get it, the more it is worth.",
       "Say who got it. You and everyone you name earn points.",
-      "Stuck? Shuffle for a new song (100 points) or ask for a hint (50, then 100, then 150). The highest total wins."
+      "Stuck? Shuffle for a new song (100 points) or ask for a hint (50, then 100, then 150). The highest total wins, and end-of-game awards for the best whistler, best guesser and more earn bonus points."
     ];
 
 

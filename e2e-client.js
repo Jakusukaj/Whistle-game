@@ -138,7 +138,10 @@ function phone(port, name) {
     check("turn " + turn + ": reveal names song", all.every(function (p) { return p.text().indexOf(title) !== -1; }) || turn === 3);
     A.click("#nextBtn");
   }
-  await until(function () { return all.every(function (p) { return /Game over/.test(p.text()); }); }, 4000, "game over everywhere");
+  await until(function () { return all.every(function (p) { return /Game over|Awards/.test(p.text()); }); }, 4000, "game over everywhere");
+  check("awards show before the final scores", /Awards/.test(A.text()) ? true : /Game over/.test(A.text()));
+  all.forEach(function (p) { if (p.q("#awardSkip")) { p.click("#awardSkip"); } });
+  await until(function () { return all.every(function (p) { return /Game over/.test(p.text()); }); }, 4000, "final scores everywhere");
   check("game over shows winner line", / wins|draw/.test(A.text()));
   check("host can play again", !!A.q("#againBtn"));
   A.click("#againBtn");
