@@ -171,6 +171,11 @@
     micLaunch();
   }
 
+  // Called from the tap on Start lobby or Join lobby, the one moment the browser lets the mic start.
+  function autoMic() {
+    if (SR && !mic.typeMode && mic.state !== "on" && mic.state !== "starting" && mic.state !== "blocked") { try { micStart(); } catch (e) {} }
+  }
+
   function micLaunch() {
     var rec = new SR();
     rec.lang = "en-GB"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 5;
@@ -396,7 +401,7 @@
         '<div class="field-group">' + nameField(name) + '<button id="joinBtn" class="btn" style="margin-top:12px">Join lobby</button></div>' +
         '<div class="spacer"></div>' + goHome + "</div>",
       bind: function () {
-        var go = function () { var n = readName(); if (n) { send({ t: "join", code: invite.code, name: n }); } };
+        var go = function () { var n = readName(); if (n) { autoMic(); send({ t: "join", code: invite.code, name: n }); } };
         $("#joinBtn").onclick = go;
         $("#name").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
         $("#inviteHome").onclick = function () { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} lastKey = null; render(); };
@@ -425,11 +430,11 @@
         g.innerHTML = gamesHtml();
         var bs = g.querySelectorAll(".gamebtn");
         for (var i = 0; i < bs.length; i++) {
-          bs[i].onclick = function () { var n = readName(); if (n) { send({ t: "join", code: this.getAttribute("data-code"), name: n }); } };
+          bs[i].onclick = function () { var n = readName(); if (n) { autoMic(); send({ t: "join", code: this.getAttribute("data-code"), name: n }); } };
         }
       },
       bind: function () {
-        var go = function () { var n = readName(); if (n) { copyOnJoin = true; primeCopy(); send({ t: "create", name: n }); } };
+        var go = function () { var n = readName(); if (n) { copyOnJoin = true; autoMic(); primeCopy(); send({ t: "create", name: n }); } };
         $("#hostBtn").onclick = go;
         $("#name").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
         $("#helpBtn").onclick = showHelp;

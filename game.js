@@ -27,6 +27,7 @@ var SONG_BUFFER = 5; // spare songs a game needs beyond one per turn (shuffles, 
 var DEFAULTS = {
   limitMs: 60000,        // a turn that nobody guesses scores nothing
   countdownMs: 3000,     // 3, 2, 1 before the clock starts
+  awayMs: 12000,         // a whistler who drops out is skipped after this long unless they come back
   confirmMs: 10000,      // whistler has this long to confirm a detected guess
   cooldownMs: 4000,      // ignore guesses this long after the whistler says "no"
   shufflePoints: 100,    // each shuffle costs this many points, taken off after the multiplier
@@ -314,6 +315,7 @@ RoomManager.prototype.handle = function (conn, msg) {
 RoomManager.prototype.attach = function (room, player, conn) {
   if (player.conn && player.conn !== conn) { player.conn.roomCode = null; player.conn.playerId = null; }
   player.conn = conn; player.connected = true;
+  if (room.turn && room.turn.playerId === player.id && room.turn.timers && room.turn.timers.away) { clearTimeout(room.turn.timers.away); room.turn.timers.away = null; }
   conn.roomCode = room.code; conn.playerId = player.id;
 };
 
@@ -430,6 +432,17 @@ RoomManager.prototype.disconnect = function (conn) {
   p.conn = null; p.connected = false;
   conn.roomCode = null; conn.playerId = null;
   this.promoteHost(room);
+  var t = room.turn;
+  if (room.phase === "turn" && t && t.playerId === p.id && t.stage !== "reveal" && t.timers && !t.timers.away) {
+    var self = this, id = t.id;
+    t.timers.away = setTimeout(function () {
+      var cur = room.turn;
+      if (cur && cur.id === id && cur.stage !== "reveal" && !p.connected) {
+        if (cur.stage === "whistling") { self.pause(cur); }
+        self.finishTurn(room, "skipped");
+      }
+    }, this.opts.awayMs);
+  }
   this.broadcast(room);
 };
 

@@ -97,7 +97,7 @@ function phone(port, name) {
     await until(function () { return W.q("#bigtime") && others.every(function (p) { return p.q("#toType") || p.q("#ginput"); }); }, 3000, "whistling started");
     if (turn === 1) {
       check("guesser sees the mic and the type instead button", !!others[0].q("#orb") && /Type instead/i.test(others[0].text()));
-      check("mic off until switched on", /tap to turn on/.test(others[0].text()));
+      check("mic starts by itself from the join tap", /Listening/.test(others[0].text()));
       others[0].click("#orb");
       await until(function () { return /Listening/.test(others[0].text()); }, 2000, "listening headline after mic on");
       check("mic orb no longer greyed", !others[0].q("#orb").classList.contains("off"));

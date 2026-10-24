@@ -39,5 +39,21 @@ function client(port) {
   var before = A.state.totalTurns;
   A.send({ t: "removePlayer", id: cat.id }); await sleep(150);
   check("host removes away player mid-game", !A.state.players.some(function (p) { return p.name === "Cat"; }) && A.state.totalTurns < before);
+  // A whistler who drops out is skipped after the grace period; one who returns in time is not.
+  var s2 = createServer({ defaultPacks: ["bangers"], revealMs: 0, countdownMs: 50, awayMs: 400 });
+  await new Promise(function (r) { s2.server.listen(0, r); });
+  var p2 = s2.server.address().port;
+  var X = client(p2), Y = client(p2), Z = client(p2);
+  await Promise.all([X.ready, Y.ready, Z.ready]);
+  X.send({ t: "create", name: "Xan" }); await sleep(100);
+  Y.send({ t: "join", code: X.code, name: "Yas" }); await sleep(100);
+  X.send({ t: "setRounds", rounds: 2 }); X.send({ t: "start" }); await sleep(200);
+  var wname = X.state.turn.playerId === X.id ? "Xan" : "Yas", W = wname === "Xan" ? X : Y, O = W === X ? Y : X;
+  var tid = X.state.turn.id;
+  W.ws.close(); await sleep(150);
+  check("turn still running just after the whistler leaves", O.state.turn && O.state.turn.stage !== "reveal");
+  await sleep(600);
+  check("whistler who stays away is skipped", O.state.turn && O.state.turn.stage === "reveal" && O.state.turn.result.outcome === "skipped");
+  s2.server.close();
   s.server.close(); process.exit(failed ? 1 : 0);
 })();
