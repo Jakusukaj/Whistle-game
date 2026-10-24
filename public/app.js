@@ -176,15 +176,27 @@
     if (SR && !mic.typeMode && mic.state !== "on" && mic.state !== "starting" && mic.state !== "blocked") { try { micStart(); } catch (e) {} }
   }
 
+  // Some in-app and privacy browsers (DuckDuckGo on iPhone, for one) expose speech recognition but never start it.
+  // After two starts that go nowhere, stop trying and let the player type.
+  function micGiveUp() {
+    if (mic.fails >= 2) {
+      mic.want = false; mic.typeMode = true; mic.state = "stopped";
+      try { if (mic.rec) { mic.rec.onend = null; mic.rec.abort(); } } catch (e) {}
+      mic.rec = null;
+      toast("This browser cannot hear guesses. Type them instead.");
+      if (st) { render(); }
+    }
+  }
+
   function micLaunch() {
     var rec = new SR();
     rec.lang = "en-GB"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 5;
     mic.rec = rec; mic.state = "starting";
     var startTimer = setTimeout(function () {
-      if (mic.rec === rec && mic.state === "starting") { mic.state = "stopped"; refreshMic(); }
+      if (mic.rec === rec && mic.state === "starting") { mic.fails = (mic.fails || 0) + 1; mic.state = "stopped"; micGiveUp(); refreshMic(); }
     }, 3500);
     rec.onsoundstart = rec.onspeechstart = function () { mic.level = Math.max(mic.level, 0.7); };
-    rec.onstart = function () { mic.base = 0; mic.total = 0; clearTimeout(startTimer); if (mic.rec === rec) { mic.state = "on"; refreshMic(); } };
+    rec.onstart = function () { mic.fails = 0; mic.base = 0; mic.total = 0; clearTimeout(startTimer); if (mic.rec === rec) { mic.state = "on"; refreshMic(); } };
     rec.onresult = function (e) {
       var text = "", i, k;
       mic.total = e.results.length;
@@ -213,12 +225,13 @@
       }
     };
     rec.onerror = function (e) {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
-        mic.want = false; mic.state = "blocked"; refreshMic();
+      if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture" || e.error === "language-not-supported") {
+        mic.want = false; mic.state = "blocked"; mic.typeMode = true; refreshMic(); if (st) { render(); }
       }
     };
     rec.onend = function () {
       clearTimeout(startTimer);
+      if (mic.want && mic.rec === rec && mic.state === "starting") { mic.fails = (mic.fails || 0) + 1; micGiveUp(); if (!mic.want) { refreshMic(); return; } }
       if (mic.want && mic.rec === rec) {
         mic.state = "starting"; refreshMic();
         setTimeout(function () {
