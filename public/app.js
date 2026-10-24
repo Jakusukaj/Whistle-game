@@ -224,15 +224,15 @@
 
   // ----------------------------------------------------------------- views
   var PACK_GROUPS = [
-    { name: "Vibe", ids: ["bangers", "rock", "party", "soul", "tv", "film", "disney"] },
+    { name: "Vibe", ids: ["bangers", "diva", "party", "soul", "tv", "film", "disney"] },
     { name: "Eras", ids: ["sixties", "seventies", "eighties", "nineties", "noughties", "tens", "today"] },
     { name: "Artists", ids: ["beatles", "bowie", "gaga", "talkingheads"] },
     { name: "Special events", ids: ["halloween", "xmas"] }
   ];
   // Pack colour tokens from the design system. "l" means light text, "i" ink text.
   var PACK_COL = {
-    bangers: ["#225A31", "l"], rock: ["#972622", "l"], party: ["#41AE61", "i"], soul: ["#FE973B", "i"], tv: ["#115E5E", "l"], film: ["#95330F", "l"], disney: ["#E4DC71", "i"],
-    sixties: ["#43B2AC", "i"], seventies: ["#F68675", "i"], eighties: ["#6EBB5D", "i"], nineties: ["#FF4FA3", "i"], noughties: ["#575A13", "l"], tens: ["#F77036", "i"], today: ["#C1CF51", "i"],
+    bangers: ["#225A31", "l"], diva: ["#FF4FA3", "i"], party: ["#41AE61", "i"], soul: ["#FE973B", "i"], tv: ["#115E5E", "l"], film: ["#95330F", "l"], disney: ["#E4DC71", "i"],
+    sixties: ["#43B2AC", "i"], seventies: ["#F68675", "i"], eighties: ["#6EBB5D", "i"], nineties: ["#972622", "l"], noughties: ["#575A13", "l"], tens: ["#F77036", "i"], today: ["#C1CF51", "i"],
     beatles: ["#2640EC", "l"], bowie: ["#D1AD41", "i"], gaga: ["#4DBC92", "i"], talkingheads: ["#FFAE34", "i"],
     halloween: ["#F85452", "i"], xmas: ["#8CAD40", "i"]
   };

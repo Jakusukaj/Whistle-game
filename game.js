@@ -53,9 +53,11 @@ var DEFAULTS = {
   roomMaxAgeMs: 12 * 60 * 60 * 1000
 };
 
-// The three hints, in order: how long the title is, the year, then who it is by.
+// The three hints, in order, from a gentle nudge to nearly obvious. Most songs have their own, written in
+// songs-src/hints-*.txt. A song without them falls back to: how long the title is, the year, then who it is by.
 // They are built from facts about the song, never its lyrics, and never give away the title.
 function hintLines(song) {
+  if (song.hints && song.hints.length === 3) { return song.hints.slice(); }
   var words = String(song.title).replace(/\(.*?\)/g, "").split(/\s+/).filter(Boolean).length;
   var packs = song.packs || [], a = song.artist;
   var h3;

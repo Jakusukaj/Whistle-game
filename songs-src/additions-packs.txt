@@ -1,0 +1,367 @@
+# Extra songs for the themed and artist packs. Flags: S soul, X Christmas, H Halloween, F film, D Disney and musicals, T TV, L Beatles, O Bowie, G Lady Gaga, K Talking Heads, A pack only.
+# Soul and Motown
+Reach Out I'll Be There | The Four Tops | m | 1966 | S
+I Can't Help Myself (Sugar Pie Honey Bunch) | The Four Tops | m | 1965 | S
+Baby I Need Your Loving | The Four Tops | m | 1964 | S
+I Second That Emotion | Smokey Robinson and the Miracles | m | 1967 | S
+The Love You Save | The Jackson 5 | m | 1970 | S
+ABC | The Jackson 5 | e | 1970 | S
+Dancing in the Moonlight | King Harvest | m | 1972 | S
+Nowhere to Run | Martha and the Vandellas | m | 1965 | S
+Jimmy Mack | Martha and the Vandellas | m | 1967 | S
+Shotgun | Junior Walker and the All Stars | m | 1965 | S
+You Can't Hurry Love | The Supremes | e | 1966 | S
+You Keep Me Hangin' On | The Supremes | m | 1966 | S
+Reflections | Diana Ross and the Supremes | m | 1967 | S
+Love Child | Diana Ross and the Supremes | m | 1968 | S
+Sweet Soul Music | Arthur Conley | m | 1967 | S
+Knock on Wood | Eddie Floyd | m | 1966 | S
+Hold On I'm Coming | Sam and Dave | m | 1966 | S
+Soul Man | Sam and Dave | m | 1967 | S
+Green Onions | Booker T. and the M.G.'s | m | 1962 | S
+Try Me | James Brown | h | 1958 | S
+I Feel Good | James Brown | m | 1965 | S
+Papa's Got a Brand New Bag | James Brown | m | 1965 | S
+Sunny | Bobby Hebb | m | 1966 | S
+Rescue Me | Fontella Bass | m | 1965 | S
+Barefootin' | Robert Parker | m | 1966 | S
+The Tears of a Clown | Smokey Robinson and the Miracles | m | 1970 | S
+Dock of the Bay | Otis Redding | m | 1968 | S
+Let's Get It On | Marvin Gaye | m | 1973 | S
+Got to Give It Up | Marvin Gaye | m | 1977 | S
+How Sweet It Is (to Be Loved by You) | Marvin Gaye | m | 1964 | S
+Ain't Nothing Like the Real Thing | Marvin Gaye and Tammi Terrell | m | 1968 | S
+Aint No Mountain High Enough | Marvin Gaye and Tammi Terrell | m | 1967 | S
+You Are the Sunshine of My Life | Stevie Wonder | m | 1973 | S
+Living for the City | Stevie Wonder | m | 1973 | S
+Boogie On Reggae Woman | Stevie Wonder | m | 1974 | S
+As | Stevie Wonder | m | 1976 | S
+Overjoyed | Stevie Wonder | m | 1985 | S
+Ribbon in the Sky | Stevie Wonder | m | 1982 | S
+Ebony and Ivory | Paul McCartney and Stevie Wonder | m | 1982 | S
+Ain't No Stoppin' Us Now | McFadden and Whitehead | m | 1979 | S
+Stayin' Alive | Bee Gees | m | 1977 | S
+Night Fever | Bee Gees | m | 1977 | S
+More Than a Woman | Bee Gees | m | 1977 | S
+Too Much Heaven | Bee Gees | m | 1978 | S
+Jive Talkin' | Bee Gees | m | 1975 | S
+You Should Be Dancing | Bee Gees | m | 1976 | S
+Le Freak | Chic | m | 1978 | S
+Good Times | Chic | m | 1979 | S
+I Want Your Love | Chic | m | 1978 | S
+Everybody Dance | Chic | m | 1977 | S
+Got to Be Real | Cheryl Lynn | m | 1978 | S
+Mr. Big Stuff | Jean Knight | m | 1971 | S
+Rock the Boat | The Hues Corporation | m | 1973 | S
+Disco Inferno | The Trammps | m | 1976 | S
+Kung Fu Fighting | Carl Douglas | e | 1974 | S
+Do the Hustle | Van McCoy | m | 1975 | S
+That's the Way (I Like It) | KC and the Sunshine Band | m | 1975 | S
+Get Down Tonight | KC and the Sunshine Band | m | 1975 | S
+Shake Your Booty | KC and the Sunshine Band | m | 1976 | S
+Play That Funky Music | Wild Cherry | m | 1976 | S
+Get Down on It | Kool and the Gang | m | 1981 | S
+Fresh | Kool and the Gang | m | 1984 | S
+Give It Up | KC and the Sunshine Band | m | 1983 | S
+Super Freak | Rick James | m | 1981 | S
+Give It to Me Baby | Rick James | m | 1981 | S
+Word Up! | Cameo | m | 1986 | S
+Atomic Dog | George Clinton | m | 1982 | S
+Flash Light | Parliament | m | 1977 | S
+Rock with You | Michael Jackson | m | 1979 | S
+Don't Stop 'til You Get Enough | Michael Jackson | m | 1979 | S
+Off the Wall | Michael Jackson | m | 1979 | S
+She's Out of My Life | Michael Jackson | m | 1979 | S
+Human Nature | Michael Jackson | m | 1983 | S
+P.Y.T. (Pretty Young Thing) | Michael Jackson | m | 1983 | S
+Black or White | Michael Jackson | m | 1991 | S
+You Are Not Alone | Michael Jackson | m | 1995 | S
+Remember the Time | Michael Jackson | m | 1992 | S
+Dirty Diana | Michael Jackson | m | 1987 | S
+The Way You Make Me Feel | Michael Jackson | m | 1987 | S
+Jam | Michael Jackson | m | 1992 | S
+Heal the World | Michael Jackson | m | 1991 | S
+# Christmas
+Fairytale of New York | The Pogues and Kirsty MacColl | m | 1987 | X
+All I Want for Christmas Is You | Mariah Carey | m | 1994 | X
+Wonderful Dream (Holidays Are Coming) | Melanie Thornton | m | 2000 | X
+Merry Christmas Everyone | Shakin' Stevens | e | 1985 | X
+Don't Let the Bells End | The Darkness | m | 2003 | X
+Mistletoe and Wine | Cliff Richard | m | 1988 | X
+Lonely This Christmas | Mud | m | 1974 | X
+Wombling Merry Christmas | The Wombles | m | 1974 | X
+Merry Xmas Everybody | Slade | e | 1973 | X
+Blue Christmas | Elvis Presley | m | 1957 | X
+Santa Claus Is Comin' to Town | Bruce Springsteen | m | 1980 | X
+Please Come Home for Christmas | Eagles | m | 1978 | X
+Run Rudolph Run | Chuck Berry | m | 1958 | X
+Santa Baby | Eartha Kitt | m | 1953 | X
+Little Drummer Boy | Bing Crosby and David Bowie | m | 1977 | X
+It's Beginning to Look a Lot like Christmas | Michael Buble | m | 2011 | X
+Mary, Did You Know? | Pentatonix | m | 2014 | X
+Underneath the Tree | Kelly Clarkson | e | 2013 | X
+Mistletoe | Justin Bieber | m | 2011 | X
+Cozy Little Christmas | Katy Perry | m | 2018 | X
+Christmas Tree Farm | Taylor Swift | m | 2019 | X
+Last Christmas | Wham! | e | 1984 | XB
+Step into Christmas | Elton John | m | 1973 | X
+Wonderful Christmastime | Paul McCartney | m | 1979 | X
+Stay Another Day | East 17 | m | 1994 | X
+Do They Know It's Christmas? | Band Aid | m | 1984 | X
+Rockin' Around the Christmas Tree | Brenda Lee | e | 1958 | X
+White Christmas | Bing Crosby | m | 1942 | X
+The First Noel | - | m | - | X
+It Came Upon the Midnight Clear | - | m | - | X
+We Three Kings | - | m | - | X
+Joy to the World | - | e | - | X
+I Saw Three Ships | - | m | - | X
+The Holly and the Ivy | - | m | - | X
+In the Bleak Midwinter | - | m | - | X
+Coventry Carol | - | h | - | X
+O Christmas Tree | - | m | - | X
+Carol of the Bells | - | h | - | X
+# Halloween
+Thriller | Michael Jackson | m | 1982 | H
+Monster | Lady Gaga | m | 2009 | HG
+Monster Mash | Bobby Pickett | e | 1962 | H
+I Was Made for Lovin' You | Kiss | m | 1979 | A
+Psycho Killer | Talking Heads | m | 1977 | HK
+Sweet Dreams (Are Made of This) | Eurythmics | m | 1983 | H
+Bad Guy | Billie Eilish | e | 2019 | H
+Somebody's Watching Me | Rockwell | m | 1984 | H
+Ghostbusters | Ray Parker Jr. | e | 1984 | H
+Little Red Riding Hood | Sam the Sham and the Pharaohs | m | 1966 | H
+Wolf Like Me | TV on the Radio | m | 2006 | H
+Black Sabbath | Black Sabbath | m | 1970 | H
+Hotel California | Eagles | m | 1976 | H
+Oogie Boogie's Song | Ken Page | m | 1993 | HD
+Monster Mash | Bobby Boris Pickett | e | 1962 | H
+Spooky | Dusty Springfield | m | 1968 | H
+Haunted House | Gene Simmons | m | 1964 | H
+Nightmare on My Street | DJ Jazzy Jeff and the Fresh Prince | m | 1988 | H
+Calling All the Monsters | China Anne McClain | m | 2011 | H
+The Nightmare Before Christmas Overture | Danny Elfman | h | 1993 | H
+Everybody's Got Something to Hide Except Me and My Monkey | The Beatles | h | 1968 | HL
+The Witch | The Rattles | m | 1970 | H
+Evil Ways | Santana | m | 1969 | H
+Thriller Theme | Vincent Price | m | 1982 | A
+Halloween Theme | John Carpenter | h | 1978 | HF
+Psycho Theme | Bernard Herrmann | h | 1960 | HF
+Tubular Bells | Mike Oldfield | m | 1973 | H
+Mr. Sandman | The Chordettes | m | 1954 | H
+The Exorcist Theme | Mike Oldfield | h | 1973 | H
+Everybody Wants to Rule the World | Tears for Fears | m | 1985 | A
+# Film
+Let It Go | Idina Menzel | m | 2013 | F
+Skyfall | Adele | m | 2012 | F
+Live and Let Die | Paul McCartney and Wings | m | 1973 | F
+Eye of the Tiger | Survivor | e | 1982 | F
+Gonna Fly Now | Bill Conti | m | 1976 | F
+Stayin' Alive | Bee Gees | m | 1977 | F
+You're the One That I Want | John Travolta and Olivia Newton-John | e | 1978 | F
+Footloose | Kenny Loggins | e | 1984 | F
+Mrs. Robinson | Simon and Garfunkel | m | 1968 | F
+Respect | Aretha Franklin | m | 1967 | F
+Pretty Woman | Roy Orbison | m | 1964 | F
+Unchained Melody | The Righteous Brothers | m | 1965 | F
+Twist and Shout | The Beatles | e | 1963 | F
+Don't You (Forget About Me) | Simple Minds | e | 1985 | F
+Stand by Me | Ben E. King | e | 1961 | F
+Lose Yourself | Eminem | m | 2002 | F
+Hakuna Matata | Nathan Lane | m | 1994 | F
+Mia and Sebastian's Theme | Justin Hurwitz | h | 2016 | F
+All Star | Smash Mouth | e | 1999 | F
+I Don't Want to Miss a Thing | Aerosmith | m | 1998 | F
+Mad World | Gary Jules | m | 2001 | F
+Born to Be Wild | Steppenwolf | m | 1968 | F
+Bohemian Rhapsody | Queen | m | 1975 | F
+Pure Imagination | Gene Wilder | m | 1971 | F
+Moon River | Audrey Hepburn | m | 1961 | F
+Raindrops Keep Fallin' on My Head | B.J. Thomas | m | 1969 | F
+Everybody's Talkin' | Harry Nilsson | m | 1969 | F
+Gollum's Song | Emiliana Torrini | h | 2002 | F
+Ghostbusters | Ray Parker Jr. | e | 1984 | F
+The Imperial March | John Williams | m | 1980 | F
+Schindler's List Theme | John Williams | h | 1993 | F
+Cantina Band | John Williams | m | 1977 | F
+Indiana Jones Theme | John Williams | m | 1981 | F
+Harry Potter and the Philosopher's Stone | John Williams | m | 2001 | F
+Pirates of the Caribbean Theme | Klaus Badelt | m | 2003 | F
+Gladiator Theme | Hans Zimmer | h | 2000 | F
+Inception Theme | Hans Zimmer | h | 2010 | F
+Interstellar Theme | Hans Zimmer | h | 2014 | F
+Mission Impossible Theme | Lalo Schifrin | m | 1966 | F
+Rocky Theme | Bill Conti | m | 1976 | F
+Chariots of Fire | Vangelis | e | 1981 | F
+Blade Runner Theme | Vangelis | h | 1982 | F
+Circle of Life | Elton John | m | 1994 | F
+Shallow | Lady Gaga and Bradley Cooper | m | 2018 | F
+Into the Unknown | Idina Menzel | m | 2019 | F
+We Don't Talk About Bruno | Encanto Cast | m | 2021 | F
+Dance Monkey | Tones and I | m | 2019 | A
+Cheek to Cheek | Fred Astaire | m | 1935 | F
+Singin' in the Rain | Gene Kelly | m | 1952 | F
+Chim Chim Cher-ee | Dick Van Dyke | m | 1964 | F
+Let's Go Fly a Kite | Dick Van Dyke | m | 1964 | F
+Feed the Birds | Julie Andrews | m | 1964 | F
+Edelweiss | Julie Andrews | m | 1965 | F
+# Disney and musicals
+I'll Make a Man Out of You | Mulan | m | 1998 | D
+You'll Be in My Heart | Tarzan | m | 1999 | D
+Hakuna Matata | The Lion King | m | 1994 | D
+Be Prepared | The Lion King | h | 1994 | D
+Poor Unfortunate Souls | The Little Mermaid | h | 1989 | D
+Go the Distance | Hercules | m | 1997 | D
+Zero to Hero | Hercules | m | 1997 | D
+I Won't Say (I'm in Love) | Hercules | m | 1997 | D
+Prince Ali | Aladdin | m | 1992 | D
+One Jump Ahead | Aladdin | m | 1992 | D
+Arabian Nights | Aladdin | m | 1992 | D
+Gaston | Beauty and the Beast | m | 1991 | D
+Belle | Beauty and the Beast | m | 1991 | D
+Tale as Old as Time | Beauty and the Beast | m | 1991 | D
+Part of Your World | The Little Mermaid | m | 1989 | D
+Just Around the Riverbend | Pocahontas | m | 1995 | D
+Heigh-Ho | Snow White | e | 1937 | D
+I'm Wishing | Snow White | m | 1937 | D
+The Siamese Cat Song | Lady and the Tramp | m | 1955 | D
+He's a Tramp | Lady and the Tramp | m | 1955 | D
+Bella Notte | Lady and the Tramp | m | 1955 | D
+I Wanna Be Like You | The Jungle Book | e | 1967 | D
+Trust in Me | The Jungle Book | m | 1967 | D
+Everybody Wants to Be a Cat | The Aristocats | m | 1970 | D
+Cruella De Vil | 101 Dalmatians | m | 1961 | D
+Kiss the Girl | The Little Mermaid | m | 1989 | D
+Dig a Little Deeper | The Princess and the Frog | m | 2009 | D
+Almost There | The Princess and the Frog | m | 2009 | D
+Let It Go | Frozen | e | 2013 | D
+In Summer | Frozen | m | 2013 | D
+Do You Want to Build a Snowman? | Frozen | m | 2013 | D
+Show Yourself | Frozen 2 | h | 2019 | D
+Surface Pressure | Encanto | m | 2021 | D
+Dos Oruguitas | Encanto | m | 2021 | D
+What Else Can I Do? | Encanto | m | 2021 | D
+Waiting on a Miracle | Encanto | m | 2021 | D
+Shiny | Moana | m | 2016 | D
+Where You Are | Moana | m | 2016 | D
+I Am Moana (Song of the Ancestors) | Moana | m | 2016 | D
+Remember Me | Coco | m | 2017 | D
+Un Poco Loco | Coco | m | 2017 | D
+Proud Corazon | Coco | m | 2017 | D
+When She Loved Me | Toy Story 2 | m | 1999 | D
+Mamma Mia | ABBA | e | 1975 | D
+Dancing Queen | ABBA | e | 1976 | D
+Our Last Summer | Mamma Mia! | m | 2008 | D
+Super Trouper | ABBA | m | 1980 | D
+Does Your Mother Know | ABBA | m | 1979 | D
+Take a Chance on Me | ABBA | e | 1977 | D
+I Have a Dream | ABBA | m | 1979 | D
+Money, Money, Money | ABBA | m | 1976 | D
+Gimme! Gimme! Gimme! (A Man After Midnight) | ABBA | m | 1979 | D
+Summer Nights | Grease | e | 1978 | D
+Sandy | Grease | m | 1978 | D
+Beauty School Dropout | Grease | m | 1978 | D
+We Go Together | Grease | m | 1978 | D
+Sit Down John | Grease | m | 1978 | D
+Gimme Gimme Gimme | ABBA | m | 1979 | A
+Waterloo | ABBA | e | 1974 | D
+# Bowie
+Moonage Daydream | David Bowie | m | 1971 | O
+Life on Mars? | David Bowie | m | 1971 | O
+Fame | David Bowie | m | 1975 | O
+Let's Dance | David Bowie | m | 1983 | O
+Ashes to Ashes | David Bowie | m | 1980 | O
+Scary Monsters (and Super Creeps) | David Bowie | m | 1980 | O
+Where Are We Now? | David Bowie | m | 2013 | O
+Space Oddity | David Bowie | m | 1969 | O
+All the Young Dudes | David Bowie | m | 1972 | O
+Oh You Pretty Things | David Bowie | m | 1971 | O
+Ziggy Stardust | David Bowie | m | 1972 | O
+Heroes | David Bowie | m | 1977 | O
+Boys Keep Swinging | David Bowie | m | 1979 | O
+# Beatles
+Penny Lane | The Beatles | m | 1967 | L
+Don't Let Me Down | The Beatles | m | 1969 | L
+The End | The Beatles | m | 1969 | L
+# Lady Gaga
+G.U.Y. | Lady Gaga | m | 2013 | G
+The Cure | Lady Gaga | m | 2017 | G
+Fashion! | Lady Gaga | m | 2013 | G
+Monster | Lady Gaga | m | 2009 | G
+# Talking Heads
+Take Me to the River | Talking Heads | m | 1978 | K
+Psycho Killer | Talking Heads | m | 1977 | K
+Life During Wartime | Talking Heads | m | 1979 | K
+Once in a Lifetime | Talking Heads | m | 1980 | K
+Burning Down the House | Talking Heads | m | 1983 | K
+Road to Nowhere | Talking Heads | m | 1985 | K
+And She Was | Talking Heads | m | 1985 | K
+Wild Wild Life | Talking Heads | m | 1986 | K
+Girlfriend Is Better | Talking Heads | m | 1983 | K
+Naive Melody (This Must Be the Place) | Talking Heads | m | 1983 | K
+Slippery People | Talking Heads | m | 1983 | K
+I Zimbra | Talking Heads | m | 1979 | K
+Cities | Talking Heads | m | 1979 | K
+Heaven | Talking Heads | m | 1979 | K
+Uh-Oh, Love Comes to Town | Talking Heads | m | 1977 | K
+
+# Musicals and shows (artist is the show)
+The Sound of Music | The Sound of Music | m | 1965 | D
+I Have Confidence | The Sound of Music | m | 1965 | D
+Sixteen Going on Seventeen | The Sound of Music | m | 1965 | D
+The Lonely Goatherd | The Sound of Music | m | 1965 | D
+Do You Love Me? | Fiddler on the Roof | m | 1971 | D
+If I Were a Rich Man | Fiddler on the Roof | m | 1971 | D
+Sunrise, Sunset | Fiddler on the Roof | m | 1971 | D
+Matchmaker | Fiddler on the Roof | m | 1971 | D
+Oh, What a Beautiful Mornin' | Oklahoma! | m | 1943 | D
+Oklahoma | Oklahoma! | m | 1943 | D
+Some Enchanted Evening | South Pacific | m | 1949 | D
+I'm Gonna Wash That Man Right Outa My Hair | South Pacific | m | 1949 | D
+There's No Business Like Show Business | Annie Get Your Gun | m | 1946 | D
+Wouldn't It Be Loverly? | My Fair Lady | m | 1956 | D
+Get Me to the Church on Time | My Fair Lady | m | 1956 | D
+Seasons of Love | Rent | m | 1996 | D
+Don't Rain on My Parade | Funny Girl | m | 1964 | D
+People | Funny Girl | m | 1964 | D
+Hello, Dolly! | Hello, Dolly! | m | 1964 | D
+Mr. Cellophane | Chicago | m | 2002 | D
+All That Jazz | Chicago | m | 2002 | D
+Cell Block Tango | Chicago | m | 2002 | D
+Mein Herr | Cabaret | m | 1972 | D
+Money Money | Cabaret | m | 1972 | D
+Willkommen | Cabaret | m | 1966 | D
+All I Ask of You | The Phantom of the Opera | m | 1986 | D
+The Music of the Night | The Phantom of the Opera | h | 1986 | D
+Think of Me | The Phantom of the Opera | m | 1986 | D
+Jellicle Songs for Jellicle Cats | Cats | h | 1981 | D
+Mr. Mistoffelees | Cats | h | 1981 | D
+Any Dream Will Do | Joseph and the Amazing Technicolor Dreamcoat | m | 1991 | D
+Close Every Door | Joseph and the Amazing Technicolor Dreamcoat | m | 1991 | D
+Jesus Christ Superstar | Jesus Christ Superstar | m | 1970 | D
+I Don't Know How to Love Him | Jesus Christ Superstar | m | 1970 | D
+Time Warp | The Rocky Horror Picture Show | e | 1975 | D
+Sweet Transvestite | The Rocky Horror Picture Show | m | 1975 | D
+Dammit Janet | The Rocky Horror Picture Show | m | 1975 | D
+Dancing Through Life | Wicked | m | 2003 | D
+The Wizard and I | Wicked | h | 2003 | D
+The Greatest Show | The Greatest Showman | m | 2017 | D
+Come Alive | The Greatest Showman | m | 2017 | D
+Rewrite the Stars | The Greatest Showman | m | 2017 | D
+From Now On | The Greatest Showman | m | 2017 | D
+Hold On | Hairspray | m | 2007 | D
+You Can't Stop the Beat | Hairspray | m | 2007 | D
+Good Morning Baltimore | Hairspray | m | 2007 | D
+Seize the Day | Newsies | m | 1992 | D
+Master of the House | Les Miserables | m | 1985 | D
+Bring Him Home | Les Miserables | h | 1985 | D
+Stars | Les Miserables | h | 1985 | D
+Castle on a Cloud | Les Miserables | m | 1985 | D
+Alexander Hamilton | Hamilton | m | 2015 | D
+Satisfied | Hamilton | h | 2015 | D
+Helpless | Hamilton | m | 2015 | D
+Non-Stop | Hamilton | h | 2015 | D
+Burn | Hamilton | m | 2015 | D
+Wait for It | Hamilton | m | 2015 | D
+Guns and Ships | Hamilton | h | 2015 | D
+Hamilton | Hamilton | m | 2015 | D

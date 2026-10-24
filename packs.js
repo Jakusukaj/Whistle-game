@@ -8,13 +8,13 @@ module.exports = [
 
   { id: "sixties",      group: "Decades",       name: "The Swinging 60s",     blurb: "Beatles, Stones and Motown",           colour: "#ffc2d6", ink: "#5a1030" },
   { id: "seventies",    group: "Decades",       name: "Glitter Ball 70s",     blurb: "Disco, glam and stadium rock",         colour: "#ffd1a1", ink: "#5a2a00" },
-  { id: "eighties",     group: "Decades",       name: "Big Hair 80s",         blurb: "Synths, shoulder pads, hits",          colour: "#e0c8ff", ink: "#3b1670" },
+  { id: "eighties",     group: "Decades",       name: "Big Hair 80s",         blurb: "British synths, shoulder pads, hits",          colour: "#e0c8ff", ink: "#3b1670" },
   { id: "nineties",     group: "Decades",       name: "Rewind to the 90s",    blurb: "Britpop, boybands, dance floors",      colour: "#b8efd9", ink: "#0b4a34" },
   { id: "noughties",    group: "Decades",       name: "Noughties Nostalgia",  blurb: "iPod-era pop and indie",               colour: "#bfe0ff", ink: "#0d3c6b" },
   { id: "tens",         group: "Decades",       name: "Streaming Era 2010s",  blurb: "Chart-toppers of the 2010s",           colour: "#ffc9b8", ink: "#6a2410" },
   { id: "today",        group: "Decades",       name: "Fresh Off the Charts", blurb: "Hits from the last few years",         colour: "#c9f0a8", ink: "#2d4f0a" },
 
-  { id: "rock",         group: "Genres",        name: "Air Guitar Anthems",   blurb: "Riffs you can play on a broom",        colour: "#d3d3dc", ink: "#26263a" },
+  { id: "diva",         group: "Genres",        name: "Pop Off Diva",         blurb: "Pop girlie central",                   colour: "#ffb8f0", ink: "#5c1050" },
   { id: "party",        group: "Genres",        name: "Floor Fillers",        blurb: "Wedding disco and party classics",     colour: "#ffb8f0", ink: "#5c1050" },
   { id: "soul",         group: "Genres",        name: "Motown Magic",         blurb: "Soul, funk and R&B classics",          colour: "#f6d0a0", ink: "#573300" },
 

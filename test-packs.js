@@ -47,19 +47,19 @@ check("no packs are ticked by default", new RoomManager({}).rooms && (function (
 var np = newGame(2, { defaultPacks: [] });
 np.m.handle(np.cs[0], { t: "start" });
 check("cannot start with no pack picked", np.room.phase === "lobby" && np.cs[0].errors.indexOf("no_packs") !== -1);
-g.m.handle(g.cs[1], { t: "setPacks", packs: ["rock"] });
+g.m.handle(g.cs[1], { t: "setPacks", packs: ["diva"] });
 check("non-host cannot change packs", room.packs.join() === "eighties,bangers" || room.packs.join() === "bangers,eighties");
 g.m.handle(g.cs[0], { t: "setPacks", packs: [] });
 check("host can untick everything", room.packs.length === 0);
-g.m.handle(g.cs[0], { t: "setPacks", packs: ["nope", "rock"] });
-check("unknown pack ids dropped", room.packs.join() === "rock");
+g.m.handle(g.cs[0], { t: "setPacks", packs: ["nope", "diva"] });
+check("unknown pack ids dropped", room.packs.join() === "diva");
 g.m.handle(g.cs[0], { t: "setPacks", packs: ids });
 check("select all works", room.packs.length === 20 && g.cs[1].state.selectedPacks.length === 20);
 check("state carries pack catalogue with counts", g.cs[1].state.packs.length === 20 && g.cs[1].state.packs[0].count > 90 && g.cs[1].state.songsInPlay === SONGS.length);
 
 // --- too few songs refused
 var h = newGame(8);
-h.m.handle(h.cs[0], { t: "setPacks", packs: ["xmas"] });
+h.m.handle(h.cs[0], { t: "setPacks", packs: ["gaga"] });
 h.m.handle(h.cs[0], { t: "setRounds", rounds: 10 });
 h.m.handle(h.cs[0], { t: "start" });
 check("start refused when packs are too small", h.room.phase === "lobby" && h.cs[0].errors.indexOf("too_few_songs") !== -1);

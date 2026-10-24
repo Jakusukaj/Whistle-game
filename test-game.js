@@ -204,13 +204,13 @@ async function mainScenario() {
   check("only the whistler can take a hint", B.state.turn.hints === 0 && !B.state.turn.hintLines);
   C.send({ t: "hint" });
   await C.waitFor(function (st) { return !!st.turn.hintLines; }, "hint shown");
-  check("hint 1 is about the title length", /The title has \d+ words?/.test(C.state.turn.hintLines[0]) && C.state.turn.hintLines.length === 1, C.state.turn.hintLines.join(" | "));
+  check("hint 1 is a single written hint", C.state.turn.hintLines[0].length > 2 && C.state.turn.hintLines.length === 1, C.state.turn.hintLines.join(" | "));
   await B.waitFor(function (st) { return !!st.turn.hintLines; }, "guessers see the hint");
   check("guessers see the hint too, and never the song", B.state.turn.hintLines.length === 1 && !B.state.turn.song);
   C.send({ t: "hint" }); await C.waitFor(function (st) { return st.turn.hints === 2; }, "hint 2");
-  check("hint 2 is the year", /^(From \d{4}|A traditional carol)$/.test(C.state.turn.hintLines[1]), C.state.turn.hintLines.join(" | "));
+  check("hint 2 is a second written hint", C.state.turn.hintLines[1].length > 2 && C.state.turn.hintLines[1] !== C.state.turn.hintLines[0], C.state.turn.hintLines.join(" | "));
   C.send({ t: "hint" }); await C.waitFor(function (st) { return st.turn.hints === 3; }, "hint 3");
-  check("hint 3 is who it is by", C.state.turn.hintLines.length === 3 && C.state.turn.hintLines[2].length > 3, C.state.turn.hintLines.join(" | "));
+  check("hint 3 is the most obvious hint", C.state.turn.hintLines.length === 3 && C.state.turn.hintLines[2].length > 3, C.state.turn.hintLines.join(" | "));
   check("no hint gives away the title", C.state.turn.hintLines.join(" ").toLowerCase().indexOf(C.state.turn.song.title.toLowerCase()) === -1);
   C.send({ t: "hint" }); await sleep(80);
   check("only three hints per song", C.state.turn.hints === 3 && C.state.turn.nextHintCost === null);

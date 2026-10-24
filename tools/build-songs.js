@@ -2,7 +2,7 @@
 // Builds songs.js from the text files in songs-src/.
 // Run: node tools/build-songs.js
 // Line format:  Title | Artist | e/m/h | year or - | flags | aliases (separated by ;)
-// Flags: B all-time bangers, R rock, P party, S soul/Motown, F film, D Disney/musicals, X Christmas, T TV,
+// Flags: B all-time bangers, V Pop Off Diva (artists in the DIVA list join automatically), P party, S soul/Motown, F film, D Disney/musicals, X Christmas, T TV,
 //        H Halloween, L Beatles, O Bowie, G Lady Gaga, K Talking Heads (artist packs are also picked up from the artist name),
 //        A artist/special-pack only: keeps a deeper cut out of the decade and "today" packs (ignored if the song is also listed without A)
 // Decade and "today" packs come from the year. A song is listed ONCE however many packs it is in.
@@ -19,7 +19,7 @@ removeRaw.forEach(function (l) {
 });
 
 var songs = {}, order = [], warnings = [];
-fs.readdirSync(dir).filter(function (f) { return /\.txt$/.test(f) && f[0] !== "_"; }).sort().forEach(function (f) {
+fs.readdirSync(dir).filter(function (f) { return /\.txt$/.test(f) && f[0] !== "_" && !/^hints/.test(f); }).sort().forEach(function (f) {
   fs.readFileSync(path.join(dir, f), "utf8").split("\n").forEach(function (line, i) {
     if (!line.trim() || line[0] === "#") { return; }
     var p = line.split("|").map(function (x) { return x.trim(); });
@@ -72,14 +72,54 @@ fs.readFileSync(path.join(dir, "_years.txt"), "utf8").split("\n").forEach(functi
 });
 Object.keys(songs).forEach(function (k) { if (songs[k].year === null && hintYears[k]) { songs[k].hintYear = hintYears[k]; } });
 
+// Pop Off Diva: these artists are in the pack automatically. Other songs join with the V flag.
+var DIVA = new RegExp("\\b(" + [
+  "beyonce", "britney spears", "madonna", "kylie minogue", "dua lipa", "taylor swift", "rihanna", "katy perry", "ariana grande",
+  "adele", "lizzo", "whitney houston", "mariah carey", "christina aguilera", "spice girls", "little mix", "girls aloud", "sugababes",
+  "doja cat", "sabrina carpenter", "chappell roan", "olivia rodrigo", "billie eilish", "miley cyrus", "shakira", "cher", "cyndi lauper",
+  "diana ross", "donna summer", "gloria gaynor", "destiny s child", "tlc", "jennifer lopez", "charli xcx", "kelly clarkson",
+  "sia", "carly rae jepsen", "ava max", "meghan trainor", "camila cabello", "tate mcrae", "raye", "rita ora", "selena gomez", "janet jackson",
+  "tina turner", "all saints", "natasha bedingfield", "lorde", "alicia keys", "jess glynne", "ellie goulding", "anne marie", "mabel", "paloma faith", "cheryl", "kim wilde", "bananarama", "dido", "anastacia", "sheena easton", "salt n pepa", "eternal", "atomic kitten", "mel c", "geri halliwell"
+].join("|") + ")\\b");
+
+// Big Hair 80s is British only: a song from 1980 to 1989 joins it if its artist matches or it has the U flag.
+var UK80 = new RegExp("\\b(" + [
+  "queen", "david bowie", "wham", "george michael", "tears for fears", "eurythmics", "culture club", "boy george", "duran duran", "spandau ballet",
+  "human league", "soft cell", "new order", "joy division", "depeche mode", "dexys", "madness", "specials", "clash", "frankie goes", "adam ant", "adam and the ants",
+  "smiths", "cure", "simple minds", "police", "sting", "kate bush", "dire straits", "band aid", "cliff richard", "shakin stevens", "chris rea", "aled jones",
+  "jona lewie", "pogues", "pretenders", "soul ii soul", "def leppard", "iron maiden", "motorhead", "whitesnake", "sheena easton", "andrew lloyd webber", "phil collins",
+  "genesis", "elton john", "bananarama", "pet shop boys", "erasure", "yazoo", "alison moyet", "ultravox", "visage", "heaven 17", "abc", "orchestral manoeuvres",
+  "thompson twins", "kajagoogoo", "howard jones", "nik kershaw", "paul young", "go west", "level 42", "simply red", "wet wet wet", "ub40", "housemartins", "beat",
+  "selecter", "bad manners", "squeeze", "ian dury", "stranglers", "buzzcocks", "siouxsie", "talk talk", "waterboys", "king", "blancmange", "peter gabriel",
+  "bucks fizz", "kim wilde", "toyah", "bow wow wow", "t pau", "bros", "rick astley", "dead or alive", "gary numan", "spandau", "the jam", "paul weller", "style council",
+  "elvis costello", "billy bragg", "echo and the bunnymen", "teardrop explodes", "big country", "aztec camera", "orange juice", "sade", "freddie mercury", "lisa stansfield",
+  "sparks", "sinitta", "belinda carlisle", "bronski beat", "communards", "jimmy somerville", "pet shop", "ultravox", "japan", "david sylvian", "roxy music", "bryan ferry",
+  "the passions", "slade", "shakatak", "imagination", "central line", "linx", "odyssey", "five star", "loose ends", "sade", "cutting crew",
+  "johnny hates jazz", "curiosity killed the cat", "climie fisher", "living in a box", "fine young cannibals", "eighth wonder", "swing out sister", "mel and kim", "mel kim",
+  "samantha fox", "sonia", "bros", "brother beyond", "pepsi and shirlie", "the christians", "the proclaimers", "proclaimers", "deacon blue", "hue and cry", "texas", "altered images",
+  "associates", "bluebells", "wang chung", "tight fit", "dollar", "hazell dean", 
+].join("|") + ")\\b");
+
+// Hints (songs-src/hints-*.txt): Title | hint 1 | hint 2 | hint 3, from a gentle nudge to nearly obvious.
+var hintsByTitle = {};
+fs.readdirSync(dir).filter(function (f) { return /^hints.*\.txt$/.test(f); }).sort().forEach(function (f) {
+  fs.readFileSync(path.join(dir, f), "utf8").split("\n").forEach(function (l, i) {
+    if (!l.trim() || l[0] === "#") { return; }
+    var q = l.split(" | ");
+    if (q.length !== 4) { warnings.push(f + ":" + (i + 1) + " hint line needs 4 parts: " + l.slice(0, 60)); return; }
+    var k = M.normalise(q[0]);
+    if (!hintsByTitle[k]) { hintsByTitle[k] = [q[1].trim(), q[2].trim(), q[3].trim()]; }
+  });
+});
+
 function packsFor(s) {
   var out = [], y = s.year, f = s.flags;
   if (f.indexOf("B") !== -1) { out.push("bangers"); }
-  if (f.indexOf("R") !== -1) { out.push("rock"); }
+  if (f.indexOf("V") !== -1 || (DIVA.test(M.normalise(s.artist)) || M.normalise(s.artist) === "pink")) { out.push("diva"); }
   if (y !== null && f.indexOf("A") === -1) {
     if (y >= 1960 && y <= 1969) { out.push("sixties"); }
     if (y >= 1970 && y <= 1979) { out.push("seventies"); }
-    if (y >= 1980 && y <= 1989) { out.push("eighties"); }
+    if (y >= 1980 && y <= 1989 && (f.indexOf("U") !== -1 || UK80.test(M.normalise(s.artist)))) { out.push("eighties"); }
     if (y >= 1990 && y <= 1999) { out.push("nineties"); }
     if (y >= 2000 && y <= 2009) { out.push("noughties"); }
     if (y >= 2010 && y <= 2019) { out.push("tens"); }
@@ -101,6 +141,7 @@ function packsFor(s) {
 }
 
 var list = order.map(function (k) { return songs[k]; }).filter(function (s) { return packsFor(s).length > 0; });
+var missingHints = [];
 var out = ["// Song library. Generated by tools/build-songs.js from songs-src/. Edit the text files there, then rebuild.",
   "//",
   "// Every song appears ONCE here. The packs it belongs to are listed in `packs`, so a song that",
@@ -112,6 +153,9 @@ list.forEach(function (s, i) {
   if (s.year !== null) { o += ", year: " + s.year; }
   else if (s.hintYear) { o += ", year: " + s.hintYear; }
   if (s.aliases.length) { o += ', aliases: ' + JSON.stringify(s.aliases); }
+  var hk = M.normalise(s.title);
+  if (hintsByTitle[hk]) { o += ', hints: ' + JSON.stringify(hintsByTitle[hk]); }
+  else { missingHints.push(s.title + " | " + s.artist + " | " + (s.year || "-") + " | " + packsFor(s).join(",")); }
   out.push(o + " }" + (i < list.length - 1 ? "," : ""));
 });
 out.push("];", "", 'if (typeof module !== "undefined" && module.exports) { module.exports = SONGS; }', "");
@@ -122,3 +166,5 @@ list.forEach(function (s) { packsFor(s).forEach(function (p) { counts[p] = count
 console.log("songs:", list.length);
 Object.keys(counts).forEach(function (p) { console.log(p.padEnd(10), JSON.stringify(counts[p])); });
 warnings.forEach(function (w) { console.log("WARN", w); });
+console.log("songs without hints:", missingHints.length);
+fs.writeFileSync(path.join(__dirname, "..", "songs-src", "_missing-hints.txt"), missingHints.join("\n"));

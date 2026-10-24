@@ -1,0 +1,175 @@
+# Pop Off Diva additions. Artists on the DIVA list in tools/build-songs.js join the pack automatically; V forces it.
+Can't Get You Out of My Head | Kylie Minogue | e | 2001 | V
+Spinning Around | Kylie Minogue | e | 2000 | V
+Love at First Sight | Kylie Minogue | e | 2002 | V
+Padam Padam | Kylie Minogue | m | 2023 | V
+All the Lovers | Kylie Minogue | m | 2010 | V
+Slow | Kylie Minogue | m | 2003 | V
+Come into My World | Kylie Minogue | m | 2002 | V
+Sound of the Underground | Girls Aloud | m | 2002 | V
+The Promise | Girls Aloud | m | 2008 | V
+Something Kinda Ooooh | Girls Aloud | m | 2006 | V
+Biology | Girls Aloud | m | 2005 | V
+Love Machine | Girls Aloud | m | 2004 | V
+Call the Shots | Girls Aloud | m | 2008 | V
+Push the Button | Sugababes | m | 2005 | V
+Round Round | Sugababes | m | 2002 | V
+Freak like Me | Sugababes | m | 2002 | V
+About You Now | Sugababes | m | 2007 | V
+Overload | Sugababes | m | 2000 | V
+Believe | Cher | e | 1998 | V
+If I Could Turn Back Time | Cher | m | 1989 | V
+Strong Enough | Cher | m | 1999 | V
+The Shoop Shoop Song (It's in His Kiss) | Cher | m | 1990 | V
+So What | Pink | m | 2008 | V
+Just Give Me a Reason | Pink | m | 2012 | V
+Get the Party Started | Pink | m | 2001 | V
+Raise Your Glass | Pink | m | 2010 | V
+What About Us | Pink | m | 2017 | V
+Lady Marmalade | Christina Aguilera, Lil' Kim, Mya and Pink | m | 2001 | V
+Jenny from the Block | Jennifer Lopez | m | 2002 | V
+On the Floor | Jennifer Lopez | m | 2011 | V
+Waiting for Tonight | Jennifer Lopez | m | 1999 | V
+If You Had My Love | Jennifer Lopez | m | 1999 | V
+Boom Clap | Charli XCX | m | 2014 | V
+Von Dutch | Charli XCX | m | 2024 | V
+360 | Charli XCX | m | 2024 | V
+Break the Rules | Charli XCX | m | 2015 | V
+Escapism | Raye | m | 2022 | V
+Prada | Raye | m | 2024 | V
+Anywhere | Rita Ora | m | 2018 | V
+Your Song | Rita Ora | m | 2017 | V
+Fantasy | Mariah Carey | m | 1995 | V
+We Belong Together | Mariah Carey | m | 2005 | V
+Hero | Mariah Carey | m | 1993 | V
+Always Be My Baby | Mariah Carey | m | 1996 | V
+Vision of Love | Mariah Carey | m | 1990 | V
+Emotions | Mariah Carey | m | 1991 | V
+Genie in a Bottle | Christina Aguilera | m | 1999 | V
+Dirrty | Christina Aguilera | m | 2002 | V
+Beautiful | Christina Aguilera | m | 2002 | V
+What a Girl Wants | Christina Aguilera | m | 1999 | V
+Gimme More | Britney Spears | m | 2007 | V
+Womanizer | Britney Spears | m | 2008 | V
+Circus | Britney Spears | m | 2008 | V
+Stronger | Britney Spears | m | 2000 | V
+Everytime | Britney Spears | m | 2004 | V
+Piece of Me | Britney Spears | m | 2007 | V
+Papa Don't Preach | Madonna | m | 1986 | V
+Express Yourself | Madonna | m | 1989 | V
+Music | Madonna | m | 2000 | V
+Borderline | Madonna | m | 1984 | V
+Crazy for You | Madonna | m | 1985 | V
+Physical | Dua Lipa | e | 2020 | V
+Dance the Night | Dua Lipa | m | 2023 | V
+Illusion | Dua Lipa | m | 2023 | V
+Training Season | Dua Lipa | m | 2024 | V
+Break My Heart | Dua Lipa | m | 2020 | V
+Fortnight | Taylor Swift | m | 2024 | V
+Karma | Taylor Swift | m | 2022 | V
+Lover | Taylor Swift | m | 2019 | V
+Willow | Taylor Swift | m | 2020 | V
+Style | Taylor Swift | m | 2015 | V
+Bad Blood | Taylor Swift | m | 2015 | V
+Look What You Made Me Do | Taylor Swift | m | 2017 | V
+Delicate | Taylor Swift | m | 2018 | V
+22 | Taylor Swift | m | 2013 | V
+Fifteen | Taylor Swift | m | 2008 | V
+Texas Hold 'Em | Beyonce | m | 2024 | V
+Cuff It | Beyonce | m | 2022 | V
+Naughty Girl | Beyonce | m | 2004 | V
+Deja Vu | Beyonce | m | 2006 | V
+Sweet Dreams | Beyonce | m | 2009 | V
+Diamonds | Rihanna | m | 2012 | V
+S&M | Rihanna | m | 2011 | V
+Work | Rihanna | m | 2016 | V
+Stay | Rihanna | m | 2012 | V
+Where Have You Been | Rihanna | m | 2011 | V
+Pon de Replay | Rihanna | m | 2005 | V
+Hot n Cold | Katy Perry | m | 2008 | V
+Waking Up in Vegas | Katy Perry | m | 2009 | V
+E.T. | Katy Perry | m | 2011 | V
+California Gurls | Katy Perry | m | 2010 | V
+Wide Awake | Katy Perry | m | 2012 | V
+Part of Me | Katy Perry | m | 2012 | V
+Problem | Ariana Grande | m | 2014 | V
+Into You | Ariana Grande | m | 2016 | V
+God Is a Woman | Ariana Grande | m | 2018 | V
+Break Free | Ariana Grande | m | 2014 | V
+Side to Side | Ariana Grande | m | 2016 | V
+Positions | Ariana Grande | m | 2020 | V
+34+35 | Ariana Grande | m | 2020 | V
+One Last Time | Ariana Grande | m | 2015 | V
+Dangerous Woman | Ariana Grande | m | 2016 | V
+Hello | Adele | m | 2015 | V
+Send My Love (to Your New Lover) | Adele | m | 2016 | V
+When We Were Young | Adele | m | 2016 | V
+Hometown Glory | Adele | m | 2007 | V
+Make You Feel My Love | Adele | m | 2008 | V
+Rumour Has It | Adele | m | 2011 | V
+Nonsense | Sabrina Carpenter | m | 2023 | V
+Feather | Sabrina Carpenter | m | 2023 | V
+Juno | Sabrina Carpenter | m | 2024 | V
+Bed Chem | Sabrina Carpenter | m | 2024 | V
+Manchild | Sabrina Carpenter | m | 2025 | V
+Deja Vu | Olivia Rodrigo | m | 2021 | V
+Traitor | Olivia Rodrigo | m | 2021 | V
+Brutal | Olivia Rodrigo | m | 2021 | V
+Woman | Doja Cat | m | 2021 | V
+Need to Know | Doja Cat | m | 2021 | V
+Juice | Lizzo | m | 2019 | V
+Come and Get It | Selena Gomez | m | 2013 | V
+Lose You to Love Me | Selena Gomez | m | 2019 | V
+Love You like a Love Song | Selena Gomez | m | 2011 | V
+Party in the U.S.A. | Miley Cyrus | m | 2009 | V
+We Can't Stop | Miley Cyrus | m | 2013 | V
+Midnight Sky | Miley Cyrus | m | 2020 | V
+Malibu | Miley Cyrus | m | 2017 | V
+One Moment in Time | Whitney Houston | m | 1988 | V
+So Emotional | Whitney Houston | m | 1987 | V
+It's Not Right but It's Okay | Whitney Houston | m | 1999 | V
+My Love Is Your Love | Whitney Houston | m | 1999 | V
+Objection (Tango) | Shakira | m | 2002 | V
+She Wolf | Shakira | m | 2009 | V
+Underneath Your Clothes | Shakira | m | 2002 | V
+Try Everything | Shakira | m | 2016 | V
+I Feel Love | Donna Summer | e | 1977 | V
+Love to Love You Baby | Donna Summer | m | 1975 | V
+Bad Girls | Donna Summer | m | 1979 | V
+On the Radio | Donna Summer | m | 1979 | V
+She Works Hard for the Money | Donna Summer | m | 1983 | V
+Ain't No Mountain High Enough | Diana Ross | e | 1970 | V
+Reach Out and Touch (Somebody's Hand) | Diana Ross | m | 1970 | V
+Baby Love | Diana Ross and the Supremes | e | 1964 | V
+What's Love Got to Do with It | Tina Turner | e | 1984 | V
+The Best | Tina Turner | e | 1989 | V
+Proud Mary | Tina Turner | m | 1971 | V
+Private Dancer | Tina Turner | m | 1984 | V
+That's the Way Love Goes | Janet Jackson | m | 1993 | V
+Together Again | Janet Jackson | m | 1997 | V
+Rhythm Nation | Janet Jackson | m | 1989 | V
+Control | Janet Jackson | m | 1986 | V
+What Have You Done for Me Lately | Janet Jackson | m | 1986 | V
+All for You | Janet Jackson | m | 2001 | V
+Kids in America | Kim Wilde | e | 1981 | V
+Cruel Summer | Bananarama | m | 1983 | V
+Venus | Bananarama | e | 1986 | V
+Don't Speak | No Doubt | m | 1996 | V
+Hollaback Girl | Gwen Stefani | m | 2005 | V
+Bills, Bills, Bills | Destiny's Child | m | 1999 | V
+Jumpin' Jumpin' | Destiny's Child | m | 2000 | V
+Emotion | Destiny's Child | m | 2001 | V
+Never Ever | All Saints | m | 1997 | V
+Fighter | Christina Aguilera | m | 2002 | V
+Hung Up | Madonna | m | 2005 | V
+Born This Way | Lady Gaga | m | 2011 | V
+Shake It Off | Taylor Swift | m | 2014 | V
+Since U Been Gone | Kelly Clarkson | m | 2004 | V
+Because of You | Kelly Clarkson | m | 2005 | V
+My Life Would Suck Without You | Kelly Clarkson | m | 2009 | V
+Run the World (Girls) | Beyonce | m | 2011 | V
+Mamma Knows Best | Jessie J | m | 2011 | V
+Price Tag | Jessie J | e | 2011 | V
+Domino | Jessie J | m | 2011 | V
+Bang Bang | Jessie J, Ariana Grande and Nicki Minaj | m | 2014 | V
+Titanium | David Guetta and Sia | m | 2011 | V
