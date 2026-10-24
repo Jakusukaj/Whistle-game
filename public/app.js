@@ -1283,40 +1283,37 @@
     };
   }
 
-  // How to play: a short animated walkthrough that fills the screen. Tap right to skip ahead, left to go back.
+  // How to play: a short animated walkthrough. The words sit on the dark background; the game screens
+  // sit inside a phone frame, so it is always clear which part is the instruction and which is the app.
   function showHelp() {
-    var AV = function (n, c) { return '<span class="avatar pc pc' + c + ' avatar--md">' + n.charAt(0) + "</span>"; };
+    var AV = function (n, k) { return '<span class="avatar pc pc' + k + ' avatar--md">' + n.charAt(0) + "</span>"; };
+    var TAP = function (x, y, d) { return '<i class="hv-tap" style="left:' + x + 'px;top:' + y + 'px;animation-delay:' + d + 'ms"></i>'; };
     var scenes = [
-      { ms: 4200, bg: FIELD_BG.orange, fg: "#111", html:
-        '<div class="hv-c"><p class="label hv-in">How to play</p><h1 class="display hv-in hv-d1">One person whistles.</h1><h1 class="display hv-in hv-d2">Everyone else listens and guesses.</h1><p class="title hv-in hv-d3">Take turns. The quicker the guess, the more points.</p></div>' },
-      { ms: 5200, bg: FIELD_BG.ground, fg: "#111", html:
-        '<div class="hv-c"><p class="hv-role w hv-in">Your turn to whistle</p><h1 class="headline hv-in hv-d1">Pick a song</h1><div class="hv-cards">' +
-        '<div class="hv-card hv-in hv-d2"><span class="label">Easy</span><b>Dancing Queen</b><i>ABBA</i></div>' +
-        '<div class="hv-card hv-pick hv-in hv-d3"><span class="label">Medium</span><b>Wonderwall</b><i>Oasis</i></div>' +
-        '<div class="hv-card hv-in hv-d4"><span class="label">Hard</span><b>Rolling in the Deep</b><i>Adele</i></div></div>' +
-        '<p class="title hv-in hv-d5">Only you can see the song. Harder songs earn bonus points.</p></div>' },
-      { ms: 5200, bg: FIELD_BG.green, fg: "#111", html:
-        '<div class="hv-c hv-mid"><p class="hv-role e hv-in">Everyone</p><div class="hv-disc"><div class="hv-num" data-seq="3,2,1,Go" data-step="900">3</div></div>' +
-        '<h1 class="headline hv-in hv-d1">Wait for the countdown</h1><p class="title hv-in hv-d3">Then whistle the tune. No words.</p></div>' },
-      { ms: 6200, bg: FIELD_BG.green, fg: "#111", html:
-        '<div class="hv-c hv-mid"><p class="hv-role l hv-in">Your turn to listen</p><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
-        '<div class="hv-say hv-in hv-d2"><span class="label">Theo says</span><b>Dancing Queen</b></div>' +
-        '<h1 class="headline hv-in hv-d3">Say the title out loud</h1><p class="title hv-in hv-d4">Someone else is whistling. Your phone mic should pick it up by itself. If it does not, tap Type instead.</p></div>' },
-      { ms: 5200, bg: FIELD_BG.ground, fg: "#111", html:
-        '<div class="hv-c"><p class="hv-role w hv-in">Your turn to whistle</p><h1 class="headline hv-in hv-d1">Who got it</h1><div class="hv-who">' +
-        '<div class="hv-row hv-on hv-in hv-d2">' + AV("Theo", 1) + '<b>Theo</b><span class="tag">Got it</span></div>' +
-        '<div class="hv-row hv-in hv-d3">' + AV("Priya", 2) + '<b>Priya</b></div>' +
-        '<div class="hv-row hv-in hv-d4">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="hv-btn hv-in hv-d4">Confirm</div>' +
-        '<p class="title hv-in hv-d5">Tap everyone who named the song, then confirm.</p></div>' },
-      { ms: 5600, bg: FIELD_BG.blue, fg: "#ECEAE4", html:
-        '<div class="hv-c"><p class="hv-role e hv-in">Everyone sees the score</p><div class="hv-big" data-count="917" data-ms="1600">0</div><p class="label">Guessed in 12.4s</p>' +
-        '<h1 class="headline hv-in hv-d2">Faster guesses score more</h1><p class="title hv-in hv-d3">The whistler earns the full score. Each guesser earns half.</p></div>' },
-      { ms: 5600, bg: FIELD_BG.pink, fg: "#111", html:
-        '<div class="hv-c"><p class="hv-role e hv-in">After the last round</p><h1 class="headline hv-in hv-d1">Most points wins</h1><div class="hv-board">' +
-        '<div class="hv-row hv-in hv-d2"><b>1</b>' + AV("Maya", 0) + '<b>Maya</b><span>2,140</span></div>' +
-        '<div class="hv-row hv-in hv-d3"><b>2</b>' + AV("Theo", 1) + '<b>Theo</b><span>1,820</span></div>' +
-        '<div class="hv-row hv-in hv-d4"><b>3</b>' + AV("Priya", 2) + '<b>Priya</b><span>1,310</span></div></div>' +
-        '<p class="title hv-in hv-d5">Awards add bonus points at the end. Shuffles and hints cost points, so use them wisely.</p></div>' }
+      { ms: 5000, role: "e", chip: "The game", head: "One person whistles.<br>Everyone else listens and guesses.", text: "Take turns. The quicker the guess, the more points.", bg: FIELD_BG.pink, ink: true,
+        mock: '<div class="m-top">Maya\'s game</div><div class="m-sub">4 of 8 players are in</div><div class="m-tiles">' +
+          [["Maya", 0, "Host"], ["Theo", 1], ["Priya", 2], ["Sam", 3]].map(function (p) { return '<div class="m-tile">' + AV(p[0], p[1]) + "<b>" + p[0] + "</b></div>"; }).join("") + '</div><div class="m-spacer"></div><div class="m-btn">Start game</div>' },
+      { ms: 5400, role: "w", chip: "Your turn to whistle", head: "Pick a song", text: "Only you can see it. Harder songs earn bonus points.", bg: FIELD_BG.ground,
+        mock: '<div class="m-top">Pick a song</div><div class="m-cards">' +
+          '<div class="m-card"><span>Easy</span><b>Dancing Queen</b><i>ABBA</i></div>' +
+          '<div class="m-card m-pick"><span>Medium</span><b>Wonderwall</b><i>Oasis</i></div>' +
+          '<div class="m-card"><span>Hard</span><b>Rolling in the Deep</b><i>Adele</i></div></div>' + TAP(300, 215, 1900) },
+      { ms: 5000, role: "e", chip: "Everyone", head: "The countdown starts", text: "It starts as soon as the song is picked. Do not whistle until it ends.", bg: FIELD_BG.green,
+        mock: '<div class="m-spacer"></div><div class="m-disc"><div class="m-num" data-seq="3,2,1,Go" data-step="1000">3</div></div><div class="m-spacer"></div><div class="m-head">Whistle when it ends</div>' },
+      { ms: 6200, role: "w", chip: "Your turn to whistle", head: "Whistle the tune", text: "No words. Shuffling the song and giving hints both cost points.", bg: FIELD_BG.green,
+        mock: '<div class="m-label">Your song to perform</div><div class="m-song">Dancing Queen</div><div class="m-art">ABBA</div><div class="m-spacer"></div><div class="m-timer" data-timer="42">42</div><div class="m-label">Seconds left</div><div class="m-spacer"></div>' +
+          '<div class="m-two"><div class="m-mini"><span>Song</span><b>Shuffle</b></div><div class="m-mini"><span>0 of 3</span><b>Give hint</b></div></div><div class="m-btn">Someone got it</div>' },
+      { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is whistling. Your phone mic should pick it up by itself. If it does not, tap Type instead.", bg: FIELD_BG.green,
+        mock: '<div class="m-label">Round 1 of 5, Theo is whistling</div><div class="m-timer m-sm" data-timer="38">38</div><div class="m-label">Seconds left</div><div class="m-spacer"></div>' +
+          '<div class="m-orbwrap"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
+          '<div class="m-say"><span>You say</span><b>Dancing Queen</b></div></div><div class="m-head">Listening</div><div class="m-link">Type instead</div><div class="m-spacer"></div>' },
+      { ms: 5600, role: "w", chip: "Your turn to whistle", head: "Say who got it", text: "When someone gets it, tap Someone got it. Tick everyone who named the song, then confirm.", bg: FIELD_BG.ground,
+        mock: '<div class="m-label">Who got it</div><div class="m-sub">Tap everyone who got it right.</div><div class="m-rows">' +
+          '<div class="m-row m-on">' + AV("Theo", 1) + '<b>Theo</b><em>Got it</em></div><div class="m-row">' + AV("Priya", 2) + '<b>Priya</b></div><div class="m-row">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="m-spacer"></div><div class="m-btn">Confirm</div>' + TAP(80, 120, 1500) },
+      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The whistler earns the full score. Each guesser earns half.", bg: FIELD_BG.blue, light: true,
+        mock: '<div class="m-label">The song was</div><div class="m-song">Dancing Queen</div><div class="m-art">ABBA</div><div class="m-big" data-count="917" data-ms="1600">0</div><div class="m-label">Guessed in 12.4s</div><div class="m-sub2">Maya scores<br>Theo named it and earns 459</div>' },
+      { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards add bonus points at the end.", bg: FIELD_BG.pink,
+        mock: '<div class="m-label">Final scores</div><div class="m-rows">' +
+          '<div class="m-row m-light"><b class="m-rk">1</b>' + AV("Maya", 0) + '<b>Maya</b><em>2,140</em></div><div class="m-row m-light"><b class="m-rk">2</b>' + AV("Theo", 1) + '<b>Theo</b><em>1,820</em></div><div class="m-row m-light"><b class="m-rk">3</b>' + AV("Priya", 2) + '<b>Priya</b><em>1,310</em></div></div>' }
     ];
     var o = document.createElement("div");
     o.className = "hv"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "How to play");
@@ -1329,25 +1326,35 @@
     var bars = o.querySelectorAll(".hv-bars i");
     var stage = $("#hvStage", o);
     var clearAll = function () { clearTimeout(timer); ints.forEach(clearInterval); ints = []; };
-    var close = function () { clearAll(); document.body.classList.remove("noscroll"); if (o.parentNode) { o.parentNode.removeChild(o); } lastBg = ""; syncBg(); };
+    var DARK = "#111111";
+    var close = function () { clearAll(); document.body.classList.remove("noscroll"); window.removeEventListener("resize", fit); if (o.parentNode) { o.parentNode.removeChild(o); } lastBg = ""; syncBg(); };
+    var fit = function () {
+      var wrap = stage.querySelector(".hv-phone"), scr = stage.querySelector(".hv-screen"); if (!wrap || !scr) { return; }
+      var r = wrap.getBoundingClientRect(), k = Math.min((r.width - 12) / 390, (r.height - 12) / 700);
+      scr.style.transform = "scale(" + k + ")";
+      scr.style.left = ((r.width - 390 * k) / 2) + "px"; scr.style.top = ((r.height - 700 * k) / 2) + "px";
+    };
+    window.addEventListener("resize", fit);
+    try { document.querySelector('meta[name="theme-color"]').setAttribute("content", DARK); document.documentElement.style.background = DARK; document.body.style.background = DARK; var bf = document.getElementById("bgfill"); if (bf) { bf.style.background = DARK; } } catch (e) {}
+    var ROLE = { w: "whistle", l: "listen", e: "all" };
     var go = function (n) {
       clearAll();
       if (n >= scenes.length) { close(); return; }
       idx = Math.max(0, n);
       var sc = scenes[idx];
-      o.style.background = sc.bg; o.style.color = sc.fg;
-      try { document.querySelector('meta[name="theme-color"]').setAttribute("content", sc.bg); document.documentElement.style.background = sc.bg; document.body.style.background = sc.bg; var bf = document.getElementById("bgfill"); if (bf) { bf.style.background = sc.bg; } } catch (e) {}
-      stage.innerHTML = sc.html;
-      for (var b = 0; b < bars.length; b++) {
-        bars[b].style.transition = "none"; bars[b].style.width = b < idx ? "100%" : "0%";
-      }
+      stage.innerHTML = '<div class="hv-words"><p class="hv-role ' + sc.role + '">' + sc.chip + '</p><h1 class="hv-head">' + sc.head + '</h1><p class="hv-text">' + sc.text + '</p></div>' +
+        '<div class="hv-phone"><div class="hv-screen' + (sc.light ? " m-lt" : "") + '" style="background:' + sc.bg + '">' + sc.mock + "</div></div>";
+      fit();
+      for (var b = 0; b < bars.length; b++) { bars[b].style.transition = "none"; bars[b].style.width = b < idx ? "100%" : "0%"; }
       void o.offsetWidth;
       bars[idx].style.transition = "width " + sc.ms + "ms linear"; bars[idx].style.width = "100%";
       var seq = stage.querySelector("[data-seq]");
       if (seq) {
         var items = seq.getAttribute("data-seq").split(","), k = 0;
-        ints.push(setInterval(function () { k = Math.min(k + 1, items.length - 1); seq.textContent = items[k]; seq.className = "hv-num hv-pop"; }, parseInt(seq.getAttribute("data-step"), 10)));
+        ints.push(setInterval(function () { k = Math.min(k + 1, items.length - 1); seq.textContent = items[k]; seq.className = "m-num hv-pop"; }, parseInt(seq.getAttribute("data-step"), 10)));
       }
+      var tm = stage.querySelector("[data-timer]");
+      if (tm) { var v = parseInt(tm.getAttribute("data-timer"), 10); ints.push(setInterval(function () { v = Math.max(0, v - 1); tm.textContent = (v < 10 ? "0" : "") + v; }, 450)); }
       var cnt = stage.querySelector("[data-count]");
       if (cnt) {
         var to = parseInt(cnt.getAttribute("data-count"), 10), dur = parseInt(cnt.getAttribute("data-ms"), 10), t0 = Date.now();
