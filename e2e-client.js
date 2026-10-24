@@ -34,7 +34,7 @@ function phone(port, name) {
 }
 
 (async function () {
-  var s = createServer({ defaultPacks: ["bangers"], limitMs: 12000, countdownMs: 150, confirmMs: 3000, cooldownMs: 300, shufflePenaltyS: 5 });
+  var s = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 12000, countdownMs: 150, confirmMs: 3000, cooldownMs: 300, shufflePenaltyS: 5 });
   await new Promise(function (r) { s.server.listen(0, r); });
   var port = s.server.address().port;
   var A = phone(port, "Ann"), B = phone(port, "Bob"), C = phone(port, "Cat");

@@ -18,7 +18,7 @@ function client(port) {
   return c;
 }
 (async function () {
-  var s = createServer({ defaultPacks: ["bangers"], countdownMs: 100 });
+  var s = createServer({ defaultPacks: ["bangers"], revealMs: 0, countdownMs: 100 });
   await new Promise(function (r) { s.server.listen(0, r); });
   var port = s.server.address().port;
   var A = client(port), B = client(port), C = client(port), D = client(port);

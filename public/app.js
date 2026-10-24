@@ -231,20 +231,24 @@
     return '<span class="wh-avatar' + (cls ? " " + cls : "") + '" style="--c:var(--player-' + (i % 8 + 1) + ')">' + esc(ch) + "</span>";
   }
 
-  function standingsHtml(s, highlightLast, winners) {
-    var list = s.players.slice().sort(function (a, b) { return a.total - b.total; });
+  function pts(n) { return Math.round(n).toLocaleString("en-GB"); }
+
+  function standingsHtml(s, awards, winners) {
+    var gained = {};
+    (awards || []).forEach(function (a) { gained[a.id] = a.points; });
+    var list = s.players.slice().sort(function (a, b) { return b.total - a.total; });
     var rank = 0, prev = null, html = "";
     list.forEach(function (p, i) {
       if (prev === null || p.total !== prev) { rank = i + 1; }
       prev = p.total;
       var me = p.id === s.me, win = winners && winners.indexOf(p.id) !== -1;
-      var last = highlightLast && s.turn && s.turn.playerId === p.id && p.last !== null ? "<small>+" + fmt(p.last) + "s</small>" : "";
+      var last = gained[p.id] !== undefined && gained[p.id] > 0 ? "<small>+" + pts(gained[p.id]) + "</small>" : "";
       html += '<div class="wh-prow' + (me ? " wh-prow--you" : "") + (win ? " win" : "") + '">' +
         '<span class="wh-rank' + (rank === 1 ? " wh-rank--1" : "") + '">' + rank + "</span>" + avatarHtml(s, p, "wh-avatar--sm") +
         '<span class="wh-prow__name">' + esc(p.name) +
           (win ? '<span class="wh-tag wh-tag--host">' + ico("trophy") + "Winner</span>" : "") +
           (me ? '<span class="wh-tag wh-tag--you">You</span>' : "") + "</span>" +
-        '<span class="wh-time">' + fmt(p.total) + "s" + last + "</span></div>";
+        '<span class="wh-time">' + pts(p.total) + last + "</span></div>";
     });
     return '<div class="wh-list board">' + html + "</div>";
   }
@@ -528,6 +532,32 @@
       '<div class="a wh-sub" id="songArtist">' + esc(T.song ? T.song.artist : "") + "</div></div>";
   }
 
+  // "Who got it?" sheet on the whistler's phone. Picks survive state updates for the same turn.
+  var whoState = { built: null, picks: [] };
+  function buildWho(t) {
+    if (whoState.built === t.id) { return; }
+    whoState.built = t.id;
+    whoState.picks = t.pending && t.pending.from ? [t.pending.from] : [];
+    var sub = (t.pending && t.pending.heard ? "Heard \u201c" + t.pending.heard + "\u201d. " : "") + "Tap everyone who got it right. Each of them earns points.";
+    $("#confSub").textContent = sub;
+    var grid = $("#whoGrid");
+    grid.innerHTML = st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
+      return '<button class="who" data-id="' + esc(p.id) + '" aria-pressed="' + (whoState.picks.indexOf(p.id) !== -1) + '">' + avatarHtml(st, p, "wh-avatar--sm") +
+        '<span class="whoname">' + esc(p.name) + "</span>" + ico("tick", "whotick") + "</button>";
+    }).join("");
+    var sync = function () { $("#yesBtn").disabled = !whoState.picks.length; };
+    var bs = grid.querySelectorAll(".who");
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].onclick = function () {
+        var id = this.getAttribute("data-id"), at = whoState.picks.indexOf(id);
+        if (at === -1) { whoState.picks.push(id); } else { whoState.picks.splice(at, 1); }
+        this.setAttribute("aria-pressed", whoState.picks.indexOf(id) !== -1);
+        sync();
+      };
+    }
+    sync();
+  }
+
   function viewTurn(s) {
     var T = s.turn, isW = T.playerId === s.me, who = pname(s, T.playerId);
     var dfield = DIFF_FIELD[T.difficulty] || "sun";
@@ -535,10 +565,10 @@
     // 1. Whistler choosing one of three songs
     if (T.stage === "choose" && isW && !T.difficulty) {
       var offs = (T.options || []).map(function (o, i) {
-        var off = Math.round((1 - o.multiplier) * 100);
+        var bonus = Math.round((o.multiplier - 1) * 100);
         return '<button class="wh-song wh-song--' + o.difficulty + ' opt" data-i="' + i + '" data-d="' + o.difficulty + '">' +
           '<span class="wh-song__mark">' + (SHAPE[o.difficulty] || "") + "</span>" +
-          '<span class="wh-song__meta od">' + esc(cap(o.difficulty)) + (off ? ", " + off + "% off your time" : ", normal score") + "</span>" +
+          '<span class="wh-song__meta od">' + esc(cap(o.difficulty)) + (bonus ? ", +" + bonus + "% points" : ", standard points") + "</span>" +
           '<span class="wh-song__title ot">' + esc(o.title) + "</span>" +
           '<span class="wh-song__artist oa">' + esc(o.artist) + "</span></button>";
       }).join("");
@@ -546,7 +576,7 @@
         key: "choose-" + T.id, field: "ink",
         html: '<div class="screen">' + topBar(s) +
           '<div class="wh-stack"><h1 class="wh-title">' + esc(who) + ", you're up</h1>" +
-          '<p class="wh-sub">Pick a song. A harder song takes time off your score.</p></div>' +
+          '<p class="wh-sub">Pick a song. A harder song earns bonus points.</p></div>' +
           '<div class="wh-stack">' + offs + "</div>" +
           (T.canRefresh ? '<button id="refreshBtn" class="wh-btn wh-btn--secondary wh-btn--block refresh">' + ico("refresh") + "<span>Refresh options</span></button>" +
             '<p class="wh-note center">Don\'t know any of these? Refresh once for three new songs.</p>' : "") +
@@ -609,18 +639,18 @@
         key: "w-" + T.id, field: dfield,
         html: '<div class="screen">' + topBar(s) +
           '<div class="timerbox"><div class="wh-over" id="tlabel">Time</div><div class="wh-timer" id="bigtime">0.0</div>' +
-          '<div class="wh-progress"><i id="bar"></i></div></div>' + songCardHtml(T) +
+          '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' + songCardHtml(T) +
           '<div class="spacer"></div>' +
           '<button id="gotBtn" class="wh-btn wh-btn--block gotbtn">Someone got it</button>' +
           '<button id="shuffleBtn" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("shuffle") + "Shuffle, " + T.penalty + "s penalty</button>" + skipHtml(s) +
           lockHtml("New song coming up.") +
-          '<div class="ovl" id="confirm" hidden><div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">Did they get it?</h2>' +
-          '<p class="wh-sub">Heard: <b id="heardTxt"></b></p><div class="wh-modal__actions">' +
-          '<button id="yesBtn" class="wh-btn wh-btn--block">Yes, that\'s it</button><button id="noBtn" class="wh-btn wh-btn--secondary wh-btn--block">No, keep going</button></div></div></div></div>',
+          '<div class="ovl" id="confirm" hidden><div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">Who got it?</h2>' +
+          '<p class="wh-sub" id="confSub"></p><div class="whogrid" id="whoGrid"></div><div class="wh-modal__actions">' +
+          '<button id="yesBtn" class="wh-btn wh-btn--block" disabled>Confirm</button><button id="noBtn" class="wh-btn wh-btn--secondary wh-btn--block">Not yet, keep going</button></div></div></div></div>',
         bind: function () {
           $("#shuffleBtn").onclick = function () { send({ t: "shuffle" }); };
           $("#gotBtn").onclick = function () { send({ t: "gotIt" }); };
-          $("#yesBtn").onclick = function () { send({ t: "confirm", ok: true }); };
+          $("#yesBtn").onclick = function () { if (whoState.picks.length) { send({ t: "confirm", ok: true, who: whoState.picks.slice() }); } };
           $("#noBtn").onclick = function () { send({ t: "confirm", ok: false }); };
           bindSkip();
         },
@@ -629,7 +659,7 @@
           $("#songTitle").textContent = t.song ? t.song.title : "";
           $("#songArtist").textContent = t.song ? t.song.artist : "";
           $("#confirm").hidden = !conf;
-          if (conf) { $("#heardTxt").textContent = "“" + t.pending.heard + "”"; }
+          if (conf) { buildWho(t); } else { whoState.built = null; }
           $("#shuffleBtn").disabled = t.stage === "confirming";
           $("#gotBtn").disabled = t.stage === "confirming";
         }
@@ -642,7 +672,7 @@
         key: "g-" + T.id + (mic.typeMode ? "-t" : "-m"), field: T.stage === "confirming" ? "sky" : "leaf",
         html: '<div class="screen">' + topBar(s) +
           '<div class="timerbox"><div class="wh-over" id="tlabel">Time</div><div class="wh-timer" id="bigtime">0.0</div>' +
-          '<div class="wh-progress"><i id="bar"></i></div></div>' +
+          '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' +
           (mic.typeMode
             ? '<div class="wh-card wh-stack"><h2 class="wh-title">Type your guess</h2>' +
               '<form id="gform" class="wh-stack"><input id="ginput" class="wh-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title">' +
@@ -650,13 +680,13 @@
               (SR ? '<button id="toMic" class="wh-btn wh-btn--ghost wh-btn--sm">' + ico("mic", "wh-i--sm") + 'Back to mic mode</button>' : "") + "</div>"
             : '<div class="wh-stack midc"><div class="wh-orb wh-orb--off off" id="orb"><span class="wh-orb__core">' + ico("mic-off") + '</span></div>' +
               '<h2 class="wh-title" id="listenHead">Listening</h2>' +
-              '<p class="wh-sub">Shout your guesses. The game pauses by itself when it hears the right answer.</p>' +
+              '<p class="wh-sub">Shout your guesses. Get it right and you earn points too.</p>' +
               '<div class="wh-stack" data-mic="quiet"></div><div class="heard wh-note" id="heard"></div></div>' +
               '<button id="toType" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("keyboard") + 'Mic not working? Type your answer</button>') +
           '<div class="spacer"></div>' + skipHtml(s) +
           lockHtml("Song changing. Guessing is paused.") +
           '<div class="wh-overlay wh-field wh-field--sky fixedov" id="checking" hidden><div class="wh-spin"></div><h2 class="wh-title">Checking...</h2>' +
-          '<p class="wh-sub">Someone may have got it. Hold tight.</p></div></div>',
+          '<p class="wh-sub">Someone may have got it. Waiting for the whistler to confirm.</p></div></div>',
         bind: function () {
           var f = $("#gform");
           if (f) {
@@ -679,33 +709,70 @@
       };
     }
 
-    // 7. Reveal
-    var R = T.result, head, lines = "";
+    // 7. Reveal: the score is counted up on screen, see revealFrame()
+    var R = T.result, head, sub = "";
+    var guessers = (R.awards || []).filter(function (x) { return x.role === "guesser"; }).map(function (x) { return pname(s, x.id); });
     if (R.outcome === "correct") {
-      head = esc(who) + " got it";
-      lines = "Time " + fmt(R.timeMs / 1000) + "s" + (R.difficulty ? " x " + R.multiplier + " (" + R.difficulty + ")" : "") +
-        (R.shuffles ? " + " + (R.shuffles * T.penalty) + "s for " + R.shuffles + " shuffle" + (R.shuffles > 1 ? "s" : "") : "");
+      head = esc(who) + " whistled it";
+      sub = guessers.length ? "Guessed by " + guessers.map(esc).join(", ").replace(/, ([^,]*)$/, " and $1") : "";
     } else if (R.outcome === "timeout") {
       head = "Time's up";
-      lines = "Nobody guessed " + esc(who) + "'s song, so it scores the full " + fmt(R.timeMs / 1000) + "s.";
+      sub = "Nobody guessed " + esc(who) + "'s song, so it scores nothing.";
     } else {
       head = "Turn skipped";
-      lines = esc(who) + " scores the full " + fmt(R.timeMs / 1000) + "s.";
+      sub = esc(who) + " scores nothing.";
     }
     var last = s.turnNumber >= s.totalTurns;
+    var awards = (R.awards || []).slice().sort(function (a, b) { return b.points - a.points; }).filter(function (a) { return a.points > 0; }).map(function (a) {
+      return '<span class="wh-chip wh-chip--static award"><b>+' + pts(a.points) + "</b> " + esc(pname(s, a.id)) + "</span>";
+    }).join("");
     return {
       key: "reveal-" + T.id + "-" + s.totalTurns, field: "cobalt",
       html: '<div class="screen">' + topBar(s) +
-        '<h1 class="wh-title winline">' + head + "</h1>" +
+        '<div class="wh-stack"><h1 class="wh-title winline">' + head + "</h1>" + (sub ? '<p class="wh-sub">' + sub + "</p>" : "") + "</div>" +
         (R.song ? '<div class="wh-card songcard"><div class="wh-over">The song was</div><div class="t wh-title">' + esc(R.song.title) + '</div><div class="a wh-sub">' + esc(R.song.artist) + "</div></div>" : "") +
-        '<div class="wh-card scorecard"><div class="breakdown wh-sub">' + lines + '</div><div class="score">' + fmt(R.score) + "s</div></div>" +
-        '<h2 class="wh-over">' + (T.sd ? "Tie-break" : "Standings") + "</h2>" + standingsHtml(s, !T.sd, null) +
+        '<div class="wh-card scorecard"><div class="wh-over" id="scoreCap">Guessed in</div><div class="scoreNum" id="scoreNum">0</div></div>' +
+        '<div class="awards rvhide" id="awards">' + awards + "</div>" +
+        '<div class="rvhide" id="board"><h2 class="wh-over">Standings</h2>' + standingsHtml(s, R.awards, null) + "</div>" +
         '<div class="spacer"></div>' +
+        '<p class="wh-sub center" id="nextIn"></p>' +
         (s.hostId === s.me
-          ? '<button id="nextBtn" class="wh-btn wh-btn--block">' + (last ? "Finish" : "Next player") + "</button>"
-          : '<p class="wh-sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") + skipHtml(s) + "</div>",
-      bind: function () { var b = $("#nextBtn"); if (b) { b.onclick = function () { send({ t: "next" }); }; } bindSkip(); }
+          ? '<button id="nextBtn" class="wh-btn wh-btn--secondary wh-btn--block">' + (last ? "Skip to final scores" : "Skip ahead") + "</button>"
+          : "") + skipHtml(s) + "</div>",
+      bind: function () { var b = $("#nextBtn"); if (b) { b.onclick = function () { send({ t: "next" }); }; } bindSkip(); },
+      update: function () {}
     };
+  }
+
+  // Where the reveal animation is at, given milliseconds since the turn finished.
+  var REDUCED = false;
+  try { REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (e) {}
+  function ease(x) { x = Math.max(0, Math.min(1, x)); return 1 - Math.pow(1 - x, 3); }
+  function revealFrame(R, el) {
+    if (R.outcome !== "correct") {
+      var fin0 = 1200;
+      return { num: 0, cap: el >= fin0 ? (R.outcome === "timeout" ? "Time's up" : "Skipped") : "Counting up", final: el >= fin0, finalAt: fin0 };
+    }
+    var rawS = Math.max(0, R.timeMs / 1000 - R.penaltyS), cur = 2200;
+    var segs = [{ from: 0, to: R.base, at: 0, len: 1600, cap: "Guessed in " + rawS.toFixed(1) + "s" }];
+    if (R.shuffles) {
+      segs.push({ from: R.base, to: R.afterShuffle, at: cur, len: 1000, cap: R.shuffles === 1 ? "Shuffle penalty, " + R.penaltyS + "s" : R.shuffles + " shuffles, " + R.penaltyS + "s penalty" });
+      cur += 1600;
+    }
+    if (R.multiplier && R.multiplier !== 1) {
+      segs.push({ from: R.afterShuffle, to: R.score, at: cur, len: 1400, cap: cap(R.difficulty || "") + " song, x" + R.multiplier });
+      cur += 2000;
+    }
+    var finalAt = Math.max(cur + 1200, 4500);
+    if (el >= finalAt) { return { num: R.score, cap: "Final score", final: true, finalAt: finalAt }; }
+    var out = { num: 0, cap: segs[0].cap, final: false, finalAt: finalAt };
+    for (var i = 0; i < segs.length; i++) {
+      var g = segs[i];
+      if (el >= g.at) { out.num = g.to; out.cap = g.cap; }
+      if (el >= g.at && el < g.at + g.len) { out.num = g.from + (g.to - g.from) * ease((el - g.at) / g.len); }
+    }
+    if (el >= cur) { out.cap = "And the score is..."; out.drum = true; }
+    return out;
   }
 
   function viewOver(s) {
@@ -720,7 +787,7 @@
         '<div class="wh-topbar"><div class="wh-topbar__title">Game over</div></div>' +
         '<h1 class="wh-title">' + head + "</h1>" +
         (s.tieBreakWon ? '<p class="wh-sub">Settled in a tie-break.</p>' : "") +
-        '<h2 class="wh-over">Final scores, lower is better</h2>' + standingsHtml(s, false, s.winners) +
+        '<h2 class="wh-over">Final scores</h2>' + standingsHtml(s, null, s.winners) +
         '<div class="spacer"></div>' +
         (isHost ? '<button id="againBtn" class="wh-btn wh-btn--block">Play again</button>' : '<p class="wh-sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") +
         '<button id="leaveBtn" class="wh-btn wh-btn--ghost">Leave room</button></div>',
@@ -735,14 +802,16 @@
     var o = document.createElement("div");
     o.className = "overlay modal";
     var steps = [
-      "On your turn, pick one of three songs: easy, medium or hard. Harder songs take time off your score.",
+      "On your turn, pick one of three songs: easy, medium or hard. Harder songs earn bonus points.",
       "Whistle the song on your phone. Only you can see it, so keep your screen to yourself.",
-      "Everyone else shouts or types guesses. The clock stops when the mic hears the right answer.",
-      "Stuck? Shuffle for a new song, but your screen locks for 5 seconds. If nobody guesses in time, you score the full time.",
-      "After the last round, the lowest total wins."
+      "Everyone else shouts or types guesses. The quicker they get it, the more points it is worth.",
+      "When someone gets it, say who. You and everyone you name earn points.",
+      "Stuck? Shuffle for a new song, but your screen locks for 5 seconds and it costs you points. Nobody guesses in time, no points.",
+      "After the last round, the highest total wins."
     ];
+
     o.innerHTML = '<div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">How to play</h2>' +
-      '<p class="wh-sub">Get everyone to guess your song as quickly as you can. Your score is the seconds it takes, so the fewest points wins.</p>' +
+      '<p class="wh-sub">Get everyone to guess your song as quickly as you can. A guess at the start is worth 1000 points and the value falls as the clock runs, so the highest total wins.</p>' +
       '<ol class="wh-steps">' + steps.map(function (t, i) { return "<li><b>" + (i + 1) + "</b><span>" + t + "</span></li>"; }).join("") + "</ol>" +
       '<div class="wh-modal__actions"><button class="wh-btn wh-btn--block" id="helpClose">Got it</button></div></div>';
     document.body.appendChild(o);
@@ -823,6 +892,26 @@
         if (cd.textContent !== String(n)) { cd.textContent = n; }
       }
     }
+    if (T.stage === "reveal" && T.result) {
+      var R = T.result, ms = REDUCED ? 1e9 : Math.max(0, nowS() - R.revealAt), fr = revealFrame(R, ms);
+      var sn = $("#scoreNum");
+      if (sn) {
+        var txt = pts(fr.num); if (sn.textContent !== txt) { sn.textContent = txt; }
+        var cp = $("#scoreCap"); if (cp && cp.textContent !== fr.cap) { cp.textContent = fr.cap; }
+        sn.classList.toggle("drum", !!fr.drum);
+        if (fr.final && !sn.classList.contains("slam")) { sn.classList.add("slam"); try { if (navigator.vibrate) { navigator.vibrate(R.score > 0 ? [60, 40, 90] : 40); } } catch (e) {} }
+        var late = ms >= fr.finalAt + 300;
+        var aw = $("#awards"), bd = $("#board");
+        if (aw) { aw.classList.toggle("rvhide", !late); }
+        if (bd) { bd.classList.toggle("rvhide", !late); }
+      }
+      var ni = $("#nextIn");
+      if (ni) {
+        var rem = T.nextAt ? T.nextAt - nowS() : null, last = st.turnNumber >= st.totalTurns;
+        var nt = rem !== null && rem <= 5000 ? (last ? "Final scores in " : "Next turn in ") + Math.max(1, Math.ceil(rem / 1000)) : "";
+        if (ni.textContent !== nt) { ni.textContent = nt; }
+      }
+    }
     if (T.stage === "whistling" || T.stage === "confirming") {
       var el = elapsedMs(T), remain = T.limitMs - el, danger = remain <= 10000;
       if (document.body.classList.contains("danger") !== danger) {
@@ -834,6 +923,11 @@
         else { big.textContent = fmt(el / 1000); if (lab) { lab.textContent = "Time so far"; } }
       }
       if (bar) { bar.style.width = Math.min(100, (el / T.limitMs) * 100) + "%"; }
+      var wv = $("#worth");
+      if (wv) {
+        var worth = Math.round(1000 * (1 - el / T.limitMs) * (T.multiplier || 1)), wt = "Worth " + pts(worth) + " points";
+        if (wv.textContent !== wt) { wv.textContent = wt; }
+      }
       if (danger && T.stage === "whistling") {
         var sec = Math.ceil(remain / 1000);
         if (sec !== lastSecond) { lastSecond = sec; try { if (navigator.vibrate) { navigator.vibrate(40); } } catch (e) {} }

@@ -251,7 +251,7 @@ html{background:var(--cloud)}
 body{min-height:100dvh;overflow-x:hidden}
 #app{min-height:100dvh;position:relative;overflow:hidden;transition:background-color .2s ease-out}
 .screen{position:relative;max-width:480px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;gap:var(--space-4);padding:max(var(--space-6),env(safe-area-inset-top)) var(--gutter) max(var(--space-6),env(safe-area-inset-bottom))}
-.screen>*:not(.wh-blob):not(.picker){position:relative;z-index:1}
+.screen>*:not(.wh-blob):not(.picker):not(.ovl):not(.lockov):not(.fixedov){position:relative;z-index:1}
 .wh-blob{z-index:0!important}
 .spacer{flex:1;min-height:var(--space-2)}
 .center{text-align:center}
@@ -377,3 +377,23 @@ body.danger #app .wh-progress>i{background:var(--ink)}
 .wh-card.wh-stack{gap:14px}
 .wh-prow{padding:10px 24px}
 .wh-seg{padding:5px}
+
+/* scoring: who got it, reveal count-up */
+.whogrid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
+.who{appearance:none;display:flex;align-items:center;gap:var(--space-2);min-height:52px;padding:6px 10px 6px 8px;border-radius:var(--radius-pill);border:var(--stroke-2) solid var(--control-line);background:var(--surface);color:var(--on-surface);font:600 14px/18px var(--font-sans);cursor:pointer;text-align:left;min-width:0}
+.who .whoname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who .whotick{display:none;width:18px;height:18px;stroke-width:3}
+.who[aria-pressed=true]{border:var(--stroke-3) solid var(--select);padding:5px 9px 5px 7px}
+.who[aria-pressed=true] .whotick{display:block}
+.who:focus-visible{outline:var(--stroke-3) solid var(--focus);outline-offset:2px}
+.scorecard{flex-direction:column;align-items:center;text-align:center;gap:var(--space-2);padding:var(--space-5) var(--space-6)}
+.scoreNum{font:700 44px/44px var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;min-height:44px}
+.scoreNum.drum{animation:wh-tick-beat .5s ease-in-out infinite}
+.scoreNum.slam{animation:wh-slam .5s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes wh-slam{0%{transform:scale(.7)}55%{transform:scale(1.35)}100%{transform:scale(1)}}
+.awards{display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center}
+.awards .award{background:var(--paper);color:var(--ink)}
+.rvhide{opacity:0;transform:translateY(10px);pointer-events:none}
+#awards,#board{transition:opacity .4s ease-out,transform .4s ease-out}
+.worth{margin-top:2px;color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.scoreNum.drum,.scoreNum.slam{animation:none}#awards,#board{transition:none}}

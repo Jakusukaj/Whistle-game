@@ -12,7 +12,7 @@ function fakeConn() { var c = { roomCode: null, playerId: null, state: null, err
   return c; }
 
 function newGame(n, opts) {
-  var m = new RoomManager(Object.assign({ defaultPacks: ["bangers"] }, opts || {}));
+  var m = new RoomManager(Object.assign({ defaultPacks: ["bangers"], revealMs: 0 }, opts || {}));
   var cs = [];
   for (var i = 0; i < n; i++) { cs.push(fakeConn()); }
   m.handle(cs[0], { t: "create", name: "P0" });

@@ -78,7 +78,7 @@ async function mainScenario() {
   console.log("\n--- Scenario 1: full game, three players ---");
   // Short timers so the test runs fast. In the real game the limit is 60s and
   // a shuffle costs 5s; the maths is the same.
-  var app = createServer({ defaultPacks: ["bangers"], limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
 
@@ -181,28 +181,40 @@ async function mainScenario() {
   var res = B.state.turn.result;
   check("result is a correct guess", res.outcome === "correct");
   check("everyone sees the song at the reveal", res.song.title === song && C.state.turn.result.song.title === song);
-  var expected = Math.round((Math.max(0, res.timeMs / 1000 - 0.5) * 1 + 0.5) * 10) / 10;
-  check("score is time x multiplier, with the shuffle lock counted in full", res.score === expected && res.score >= 0.5, res.score + " vs " + expected);
-  check("score is added to the total", A.state.players.filter(function (p) { return p.id === A.playerId; })[0].total === res.score);
+  var expected = Math.round(1000 * (1 - res.timeMs / 1000 / 3));
+  check("a quicker guess scores more: 1000 x (1 - time / limit), shuffle time included", res.score === expected && res.score > 0 && res.score <= 1000, res.score + " vs " + expected);
+  check("base points ignore the shuffle, so the shuffle costs points", res.base > res.afterShuffle && res.shuffles === 1, res.base + " / " + res.afterShuffle);
+  var tot = function (c) { return A.state.players.filter(function (p) { return p.id === c.playerId; })[0].total; };
+  check("the whistler's points are added to their total", tot(A) === res.score);
+  check("the person who was heard guessing is pre-credited with half", tot(C) === Math.round(res.score / 2) && res.awards.length === 2, tot(C));
+  check("people who were not named earn nothing", tot(B) === 0);
   check("guessers never saw the song before the reveal", B.songSeen.length === 0 && C.songSeen.length === 0, B.songSeen.join());
 
   A.send({ t: "next" });
   await B.waitFor(turnId(B.playerId), "turn 2 is Ben's");
   check("turn 2 stage resets to choose", B.stage() === "choose");
   await startTurnAs(cs, B, "hard");
-  check("hard multiplier is 0.8", B.state.turn.multiplier === 0.8);
+  check("hard multiplier is 1.2", B.state.turn.multiplier === 1.2);
   await B.waitFor(stageIs("reveal"), "timeout reveal", 6000);
   await A.waitFor(stageIs("reveal"), "timeout reveal for A", 6000);
   check("an unguessed turn times out", B.state.turn.result.outcome === "timeout");
-  check("a timeout scores the full limit, whatever the difficulty", B.state.turn.result.score === 3, B.state.turn.result.score);
+  check("a timeout scores nothing, whatever the difficulty", B.state.turn.result.score === 0 && B.state.turn.result.awards.length === 1, B.state.turn.result.score);
   check("timeout still reveals the song", !!B.state.turn.result.song.title && !!A.state.turn.result.song.title);
 
   A.send({ t: "next" });
   await C.waitFor(turnId(C.playerId), "turn 3 is Cat's");
   await startTurnAs(cs, C, "medium");
   C.send({ t: "gotIt" });
-  await C.waitFor(stageIs("reveal"), "gotIt reveal");
-  check("whistler can end the turn manually", C.state.turn.result.outcome === "correct" && C.state.turn.result.multiplier === 0.9);
+  await C.waitFor(stageIs("confirming"), "gotIt asks who");
+  check("Someone got it pauses the clock and asks who", C.state.turn.runningSince === null && C.state.turn.pending.manual === true);
+  var before = A.state.players.map(function (p) { return p.total; });
+  C.send({ t: "confirm", ok: true, who: [A.playerId, B.playerId, C.playerId, "nobody"] });
+  await C.waitFor(stageIs("reveal"), "naming reveal");
+  var r3 = C.state.turn.result;
+  check("whistler names who got it", r3.outcome === "correct" && r3.multiplier === 1.1);
+  check("each named guesser is awarded separately, never the whistler twice or a stranger", r3.awards.length === 3 && r3.awards.filter(function (a) { return a.role === "guesser"; }).length === 2, JSON.stringify(r3.awards));
+  check("each guesser earns half the whistler's points", r3.awards.filter(function (a) { return a.role === "guesser"; }).every(function (a) { return a.points === Math.round(r3.score / 2); }));
+  check("medium is worth 10% more than the same speed on easy", r3.score === Math.round(r3.afterShuffle * 1.1));
 
   A.send({ t: "next" });
   await A.waitFor(function (s) { return s.phase === "gameover"; }, "game over");
@@ -220,7 +232,7 @@ async function mainScenario() {
 
 async function skipAndLeaveScenario() {
   console.log("\n--- Scenario 2: skip, leave, late joiner ---");
-  var app = createServer({ defaultPacks: ["bangers"], limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Ann", "Ben", "Cat"]);
@@ -238,7 +250,7 @@ async function skipAndLeaveScenario() {
   check("only the host can skip", B.errors.indexOf("not_host") !== -1 && A.stage() === "choose");
   A.send({ t: "skip" });
   await A.waitFor(stageIs("reveal"), "skipped");
-  check("a skipped turn scores the full limit", A.state.turn.result.outcome === "skipped" && A.state.turn.result.score === 1.5, A.state.turn.result.score);
+  check("a skipped turn scores nothing", A.state.turn.result.outcome === "skipped" && A.state.turn.result.score === 0, A.state.turn.result.score);
 
   A.send({ t: "next" });
   await B.waitFor(turnId(B.playerId), "Ben's turn");
@@ -252,7 +264,7 @@ async function skipAndLeaveScenario() {
 
 async function reconnectScenario() {
   console.log("\n--- Scenario 3: reconnect and host hand-over ---");
-  var app = createServer({ defaultPacks: ["bangers"], limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Ann", "Ben"]);
@@ -276,7 +288,7 @@ async function reconnectScenario() {
 
 async function tieScenario() {
   console.log("\n--- Scenario 4: tie goes to sudden death ---");
-  var app = createServer({ defaultPacks: ["bangers"], limitMs: 600, countdownMs: 50, confirmMs: 400, cooldownMs: 200 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 600, countdownMs: 50, confirmMs: 400, cooldownMs: 200 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Xia", "Yan"]);
@@ -295,17 +307,19 @@ async function tieScenario() {
   check("the other contender cannot see the song", !Y.state.turn.song);
 
   X.send({ t: "ready" }); await X.waitFor(stageIs("whistling"), "x whistling");
-  X.send({ t: "gotIt" }); await X.waitFor(stageIs("reveal"), "x sd reveal");
+  X.send({ t: "gotIt" }); await X.waitFor(stageIs("confirming"), "x asks who");
+  X.send({ t: "confirm", ok: true, who: [Y.playerId] }); await X.waitFor(stageIs("reveal"), "x sd reveal");
+  check("tie-break guessers earn no points", X.state.turn.result.awards.length === 1);
   X.send({ t: "next" }); await Y.waitFor(turnId(Y.playerId), "y sd turn");
   Y.send({ t: "ready" }); await Y.waitFor(stageIs("whistling"), "y whistling");
   await Y.waitFor(stageIs("reveal"), "y sd timeout", 2000);
   X.send({ t: "next" });
   await X.waitFor(function (s) { return s.phase === "gameover"; }, "gameover");
-  check("faster player wins the tie-break", X.state.winners.length === 1 && X.state.winners[0] === X.playerId, X.state.winners);
+  check("higher scorer wins the tie-break", X.state.winners.length === 1 && X.state.winners[0] === X.playerId, X.state.winners);
   check("game over says it was settled by tie-break", X.state.tieBreakWon === true);
   var xs = X.state.players.filter(function (p) { return p.id === X.playerId; })[0];
   var ys = X.state.players.filter(function (p) { return p.id === Y.playerId; })[0];
-  check("tie-break scores do not change the totals", xs.total === 0.6 && ys.total === 0.6, xs.total + "/" + ys.total);
+  check("tie-break scores do not change the totals", xs.total === 0 && ys.total === 0, xs.total + "/" + ys.total);
 
   cs.forEach(function (c) { c.close(); });
   app.server.close();
@@ -313,7 +327,7 @@ async function tieScenario() {
 
 async function endlessTieScenario() {
   console.log("\n--- Scenario 5: tie that cannot be broken ---");
-  var app = createServer({ defaultPacks: ["bangers"], limitMs: 300, countdownMs: 30, confirmMs: 300, cooldownMs: 100 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 300, countdownMs: 30, confirmMs: 300, cooldownMs: 100 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Xia", "Yan"]);

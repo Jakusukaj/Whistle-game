@@ -3,13 +3,15 @@
 // RoomManager.handle(conn, msg), and conn.send(obj) is how replies go back.
 //
 // Rules in one paragraph: every player whistles once per round. The whistler
-// picks easy, medium or hard (score multipliers x1.0, x0.9, x0.8, so a lower
-// score is better), sees the song on their own phone, and the clock runs until
-// the room guesses it (max 60s). Guesses come from the other phones, by voice
+// picks easy, medium or hard (point multipliers x1.0, x1.1, x1.2), sees the song
+// on their own phone, and the clock runs until the room guesses it (max 60s).
+// A quicker guess is worth more: 1000 x (1 - time / limit), shuffle penalties
+// count as extra time, then the multiplier applies. The whistler names who got
+// it right and each of them earns half of the whistler's points. Guesses come from the other phones, by voice
 // or typing, and are checked HERE so the song never reaches a guesser's phone.
 // A likely match pauses the clock and asks the whistler to confirm, which keeps
 // the answer secret if the detection was wrong. Shuffling for a new song costs
-// +5s. Lowest total wins; a tie goes to a sudden-death round.
+// +5s. Highest total wins; a tie goes to a sudden-death round.
 
 var crypto = require("crypto");
 var SONGS = require("./songs.js");
@@ -23,12 +25,15 @@ var PACK_IDS = PACKS.map(function (p) { return p.id; });
 var SONG_BUFFER = 5; // spare songs a game needs beyond one per turn (shuffles, tie-breaks)
 
 var DEFAULTS = {
-  limitMs: 60000,        // a turn that nobody guesses scores this
+  limitMs: 60000,        // a turn that nobody guesses scores nothing
   countdownMs: 3000,     // 3, 2, 1 before the clock starts
   confirmMs: 10000,      // whistler has this long to confirm a detected guess
   cooldownMs: 4000,      // ignore guesses this long after the whistler says "no"
   shufflePenaltyS: 5,
-  multipliers: { easy: 1, medium: 0.9, hard: 0.8 },
+  multipliers: { easy: 1, medium: 1.1, hard: 1.2 },
+  maxPoints: 1000,       // a guess at 0s is worth this before the multiplier
+  guesserShare: 0.5,     // each named guesser earns this share of the whistler's points
+  revealMs: 13000,       // reveal animation plus the 5 second countdown, then the game moves on (0 turns it off)
   sdDifficulty: "medium",
   sdMaxRounds: 3,
   minPlayers: 2,
@@ -90,7 +95,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
       multiplier: t.multiplier, shuffles: t.shuffles, sd: t.sd, round: t.round,
       countdownEndsAt: t.countdownEndsAt, accumulatedMs: t.accumulatedMs,
       runningSince: t.runningSince, limitMs: room.limitMs,
-      penalty: this.opts.shufflePenaltyS
+      penalty: this.opts.shufflePenaltyS, nextAt: t.nextAt || null
     };
     var locked = t.lockUntil && t.lockUntil > this.now();
     if (locked) { tv.lockUntil = t.lockUntil; }
@@ -101,7 +106,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
       });
     }
     if (isW && t.song && t.stage !== "reveal" && !locked) { tv.song = { title: t.song.title, artist: t.song.artist }; }
-    if (isW && t.stage === "confirming" && t.pending) { tv.pending = { heard: t.pending.heard }; }
+    if (isW && t.stage === "confirming" && t.pending) { tv.pending = { heard: t.pending.heard, from: t.pending.from || null, manual: !!t.pending.manual }; }
     if (t.stage === "reveal") { tv.result = t.result; }
   }
   return {
@@ -111,7 +116,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
     players: room.players.filter(function (p) { return !p.sitOut; }).map(function (p) {
-      return { id: p.id, name: p.name, connected: p.connected, total: round1(p.total), last: p.last, turns: p.turns };
+      return { id: p.id, name: p.name, connected: p.connected, total: p.total, last: p.last, turns: p.turns };
     }),
     packs: PACKS.map(function (p) {
       return { id: p.id, group: p.group, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
@@ -229,7 +234,7 @@ RoomManager.prototype.handle = function (conn, msg) {
     case "shuffle":    return this.shuffle(room, me);
     case "ready":      return this.ready(room, me);
     case "gotIt":      return this.gotIt(room, me);
-    case "confirm":    return this.confirmGuess(room, me, !!msg.ok);
+    case "confirm":    return this.confirmGuess(room, me, !!msg.ok, false, msg.who);
     case "guess":      return this.guess(room, me, conn, msg);
     case "leave":      return this.leave(room, me, conn);
     default: return;
@@ -508,9 +513,9 @@ RoomManager.prototype.drawSong = function (room, turn) {
 
 // The ticked packs ran out of unplayed songs: finish the game with the current standings.
 RoomManager.prototype.endEarly = function (room) {
-  var min = Infinity;
-  room.players.forEach(function (p) { if (!p.sitOut && p.total < min) { min = p.total; } });
-  var ids = room.players.filter(function (p) { return !p.sitOut && round1(p.total) === round1(min); }).map(function (p) { return p.id; });
+  var top = -Infinity;
+  room.players.forEach(function (p) { if (!p.sitOut && p.total > top) { top = p.total; } });
+  var ids = room.players.filter(function (p) { return !p.sitOut && p.total === top; }).map(function (p) { return p.id; });
   this.gameOver(room, ids, false);
 };
 
@@ -617,12 +622,15 @@ RoomManager.prototype.guess = function (room, me, conn, msg) {
   this.broadcast(room);
 };
 
-RoomManager.prototype.confirmGuess = function (room, me, ok, byTimeout) {
+RoomManager.prototype.confirmGuess = function (room, me, ok, byTimeout, who) {
   var t = room.turn;
   if (room.phase !== "turn" || !t || t.stage !== "confirming") { return; }
   if (!byTimeout && t.playerId !== me.id) { return; }
   if (t.timers.confirm) { clearTimeout(t.timers.confirm); t.timers.confirm = null; }
-  if (ok) { return this.finishTurn(room, "correct"); }
+  if (ok) {
+    var ids = Array.isArray(who) ? who : (t.pending && t.pending.from ? [t.pending.from] : []);
+    return this.finishTurn(room, "correct", ids);
+  }
   t.stage = "whistling";
   t.pending = null;
   t.runningSince = this.now();
@@ -633,9 +641,12 @@ RoomManager.prototype.confirmGuess = function (room, me, ok, byTimeout) {
 
 RoomManager.prototype.gotIt = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling", "confirming"]);
-  if (!t || this.now() < t.lockUntil) { return; }
-  if (t.stage === "whistling") { this.pause(t); }
-  this.finishTurn(room, "correct");
+  if (!t || this.now() < t.lockUntil || t.stage !== "whistling") { return; }
+  // Pause the clock and ask the whistler who got it. No timeout: they take their time.
+  this.pause(t);
+  t.stage = "confirming";
+  t.pending = { heard: "", from: null, manual: true };
+  this.broadcast(room);
 };
 
 RoomManager.prototype.skip = function (room) {
@@ -645,33 +656,56 @@ RoomManager.prototype.skip = function (room) {
   this.finishTurn(room, "skipped");
 };
 
-RoomManager.prototype.finishTurn = function (room, outcome) {
-  var t = room.turn;
+RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
+  var t = room.turn, self = this;
   if (!t || t.stage === "reveal") { return; }
   this.clearTimers(t);
   var limitS = room.limitMs / 1000;
   var timeMs = outcome === "correct" ? Math.min(t.accumulatedMs, room.limitMs) : room.limitMs;
   var mult = t.multiplier || 1;
-  var score;
+  var lockedS = this.opts.shufflePenaltyS * t.shuffles;
+  var base = 0, afterShuffle = 0, score = 0;
   if (outcome === "correct") {
-    // The shuffle lock time is part of the clock but is not discounted by the multiplier.
-    var lockedS = this.opts.shufflePenaltyS * t.shuffles;
-    score = round1(Math.min(limitS, Math.max(0, timeMs / 1000 - lockedS) * mult + lockedS));
-  } else {
-    score = limitS;
+    // Shuffle lock time is part of the clock, so it already counts against the guess time.
+    var rawS = Math.max(0, timeMs / 1000 - lockedS);
+    base = Math.max(0, Math.round(this.opts.maxPoints * (1 - rawS / limitS)));
+    afterShuffle = Math.max(0, Math.round(this.opts.maxPoints * (1 - timeMs / 1000 / limitS)));
+    score = Math.round(afterShuffle * mult);
+  }
+  // Who gets points: the whistler, plus each person they named (never themselves).
+  var awards = [{ id: t.playerId, points: score, role: "whistler" }];
+  if (outcome === "correct" && !t.sd) {
+    var seen = {};
+    (whoIds || []).forEach(function (id) {
+      var gp = findPlayer(room, id);
+      if (!gp || gp.sitOut || id === t.playerId || seen[id]) { return; }
+      seen[id] = true;
+      awards.push({ id: id, points: Math.round(score * self.opts.guesserShare), role: "guesser" });
+    });
   }
   t.stage = "reveal";
   t.pending = null;
   t.result = {
-    outcome: outcome, timeMs: timeMs, multiplier: t.multiplier, difficulty: t.difficulty,
-    shuffles: t.shuffles, score: score,
+    outcome: outcome, timeMs: timeMs, limitMs: room.limitMs, multiplier: t.multiplier, difficulty: t.difficulty,
+    shuffles: t.shuffles, penaltyS: lockedS, base: base, afterShuffle: afterShuffle, score: score, awards: awards,
+    revealAt: this.now(),
     song: t.song ? { title: t.song.title, artist: t.song.artist } : null
   };
-  var p = findPlayer(room, t.playerId);
-  if (p) {
-    p.last = score;
-    if (t.sd) { room.sd.scores[p.id] = score; }
-    else { p.total = round1(p.total + score); p.turns++; }
+  room.players.forEach(function (p) { p.last = null; });
+  awards.forEach(function (a) {
+    var p = findPlayer(room, a.id);
+    if (!p) { return; }
+    p.last = a.points;
+    if (t.sd) { if (a.role === "whistler") { room.sd.scores[p.id] = a.points; } }
+    else { p.total += a.points; if (a.role === "whistler") { p.turns++; } }
+  });
+  if (this.opts.revealMs > 0) {
+    var id = t.id;
+    t.nextAt = this.now() + this.opts.revealMs;
+    t.timers.next = setTimeout(function () {
+      if (room.turn && room.turn.id === id && room.turn.stage === "reveal") { self.advance(room); }
+    }, this.opts.revealMs);
+    if (t.timers.next.unref) { t.timers.next.unref(); }
   }
   this.broadcast(room);
 };
@@ -685,16 +719,16 @@ RoomManager.prototype.next = function (room) {
 RoomManager.prototype.afterTurns = function (room) {
   var i, ids;
   if (room.sd) {
-    var best = Infinity;
-    room.sd.contenders.forEach(function (id) { if (room.sd.scores[id] < best) { best = room.sd.scores[id]; } });
+    var best = -Infinity;
+    room.sd.contenders.forEach(function (id) { if (room.sd.scores[id] > best) { best = room.sd.scores[id]; } });
     var winners = room.sd.contenders.filter(function (id) { return room.sd.scores[id] === best; });
     if (winners.length === 1 || room.sd.round >= this.opts.sdMaxRounds) { return this.gameOver(room, winners, true); }
     room.sd.contenders = winners; room.sd.round++; room.sd.scores = {};
     return this.queueSuddenDeath(room);
   }
-  var min = Infinity;
-  room.players.forEach(function (p) { if (p.total < min) { min = p.total; } });
-  ids = room.players.filter(function (p) { return round1(p.total) === round1(min); }).map(function (p) { return p.id; });
+  var top = -Infinity;
+  room.players.forEach(function (p) { if (p.total > top) { top = p.total; } });
+  ids = room.players.filter(function (p) { return p.total === top; }).map(function (p) { return p.id; });
   if (ids.length > 1) {
     room.sd = { contenders: ids, round: 1, scores: {} };
     return this.queueSuddenDeath(room);
