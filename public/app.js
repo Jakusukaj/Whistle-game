@@ -374,6 +374,25 @@
     }).join("") + "</div></div>";
   }
 
+  // One small round icon per player: green mic when listening, red when off, grey keyboard when typing.
+  function micIcon(p) {
+    var st2 = p.mic === "on" ? "on" : p.mic === "typing" ? "typing" : "off";
+    var label = st2 === "on" ? "Mic on" : st2 === "typing" ? "Typing guesses" : "Mic off";
+    return '<span class="micdot ' + st2 + '" title="' + label + '" role="img" aria-label="' + esc(p.name) + ": " + label + '">' + ico(st2 === "on" ? "mic" : st2 === "typing" ? "keyboard" : "mic-off", "wh-i--sm") + "</span>";
+  }
+  // A compact row of everyone's mic status, shown in game.
+  function micStrip(s) {
+    return '<div class="micstrip" id="micStrip">' + s.players.map(function (p) {
+      return '<span class="mchip ' + (p.mic === "on" ? "on" : p.mic === "typing" ? "typing" : "off") + '">' + esc(p.name) + micIcon(p) + "</span>";
+    }).join("") + "</div>";
+  }
+
+  function syncMicStrip(s) {
+    var el = $("#micStrip"); if (!el) { return; }
+    var h = micStrip(s);
+    if (el.outerHTML !== h) { el.outerHTML = h; }
+  }
+
   function packCard(p, on, ro, voters) {
     var vh = voters && voters.length ? '<span class="voters">' + voters.slice(0, 5).map(function (v) { return v; }).join("") + (voters.length > 5 ? '<span class="vmore">+' + (voters.length - 5) + "</span>" : "") + "</span>" : "";
     return '<button class="wh-pack pack' + (on ? " on" : "") + (ro ? " ro wh-pack--readonly" : "") + '" data-id="' + p.id + '" aria-pressed="' + on + '">' +
@@ -396,7 +415,7 @@
     var shown = limit ? r.slice(0, limit) : r;
     return '<div class="ranking">' + shown.map(function (x) {
       var inn = s.selectedPacks.indexOf(x.p.id) !== -1;
-      return '<div class="rkrow' + (inn ? " in" : "") + '">' + packArt(x.p.id, "rkart") + '<span class="rkname">' + esc(x.p.name) + '</span><span class="rkn">' + (inn ? ico("tick", "wh-i--sm") : "") + x.n + (x.n === 1 ? " vote" : " votes") + "</span></div>";
+      return '<div class="rkrow' + (inn ? " in" : "") + '">' + packArt(x.p.id, "rkart") + '<span class="rkname">' + esc(x.p.name) + '</span><span class="rkn">' + x.n + (x.n === 1 ? " vote" : " votes") + "</span>" + (inn ? '<span class="rkin">Playing</span>' : "") + "</div>";
     }).join("") + (limit && r.length > limit ? '<p class="wh-note">+' + (r.length - limit) + " more with votes</p>" : "") + "</div>";
   }
 
@@ -459,9 +478,8 @@
     var list = s.players.map(function (p) {
       return '<div class="wh-prow pl">' + avatarHtml(s, p) + '<span class="wh-prow__name nm">' + esc(p.name) +
         (p.id === s.hostId ? '<span class="wh-tag wh-tag--host">Host</span>' : "") +
-        (p.id === s.me ? '<span class="wh-tag wh-tag--you">You</span>' : "") +
-        (p.mic === "off" ? '<span class="wh-tag micoff">' + ico("mic-off") + "Mic off</span>" : "") + "</span>" +
-        '<span class="wh-prow__meta"><i class="pdot' + (p.connected ? " on" : "") + '"></i>' + (p.connected ? "Online" : "Away") + "</span></div>";
+        (p.id === s.me ? '<span class="wh-tag wh-tag--you">You</span>' : "") + "</span>" +
+        '<span class="wh-prow__meta"><i class="pdot' + (p.connected ? " on" : "") + '"></i>' + (p.connected ? "Online" : "Away") + "</span>" + micIcon(p) + "</div>";
     }).join("");
     return {
       key: "lobby", field: "cobalt",
@@ -740,7 +758,7 @@
         html: '<div class="screen">' + topBar(s) +
           '<div class="wh-stack midc"><div class="wh-spin"></div><h1 class="wh-title">' + esc(who) + (T.difficulty ? " is getting ready" : " is picking a song") + "</h1>" +
           '<p class="wh-sub">' + (T.difficulty ? "A 3, 2, 1 countdown starts as soon as they tap Ready." : "Get ready to guess. Say the title out loud or type it.") + "</p></div>" +
-          '<div class="wh-stack" data-mic></div><div class="spacer"></div>' + skipHtml(s) + "</div>",
+          '<div class="wh-stack" data-mic></div>' + micStrip(s) + '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: bindSkip
       };
     }
@@ -763,7 +781,7 @@
         key: "w-" + T.id, field: dfield,
         html: '<div class="screen">' + topBar(s) +
           '<div class="timerbox"><div class="wh-over" id="tlabel">Time</div><div class="wh-timer" id="bigtime">0.0</div>' +
-          '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' + songCardHtml(T) + '<div class="asks" id="hintAsks">' + asksHtml(s, T) + '</div><div class="wh-card hintcard" id="hintBox" hidden></div>' +
+          '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' + songCardHtml(T) + '<div class="asks" id="hintAsks">' + asksHtml(s, T) + '</div><div class="wh-card hintcard" id="hintBox" hidden></div>' + micStrip(s) +
           '<div class="spacer"></div>' +
           '<button id="gotBtn" class="wh-btn wh-btn--block gotbtn">Someone got it</button>' +
           '<div class="lifelines"><button id="shuffleBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("shuffle") + "<span>Shuffle<small>" + "-" + T.penalty + " points</small></span></button>" +
@@ -787,6 +805,7 @@
           $("#confirm").hidden = !conf;
           if (conf) { buildWho(t); } else { whoState.built = null; }
           showHints(t);
+          syncMicStrip(st);
           syncAsks(st, t);
           $("#hintCost").textContent = hintCostText(t);
           $("#hintBtn").disabled = t.stage === "confirming" || t.nextHintCost === null;
@@ -814,7 +833,7 @@
               '<p class="wh-sub">Shout your guesses. Get it right and you earn points too.</p>' +
               '<div class="wh-stack" data-mic="quiet"></div></div>' +
               '<button id="toType" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("keyboard") + 'Mic not working? Type your answer</button>') +
-          '<div class="spacer"></div>' +
+          micStrip(s) + '<div class="spacer"></div>' +
           '<button id="askHintBtn" class="wh-btn wh-btn--secondary wh-btn--block askhint">' + ico("info") + "<span>Request a hint</span></button>" + skipHtml(s) +
           '<div class="wh-overlay wh-field wh-field--sky fixedov" id="checking" hidden><div class="wh-spin"></div><h2 class="wh-title">Checking...</h2>' +
           '<p class="wh-sub">Someone may have got it.<br>Waiting for the whistler to confirm.</p></div></div>',
@@ -841,6 +860,7 @@
           showHints(st.turn);
           if (mic.turnSeen !== st.turn.id) { mic.turnSeen = st.turn.id; mic.base = mic.total || 0; mic.heard = ""; }
           syncAskBtn(st.turn);
+          syncMicStrip(st);
         }
       };
     }

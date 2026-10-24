@@ -220,7 +220,7 @@ RoomManager.prototype.addBot = function (room) {
   var n = 1, name;
   do { name = "Test " + n++; } while (room.players.some(function (p) { return p.name === name; }));
   var p = this.addPlayer(room, name);
-  p.bot = true; p.connected = true;
+  p.bot = true; p.connected = true; p.mic = "on";
   return p;
 };
 
@@ -248,6 +248,12 @@ RoomManager.prototype.handle = function (conn, msg) {
     if (msg.t === "adminAutoplay") { return this.setAutoplay(room, !!msg.on); }
     if (msg.t === "adminAddBot") {
       if (room.phase === "lobby") { this.addBot(room); this.broadcast(room); }
+      return;
+    }
+    // This phone's real microphone belongs to the admin's own player, not the one being viewed.
+    if (msg.t === "mic") {
+      var own = findPlayer(room, room.admin.pid);
+      if (own) { own.mic = ["on", "off", "typing"].indexOf(msg.state) !== -1 ? msg.state : null; this.broadcast(room); }
       return;
     }
     // Everything else is done as the test player being viewed.

@@ -523,3 +523,40 @@ p,.wh-sub,.wh-note,.wh-help,.wh-pack__desc,.wh-setting__sub,.packnote,.packline,
 .pranking .rkrow.in .rkn{padding:3px 8px}
 .pranking .wh-note{display:none}
 .pranking>.wh-note{display:block;margin:0;font-size:12px}
+
+/* mic status for everyone */
+.micdot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:var(--outline);flex:none;color:var(--ink)}
+.micdot .wh-i{width:16px;height:16px}
+.micdot.on{background:var(--leaf)}
+.micdot.off{background:var(--danger);color:var(--paper)}
+.micdot.typing{background:var(--surface-sunken)}
+.micstrip{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.mchip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 6px 0 14px;border-radius:999px;background:var(--paper);color:var(--ink);border:var(--outline);font:600 13px/1 var(--font-sans)}
+.mchip .micdot{width:24px;height:24px}
+.wh-prow__meta{gap:6px}
+.wh-prow.pl{gap:12px}
+
+/* pack ranking: only packs that are playing are marked */
+.rkrow.in .rkn{background:none;border:0;padding:0}
+.rkn{background:none;border:0}
+.rkin{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--lime);border:var(--outline);font:700 12px/1 var(--font-display);flex:none}
+.pranking .rkin{height:20px;padding:0 8px;font-size:11px}
+
+/* more room inside curved boxes */
+.wh-card{padding:28px 32px}
+.songcard.wh-card,.scorecard.wh-card{padding:28px 32px}
+.wh-setting{padding:22px 32px}
+.wh-setting--col{padding:24px 32px 28px}
+.wh-list{padding:8px 0}
+.wh-prow{padding:12px 32px}
+.wh-game{padding:16px 20px 16px 32px}
+.wh-banner{padding:14px 28px}
+.wh-modal{padding:32px 30px}
+.hintcard{padding:24px 32px}
+.pranking{padding:12px 22px}
+.wh-pack{padding:14px 14px 18px;gap:12px}
+.wh-pack[aria-pressed=true]{padding:12.5px 12.5px 16.5px}
+.wh-pack__body{padding:0 6px}
+.wh-pack .wh-tick{top:22px;right:22px}
+.wh-empty{padding:34px 32px}
+.codecard{padding:6px 10px}
