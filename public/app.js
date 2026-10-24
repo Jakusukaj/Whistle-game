@@ -563,7 +563,7 @@
   }
 
   function lockHtml(note) {
-    return '<div class="lockov wh-field wh-field--ink" id="lock" hidden><div class="lk1">Shuffle!</div><div class="lk2">5s penalty</div>' +
+    return '<div class="lockov wh-field wh-field--ink" id="lock" hidden><div class="lk1">Shuffle!</div><div class="lk2">Shuffle costs 100 points</div>' +
       '<div class="lknum" id="lknum">5</div><div class="lk3">' + note + "</div></div>";
   }
 
@@ -574,7 +574,7 @@
       '<div class="a wh-sub" id="songArtist">' + esc(T.song ? T.song.artist : "") + "</div></div>";
   }
 
-  function hintCostText(t) { return t.nextHintCost === null ? "No hints left" : t.nextHintCost + "s penalty"; }
+  function hintCostText(t) { return t.nextHintCost === null ? "No hints left" : "-" + t.nextHintCost + " points"; }
   // The hints revealed so far, shown on every phone.
   function showHints(t) {
     var hb = $("#hintBox"); if (!hb) { return; }
@@ -695,7 +695,7 @@
           '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' + songCardHtml(T) + '<div class="wh-card hintcard" id="hintBox" hidden></div>' +
           '<div class="spacer"></div>' +
           '<button id="gotBtn" class="wh-btn wh-btn--block gotbtn">Someone got it</button>' +
-          '<div class="lifelines"><button id="shuffleBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("shuffle") + "<span>Shuffle<small>" + T.penalty + "s penalty</small></span></button>" +
+          '<div class="lifelines"><button id="shuffleBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("shuffle") + "<span>Shuffle<small>" + "-" + T.penalty + " points</small></span></button>" +
           '<button id="hintBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("info") + "<span>Hint<small id=\"hintCost\">" + hintCostText(T) + "</small></span></button></div>" + skipHtml(s) +
           lockHtml("New song coming up.") +
           '<div class="ovl" id="confirm" hidden><div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">Who got it?</h2>' +
@@ -791,7 +791,7 @@
       html: '<div class="screen">' + topBar(s) +
         '<div class="wh-stack"><h1 class="wh-title winline">' + head + "</h1>" + (sub ? '<p class="wh-sub">' + sub + "</p>" : "") + "</div>" +
         (R.song ? '<div class="wh-card songcard"><div class="wh-over">The song was</div><div class="t wh-title">' + esc(R.song.title) + '</div><div class="a wh-sub">' + esc(R.song.artist) + "</div></div>" : "") +
-        '<div class="wh-card scorecard"><div class="wh-over" id="scoreCap">Guessed in</div><div class="scoreNum" id="scoreNum">0</div></div>' +
+        '<div class="wh-card scorecard"><div class="wh-over" id="scoreCap">Guessed in</div><div class="scorerow"><span class="multBadge" id="multBadge" hidden></span><div class="scoreNum" id="scoreNum">0</div><span class="deltaTag" id="deltaTag" hidden></span></div></div>' +
         '<div class="awards rvhide" id="awards">' + awards + "</div>" +
         '<div class="rvhide" id="board"><h2 class="wh-over">Standings</h2>' + standingsHtml(s, R.awards, null) + "</div>" +
         '<div class="spacer"></div>' +
@@ -813,29 +813,32 @@
       var fin0 = 1200;
       return { num: 0, cap: el >= fin0 ? "No points" : "Counting up", final: el >= fin0, finalAt: fin0 };
     }
-    var rawS = Math.max(0, R.timeMs / 1000 - R.penaltyS), cur = 2200;
+    var rawS = Math.max(0, R.timeMs / 1000 - R.lockedS), cur = 2400, run = R.base;
+    // Order: base score, then the song multiplier, then shuffles, then hints, then the big reveal.
     var segs = [{ from: 0, to: R.base, at: 0, len: 1600, cap: "Guessed in " + rawS.toFixed(1) + "s" }];
-    if (R.shuffles) {
-      segs.push({ from: R.base, to: R.afterShuffle, at: cur, len: 1000, cap: R.shuffles === 1 ? "Shuffle penalty, " + R.penaltyS + "s" : R.shuffles + " shuffles, " + R.penaltyS + "s penalty" });
-      cur += 1600;
-    }
-    var preMult = R.afterShuffle;
-    if (R.hints) {
-      var ah = R.afterHint === undefined ? R.afterShuffle : R.afterHint;
-      segs.push({ from: R.afterShuffle, to: ah, at: cur, len: 1000, cap: (R.hints === 1 ? "Hint penalty, " : R.hints + " hints, ") + R.hintS + "s" + (R.hints === 1 ? "" : " penalty") });
-      cur += 1600; preMult = ah;
-    }
     if (R.multiplier && R.multiplier !== 1) {
-      segs.push({ from: preMult, to: R.score, at: cur, len: 1400, cap: cap(R.difficulty || "") + " song, x" + R.multiplier });
-      cur += 2000;
+      segs.push({ from: run, to: R.afterMult, at: cur + 500, len: 1400, cap: cap(R.difficulty || "") + " song", badge: "x" + R.multiplier, badgeAt: cur });
+      run = R.afterMult; cur += 2300;
     }
-    var finalAt = Math.max(cur + 1200, 4500);
+    if (R.shuffles) {
+      var sp = Math.min(run, R.shufflePts);
+      segs.push({ from: run, to: run - sp, at: cur, len: 900, cap: R.shuffles === 1 ? "Shuffle" : R.shuffles + " shuffles", delta: "-" + R.shufflePts });
+      run -= sp; cur += 1700;
+    }
+    if (R.hints) {
+      var hp = Math.min(run, R.hintPts);
+      segs.push({ from: run, to: run - hp, at: cur, len: 900, cap: R.hints === 1 ? "Hint" : R.hints + " hints", delta: "-" + R.hintPts });
+      run -= hp; cur += 1700;
+    }
+    var finalAt = Math.max(cur + 1400, 4500);
     if (el >= finalAt) { return { num: R.score, cap: "Final score", final: true, finalAt: finalAt }; }
-    var out = { num: 0, cap: segs[0].cap, final: false, finalAt: finalAt };
+    var out = { num: 0, cap: segs[0].cap, final: false, finalAt: finalAt, badge: "", delta: "" };
     for (var i = 0; i < segs.length; i++) {
       var g = segs[i];
-      if (el >= g.at) { out.num = g.to; out.cap = g.cap; }
+      if (g.badge && el >= g.badgeAt) { out.badge = g.badge; out.cap = cap(R.difficulty || "") + " song"; }
+      if (el >= g.at) { out.num = g.to; out.cap = g.cap; if (g.badge) { out.badge = g.badge; } }
       if (el >= g.at && el < g.at + g.len) { out.num = g.from + (g.to - g.from) * ease((el - g.at) / g.len); }
+      if (g.delta && el >= g.at - 300 && el < g.at + g.len + 500) { out.delta = g.delta; out.cap = g.cap; }
     }
     if (el >= cur) { out.cap = "And the score is..."; out.drum = true; }
     return out;
@@ -872,7 +875,7 @@
       "Whistle it. Only you can see the song.",
       "Everyone else shouts or types guesses. The quicker they get it, the more it is worth.",
       "Say who got it. You and everyone you name earn points.",
-      "Stuck? Shuffle for a new song or ask for a hint. Both cost time. The highest total wins."
+      "Stuck? Shuffle for a new song (100 points) or ask for a hint (50, then 100, then 150). The highest total wins."
     ];
 
 
@@ -945,7 +948,7 @@
       if (on) {
         var ln = document.getElementById("lknum"), n = Math.max(1, Math.ceil((L - nowS()) / 1000));
         if (ln && ln.textContent !== String(n)) { ln.textContent = n; }
-        var lp = lk.querySelector(".lk2"); if (lp) { lp.textContent = T.penalty + "s penalty"; }
+        var lp = lk.querySelector(".lk2"); if (lp) { lp.textContent = "Shuffle costs " + T.penalty + " points"; }
       }
       var sb = document.getElementById("shuffleBtn"), gb = document.getElementById("gotBtn"), hbn = document.getElementById("hintBtn");
       if (hbn) { hbn.disabled = on || T.stage === "confirming" || T.nextHintCost === null; }
@@ -966,6 +969,11 @@
         var txt = pts(fr.num); if (sn.textContent !== txt) { sn.textContent = txt; }
         var cp = $("#scoreCap"); if (cp && cp.textContent !== fr.cap) { cp.textContent = fr.cap; }
         sn.classList.toggle("drum", !!fr.drum);
+        var mb = $("#multBadge"), dt = $("#deltaTag");
+        if (mb) { mb.hidden = !fr.badge; if (fr.badge && mb.textContent !== fr.badge) { mb.textContent = fr.badge; } }
+        if (dt) { dt.hidden = !fr.delta; if (fr.delta && dt.textContent !== fr.delta) { dt.textContent = fr.delta; } }
+        if (fr.final && mb) { mb.hidden = true; }
+        sn.classList.toggle("big", !!fr.final);
         if (fr.final && !sn.classList.contains("slam")) { sn.classList.add("slam"); try { if (navigator.vibrate) { navigator.vibrate(R.score > 0 ? [60, 40, 90] : 40); } } catch (e) {} }
         var late = ms >= fr.finalAt + 300;
         var aw = $("#awards"), bd = $("#board");
@@ -992,7 +1000,7 @@
       if (bar) { bar.style.width = Math.min(100, (el / T.limitMs) * 100) + "%"; }
       var wv = $("#worth");
       if (wv) {
-        var worth = Math.max(0, Math.round(1000 * (1 - (el / 1000 + (T.hintCost || 0)) / (T.limitMs / 1000)) * (T.multiplier || 1))), wt = "Worth " + pts(worth) + " points";
+        var worth = Math.max(0, Math.round(1000 * (1 - Math.max(0, el / 1000 - (T.lockS || 0) * (T.shuffles || 0)) / (T.limitMs / 1000)) * (T.multiplier || 1)) - (T.penalty || 0) * (T.shuffles || 0) - (T.hintCost || 0)), wt = "Worth " + pts(worth) + " points";
         if (wv.textContent !== wt) { wv.textContent = wt; }
       }
       if (danger && T.stage === "whistling") {

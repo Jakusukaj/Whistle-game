@@ -416,3 +416,56 @@ p,.wh-sub,.wh-note,.wh-help,.wh-pack__desc,.wh-setting__sub,.packnote,.packline,
 .startnote{margin-top:-4px}
 #orb{cursor:pointer}
 .intro{margin-top:var(--space-2)}
+
+/* ---------- Design system v2: sticker outlines, hard shadows, a little tilt ---------- */
+.wh-card,.wh-list,.wh-setting,.wh-pack,.wh-modal,.wh-prow--card{border:var(--outline);border-color:var(--ink)}
+.wh-card,.wh-list,.wh-setting,.wh-pack,.wh-modal,.wh-sheet{color:var(--ink);--on-surface:var(--ink);--text:var(--ink);--line:var(--ink)}
+.wh-blob{border:var(--outline)}
+.wh-sheet{border-top:var(--outline);border-radius:48px 48px 0 0;box-shadow:none}
+.wh-modal{border-radius:44px}
+.wh-btn:not(.wh-btn--ghost):not(.wh-btn--danger):not(.wh-btn--secondary){box-shadow:var(--shadow-sm)}
+.wh-btn:not(.wh-btn--ghost):not(:disabled):active{box-shadow:none;transform:translate(1px,1px) scale(.97)}
+.wh-btn--secondary{background:var(--paper);color:var(--ink);border-color:var(--ink)}
+.wh-btn--secondary:disabled{background:var(--disabled-bg);border-color:var(--disabled-bg)}
+.wh-field--cobalt .wh-btn:not(.wh-btn--secondary):not(.wh-btn--ghost):not(.wh-btn--danger):not(:disabled),.wh-field--ink .wh-btn:not(.wh-btn--secondary):not(.wh-btn--ghost):not(.wh-btn--danger):not(:disabled),.wh-field--plum .wh-btn:not(.wh-btn--secondary):not(.wh-btn--ghost):not(.wh-btn--danger):not(:disabled){border-color:var(--ink);box-shadow:3px 4px 0 var(--paper)}
+.wh-input{border-color:var(--control-line)}
+.wh-input:focus,.wh-input.is-focus{outline:0;border:3px solid var(--cobalt);box-shadow:var(--shadow-hard)}
+.wh-stepper__btn{background:var(--sun);border-color:var(--ink);color:var(--ink);box-shadow:2px 3px 0 var(--ink)}
+.wh-stepper__btn:disabled{background:var(--disabled-bg);border-color:var(--disabled-bg);box-shadow:none;color:var(--disabled-text)}
+.wh-seg{background:var(--paper);border:var(--outline)}
+.wh-seg__item{color:var(--text-muted)}
+.wh-seg__item[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.wh-chip--static{border:var(--outline);background:var(--paper);color:var(--ink)}
+.wh-chip--static.host,.wh-chip--static.host-tag{background:var(--sun);transform:rotate(-3deg);box-shadow:var(--shadow-sm)}
+.wh-chip:not(.wh-chip--static){background:var(--paper);color:var(--ink);border:var(--outline)}
+.wh-chip[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.wh-avatar{border:var(--outline)}
+.wh-pack{padding:10px 10px 14px;gap:10px;border-radius:44px;transition:transform .24s cubic-bezier(.2,.9,.3,1.3),box-shadow .24s}
+.wh-pack__art{border:var(--outline);border-radius:30%;overflow:hidden;aspect-ratio:1/1;height:auto;width:100%}
+
+.wh-pack__body{padding:0 4px}
+.wh-pack .wh-tick{top:18px;right:18px}
+.wh-pack[aria-pressed=true]{border-color:var(--ink);border-width:3px;padding:8.5px 8.5px 12.5px;box-shadow:var(--shadow-hard);transform:translate(-2px,-2px) rotate(-1.5deg)}
+.wh-packrow svg{border:var(--outline);border-radius:30%}
+.wh-prow--you,.wh-prow.now{box-shadow:var(--shadow-hard)}
+.wh-rank{background:var(--ink);color:var(--paper)}
+.wh-rank--1{background:var(--ink);color:var(--sun)}
+.wh-timer{border-radius:999px}
+.wh-progress{border:var(--outline)}
+.wh-orb__core{box-shadow:4px 5px 0 var(--hot)}
+.wh-orb--off .wh-orb__core,.wh-orb--blocked .wh-orb__core{box-shadow:none}
+.wh-orb--off .wh-orb__core{background:var(--paper)}
+#toast,.wh-toast{border:var(--outline);box-shadow:var(--shadow-sm)}
+.wh-title.winline{text-wrap:balance}
+
+/* score reveal: base, multiplier, deductions, then a big final number */
+.scorerow{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;min-height:72px;width:100%}
+.scoreNum{transition:font-size .5s cubic-bezier(.2,.9,.3,1.3),letter-spacing .5s;min-height:44px}
+.scoreNum.big{font-size:76px;line-height:76px;min-height:76px;letter-spacing:-.03em}
+.scoreNum.slam{animation:wh-slam .6s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes wh-slam{0%{transform:scale(.6)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+.multBadge,.deltaTag{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;border:var(--outline);box-shadow:var(--shadow-sm);font:700 15px/1 var(--font-display);color:var(--ink);animation:wh-pop .28s cubic-bezier(.2,.9,.3,1.3)}
+.multBadge{background:var(--lime);transform:rotate(-4deg)}
+.deltaTag{background:var(--tomato);transform:rotate(3deg)}
+.multBadge[hidden],.deltaTag[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.scoreNum,.multBadge,.deltaTag,.wh-pack{transition:none;animation:none}}

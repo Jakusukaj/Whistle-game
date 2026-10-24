@@ -78,7 +78,7 @@ async function mainScenario() {
   console.log("\n--- Scenario 1: full game, three players ---");
   // Short timers so the test runs fast. In the real game the limit is 60s and
   // a shuffle costs 5s; the maths is the same.
-  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5, hintPenaltiesS: [0.1, 0.1, 0.1] });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shuffleLockS: 0.5 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
 
@@ -181,9 +181,9 @@ async function mainScenario() {
   var res = B.state.turn.result;
   check("result is a correct guess", res.outcome === "correct");
   check("everyone sees the song at the reveal", res.song.title === song && C.state.turn.result.song.title === song);
-  var expected = Math.round(1000 * (1 - res.timeMs / 1000 / 3));
-  check("a quicker guess scores more: 1000 x (1 - time / limit), shuffle time included", res.score === expected && res.score > 0 && res.score <= 1000, res.score + " vs " + expected);
-  check("base points ignore the shuffle, so the shuffle costs points", res.base > res.afterShuffle && res.shuffles === 1, res.base + " / " + res.afterShuffle);
+  var expected = Math.max(0, Math.round(1000 * (1 - (res.timeMs / 1000 - 0.5) / 3)) - 100);
+  check("score is 1000 x (1 - time / limit), minus 100 for the shuffle; lock time is free", res.score === expected && res.score > 0 && res.score <= 1000, res.score + " vs " + expected);
+  check("a shuffle costs 100 points off the multiplied score", res.shuffles === 1 && res.shufflePts === 100 && res.score === res.afterMult - 100, res.afterMult + " / " + res.score);
   var tot = function (c) { return A.state.players.filter(function (p) { return p.id === c.playerId; })[0].total; };
   check("the whistler's points are added to their total", tot(A) === res.score);
   check("the person who was heard guessing is pre-credited with half", tot(C) === Math.round(res.score / 2) && res.awards.length === 2, tot(C));
@@ -230,8 +230,8 @@ async function mainScenario() {
   check("whistler names who got it", r3.outcome === "correct" && r3.multiplier === 1.1);
   check("each named guesser is awarded separately, never the whistler twice or a stranger", r3.awards.length === 3 && r3.awards.filter(function (a) { return a.role === "guesser"; }).length === 2, JSON.stringify(r3.awards));
   check("each guesser earns half the whistler's points", r3.awards.filter(function (a) { return a.role === "guesser"; }).every(function (a) { return a.points === Math.round(r3.score / 2); }));
-  check("medium is worth 10% more than the same speed on easy", r3.score === Math.round(r3.afterHint * 1.1));
-  check("hints cost seconds, so they cost points", r3.hints === 3 && Math.abs(r3.hintS - 0.3) < 1e-9 && r3.afterHint < r3.afterShuffle, r3.afterHint + " < " + r3.afterShuffle);
+  check("medium is worth 10% more than the same speed on easy", r3.afterMult === Math.round(r3.base * 1.1));
+  check("three hints cost 50 + 100 + 150 points", r3.hints === 3 && r3.hintPts === 300 && r3.score === Math.max(0, r3.afterMult - 300 - r3.shufflePts), r3.hintPts + " / " + r3.score);
 
   A.send({ t: "next" });
   await A.waitFor(function (s) { return s.phase === "gameover"; }, "game over");

@@ -29,8 +29,9 @@ var DEFAULTS = {
   countdownMs: 3000,     // 3, 2, 1 before the clock starts
   confirmMs: 10000,      // whistler has this long to confirm a detected guess
   cooldownMs: 4000,      // ignore guesses this long after the whistler says "no"
-  shufflePenaltyS: 5,
-  hintPenaltiesS: [5, 10, 15], // the 1st, 2nd and 3rd hint on a song cost this many extra seconds
+  shuffleLockS: 5,       // the whistler's screen is locked this long after a shuffle (the clock does not count it)
+  shufflePoints: 100,    // each shuffle costs this many points, taken off after the multiplier
+  hintPoints: [50, 100, 150], // the 1st, 2nd and 3rd hint on a song cost this many points
   multipliers: { easy: 1, medium: 1.1, hard: 1.2 },
   maxPoints: 1000,       // a guess at 0s is worth this before the multiplier
   guesserShare: 0.5,     // each named guesser earns this share of the whistler's points
@@ -114,9 +115,9 @@ RoomManager.prototype.viewFor = function (room, pid) {
       multiplier: t.multiplier, shuffles: t.shuffles, sd: t.sd, round: t.round,
       countdownEndsAt: t.countdownEndsAt, accumulatedMs: t.accumulatedMs,
       runningSince: t.runningSince, limitMs: room.limitMs,
-      penalty: this.opts.shufflePenaltyS, nextAt: t.nextAt || null,
+      penalty: this.opts.shufflePoints, lockS: this.opts.shuffleLockS, nextAt: t.nextAt || null,
       hints: t.hints || 0, hintCost: t.hintCost || 0,
-      nextHintCost: (t.hints || 0) < 3 ? this.opts.hintPenaltiesS[t.hints || 0] : null
+      nextHintCost: (t.hints || 0) < 3 ? this.opts.hintPoints[t.hints || 0] : null
     };
     var locked = t.lockUntil && t.lockUntil > this.now();
     if (locked) { tv.lockUntil = t.lockUntil; }
@@ -574,7 +575,7 @@ RoomManager.prototype.pickDifficulty = function (room, me, msg) {
 RoomManager.prototype.shuffle = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling"]);
   if (!t || !t.difficulty || (t.lockUntil && t.lockUntil > this.now())) { return; }
-  var self = this, id = t.id, ms = this.opts.shufflePenaltyS * 1000;
+  var self = this, id = t.id, ms = this.opts.shuffleLockS * 1000;
   if (!this.drawSong(room, t)) { return; } // no unplayed songs left: nothing to shuffle to
   t.shuffles++;
   t.hints = 0;
@@ -586,11 +587,11 @@ RoomManager.prototype.shuffle = function (room, me) {
   this.broadcast(room);
 };
 
-// The lifeline: up to three hints per song, each costing more extra seconds than the last.
+// The lifeline: up to three hints per song, each costing more points than the last.
 RoomManager.prototype.hint = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling"]);
   if (!t || !t.song || t.hints >= 3 || (t.lockUntil && t.lockUntil > this.now())) { return; }
-  t.hintCost += this.opts.hintPenaltiesS[t.hints];
+  t.hintCost += this.opts.hintPoints[t.hints];
   t.hints++;
   t.hintsUsed++;
   this.broadcast(room);
@@ -699,16 +700,16 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
   var limitS = room.limitMs / 1000;
   var timeMs = outcome === "correct" ? Math.min(t.accumulatedMs, room.limitMs) : room.limitMs;
   var mult = t.multiplier || 1;
-  var lockedS = this.opts.shufflePenaltyS * t.shuffles;
-  var hintS = t.hintCost || 0;
-  var base = 0, afterShuffle = 0, afterHint = 0, score = 0;
+  var lockedS = this.opts.shuffleLockS * t.shuffles;
+  var shufflePts = this.opts.shufflePoints * t.shuffles;
+  var hintPts = t.hintCost || 0;
+  var base = 0, afterMult = 0, score = 0;
   if (outcome === "correct") {
-    // Shuffle lock time is part of the clock, so it already counts against the guess time.
+    // Time spent locked out after a shuffle does not count against the guess.
     var rawS = Math.max(0, timeMs / 1000 - lockedS);
     base = Math.max(0, Math.round(this.opts.maxPoints * (1 - rawS / limitS)));
-    afterShuffle = Math.max(0, Math.round(this.opts.maxPoints * (1 - timeMs / 1000 / limitS)));
-    afterHint = Math.max(0, Math.round(this.opts.maxPoints * (1 - (timeMs / 1000 + hintS) / limitS)));
-    score = Math.round(afterHint * mult);
+    afterMult = Math.round(base * mult);
+    score = Math.max(0, afterMult - shufflePts - hintPts);
   }
   // Who gets points: the whistler, plus each person they named (never themselves).
   var awards = [{ id: t.playerId, points: score, role: "whistler" }];
@@ -725,7 +726,7 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
   t.pending = null;
   t.result = {
     outcome: outcome, timeMs: timeMs, limitMs: room.limitMs, multiplier: t.multiplier, difficulty: t.difficulty,
-    shuffles: t.shuffles, penaltyS: lockedS, hints: t.hintsUsed || 0, hintS: hintS, base: base, afterShuffle: afterShuffle, afterHint: afterHint, score: score, awards: awards,
+    shuffles: t.shuffles, shufflePts: shufflePts, lockedS: lockedS, hints: t.hintsUsed || 0, hintPts: hintPts, base: base, afterMult: afterMult, score: score, awards: awards,
     revealAt: this.now(),
     song: t.song ? { title: t.song.title, artist: t.song.artist } : null
   };

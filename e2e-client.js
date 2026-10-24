@@ -34,7 +34,7 @@ function phone(port, name) {
 }
 
 (async function () {
-  var s = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 12000, countdownMs: 150, confirmMs: 3000, cooldownMs: 300, shufflePenaltyS: 5 });
+  var s = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 12000, countdownMs: 150, confirmMs: 3000, cooldownMs: 300, shuffleLockS: 5 });
   await new Promise(function (r) { s.server.listen(0, r); });
   var port = s.server.address().port;
   var A = phone(port, "Ann"), B = phone(port, "Bob"), C = phone(port, "Cat");
@@ -114,7 +114,7 @@ function phone(port, name) {
     if (turn === 2) {
       W.click("#shuffleBtn");
       await until(function () { return W.q("#lock") && !W.q("#lock").hidden && others.every(function (p) { return p.q("#lock") && !p.q("#lock").hidden; }); }, 2000, "shuffle lock shown on all phones");
-      check("lock shows SHUFFLE and penalty", /Shuffle!/.test(W.q("#lock").textContent) && /5s penalty/.test(W.q("#lock").textContent));
+      check("lock shows SHUFFLE and its cost", /Shuffle!/.test(W.q("#lock").textContent) && /100 points/.test(W.q("#lock").textContent));
       check("shuffle buttons disabled during lock", W.q("#shuffleBtn").disabled);
       await until(function () { return W.q("#lock").hidden; }, 7000, "lock clears");
       await until(function () { return W.q("#songTitle").textContent.length > 1; }, 2000, "new song shown after lock");
