@@ -169,20 +169,23 @@
     try { rec.start(); } catch (err) { mic.state = "stopped"; refreshMic(); }
   }
 
+  function ico(n, c) { return '<svg class="wh-i' + (c ? " " + c : "") + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
+  function cap(s) { s = String(s); return s.charAt(0).toUpperCase() + s.slice(1); }
+
   function micHtml() {
     switch (mic.state) {
       case "unsupported":
-        return '<span class="chip">Typing only on this phone</span>';
+        return '<span class="wh-chip wh-chip--static">Typing only on this phone</span>';
       case "off":
-        return '<button id="micBtn" class="btn teal">Turn on mic</button><p class="note">Lets this phone hear guesses. You can also type them.</p>';
+        return '<button id="micBtn" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("mic") + 'Turn on mic</button><p class="wh-note">Lets this phone hear guesses. You can also type them.</p>';
       case "starting":
-        return '<span class="chip">Starting mic...</span>';
+        return '<span class="wh-chip wh-chip--static">Starting mic...</span>';
       case "on":
-        return '<span class="chip ok">Mic on</span>';
+        return '<span class="wh-chip wh-chip--static"><i style="--c:var(--success)"></i>Mic on</span>';
       case "blocked":
-        return '<span class="chip bad">Mic blocked</span><p class="note">Allow the microphone for this site in your browser settings, then reload. You can still type guesses.</p>';
+        return '<span class="wh-chip wh-chip--static"><i style="--c:var(--danger)"></i>Mic blocked</span><p class="wh-note">Allow the microphone for this site in your browser settings, then reload. You can still type guesses.</p>';
       default:
-        return '<button id="micBtn" class="btn teal">Mic stopped. Tap to restart</button>';
+        return '<button id="micBtn" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("mic") + 'Mic stopped, tap to restart</button>';
     }
   }
 
@@ -195,35 +198,69 @@
       if (b) { b.onclick = micStart; }
     }
     var orb = $("#orb");
-    if (orb) { orb.classList.toggle("off", mic.state !== "on"); }
+    if (orb) {
+      var off = mic.state !== "on";
+      orb.classList.toggle("off", off);
+      orb.classList.toggle("wh-orb--off", off);
+      orb.classList.toggle("wh-orb--live", !off);
+      orb.innerHTML = '<span class="wh-orb__core">' + ico(off ? "mic-off" : "mic") + "</span>";
+    }
     var hd = $("#listenHead");
     if (hd) { hd.textContent = mic.state === "on" ? "Listening" : mic.state === "blocked" ? "Mic blocked" : "Mic is off"; }
   }
 
-  var MIC_SVG = '<svg viewBox="0 0 24 24" width="64" height="64" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" fill="#1b3447"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" fill="none" stroke="#1b3447" stroke-width="2" stroke-linecap="round"/></svg>';
-
   // ----------------------------------------------------------------- views
+  var PACK_ART = {
+    bangers: "bangers", sixties: "60s", seventies: "70s", eighties: "80s", nineties: "90s", noughties: "00s", tens: "10s",
+    today: "fresh", rock: "air-guitar", party: "floor-fillers", soul: "motown", tv: "telly", film: "popcorn", disney: "ever-after",
+    halloween: "spooky", xmas: "christmas", beatles: "beatles", bowie: "bowie", gaga: "gaga", talkingheads: "heads"
+  };
+  function packArt(id, cls) {
+    return '<svg class="' + (cls || "") + '" viewBox="0 0 120 120" aria-hidden="true"><use href="#p-' + (PACK_ART[id] || "bangers") + '"/></svg>';
+  }
+  var SHAPE = {
+    easy: '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#15131C"/></svg>',
+    medium: '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" fill="#15131C"/></svg>',
+    hard: '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M12 3L21.5 20H2.5Z" fill="#15131C" stroke="#15131C" stroke-width="2" stroke-linejoin="round"/></svg>'
+  };
+  var DIFF_FIELD = { easy: "leaf", medium: "sun", hard: "tomato" };
+
+  function avatarHtml(s, p, cls) {
+    var i = Math.max(0, s.players.indexOf(p));
+    var ch = (String(p.name).trim().charAt(0) || "?").toUpperCase();
+    return '<span class="wh-avatar' + (cls ? " " + cls : "") + '" style="--c:var(--player-' + (i % 8 + 1) + ')">' + esc(ch) + "</span>";
+  }
+
   function standingsHtml(s, highlightLast, winners) {
     var list = s.players.slice().sort(function (a, b) { return a.total - b.total; });
     var rank = 0, prev = null, html = "";
     list.forEach(function (p, i) {
       if (prev === null || p.total !== prev) { rank = i + 1; }
       prev = p.total;
-      var cls = "brow" + (p.id === s.me ? " me" : "") + (winners && winners.indexOf(p.id) !== -1 ? " win" : "");
-      var last = highlightLast && s.turn && s.turn.playerId === p.id && p.last !== null ? '<span class="ls">+' + fmt(p.last) + "s</span>" : "";
-      html += '<div class="' + cls + '"><span class="rk">' + rank + '</span><span class="nm">' + esc(p.name) + "</span>" +
-        '<span class="tm">' + fmt(p.total) + "s" + last + "</span></div>";
+      var me = p.id === s.me, win = winners && winners.indexOf(p.id) !== -1;
+      var last = highlightLast && s.turn && s.turn.playerId === p.id && p.last !== null ? "<small>+" + fmt(p.last) + "s</small>" : "";
+      html += '<div class="wh-prow' + (me ? " wh-prow--you" : "") + (win ? " win" : "") + '">' +
+        '<span class="wh-rank' + (rank === 1 ? " wh-rank--1" : "") + '">' + rank + "</span>" + avatarHtml(s, p, "wh-avatar--sm") +
+        '<span class="wh-prow__name">' + esc(p.name) +
+          (win ? '<span class="wh-tag wh-tag--host">' + ico("trophy") + "Winner</span>" : "") +
+          (me ? '<span class="wh-tag wh-tag--you">You</span>' : "") + "</span>" +
+        '<span class="wh-time">' + fmt(p.total) + "s" + last + "</span></div>";
     });
-    return '<div class="board">' + html + "</div>";
+    return '<div class="wh-list board">' + html + "</div>";
   }
 
   function gamesHtml() {
-    if (!gameList.length) { return '<p class="note center">No games open yet. Ask someone to host one, then it will show up here.</p>'; }
+    if (!gameList.length) {
+      return '<div class="wh-empty"><h3>No games open yet</h3><p>Ask someone to host one, then it will show up here.</p></div>';
+    }
     return gameList.map(function (g) {
-      return '<button class="gamebtn" data-code="' + esc(g.code) + '"><span class="gh">' + esc(g.host) + "'s game</span>" +
-        '<span class="gs">' + g.players + (g.players === 1 ? " player" : " players") + (g.inProgress ? ", in progress" : ", waiting to start") + "</span></button>";
+      return '<button class="wh-game gamebtn" data-code="' + esc(g.code) + '"><span class="gtxt"><p class="wh-game__t">' + esc(g.host) + "'s game</p>" +
+        '<p class="wh-game__s">' + g.players + (g.players === 1 ? " player" : " players") + (g.inProgress ? ", in progress" : ", waiting to start") + "</p></span>" +
+        '<span class="wh-tag wh-tag--host">Join</span></button>';
     }).join("");
   }
+
+  function blob(css) { return '<span class="wh-blob" style="' + css + '"></span>'; }
 
   function viewHome() {
     var name = ""; try { name = localStorage.getItem("whistle.name") || ""; } catch (e) {}
@@ -235,18 +272,21 @@
       return n;
     }
     return {
-      key: "home",
+      key: "home", field: "sun",
       html:
         '<div class="screen">' +
-          '<div class="logo">Whistle</div>' +
-          '<p class="tag">Keep a straight face. Keep whistling.</p>' +
-          '<div class="card stack">' +
-            '<label class="lbl" for="name">Your name</label>' +
-            '<input id="name" class="input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Name" value="' + esc(name) + '">' +
-            '<button id="hostBtn" class="btn">Host a game</button>' +
+          blob("width:170px;height:170px;right:-70px;top:-60px;background:var(--tomato)") +
+          blob("width:130px;height:130px;left:-60px;bottom:70px;background:var(--cobalt)") +
+          '<div class="brand"><h1 class="wh-title">Whistle</h1>' +
+          '<p class="wh-sub">Keep a straight face. Keep whistling.</p></div>' +
+          '<div class="wh-card wh-stack">' +
+            '<div class="wh-fieldgroup"><label class="wh-label" for="name">Your name</label>' +
+            '<input id="name" class="wh-input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Name" value="' + esc(name) + '"></div>' +
+            '<button id="hostBtn" class="wh-btn wh-btn--block">Host a game</button>' +
           "</div>" +
-          '<div class="card stack"><div class="top">Join a game</div><div class="stack" id="games">' + gamesHtml() + "</div></div>" +
-          '<button id="helpBtn" class="link">How to play</button>' +
+          '<h2 class="wh-over">Join a game</h2><div class="wh-stack" id="games">' + gamesHtml() + "</div>" +
+          '<div class="spacer"></div>' +
+          '<button id="helpBtn" class="wh-btn wh-btn--ghost">' + ico("info") + 'How to play</button>' +
           '<button id="adminDot" class="admindot" aria-label="Admin"></button>' +
         "</div>",
       update: function () {
@@ -267,17 +307,18 @@
 
   function viewAdminLogin() {
     return {
-      key: "adminlogin",
+      key: "adminlogin", field: "sun",
       html:
         '<div class="screen">' +
-          '<div class="logo small">Admin</div>' +
-          '<p class="tag">Test mode. Play a whole game on your own.</p>' +
-          '<div class="card stack">' +
-            '<label class="lbl" for="apw">Password</label>' +
-            '<input id="apw" class="input" type="password" autocomplete="off" placeholder="Password">' +
-            '<button id="aGo" class="btn">Enter admin mode</button>' +
+          '<div class="brand"><h1 class="wh-title">Admin</h1>' +
+          '<p class="wh-sub">Test mode. Play a whole game on your own.</p></div>' +
+          '<div class="wh-card wh-stack">' +
+            '<div class="wh-fieldgroup"><label class="wh-label" for="apw">Password</label>' +
+            '<input id="apw" class="wh-input" type="password" autocomplete="off" placeholder="Password"></div>' +
+            '<button id="aGo" class="wh-btn wh-btn--block">Enter admin mode</button>' +
           "</div>" +
-          '<button id="aBack" class="btn ghost">Back</button>' +
+          '<div class="spacer"></div>' +
+          '<button id="aBack" class="wh-btn wh-btn--ghost">Back</button>' +
         "</div>",
       bind: function () {
         var go = function () { send({ t: "createAdmin", password: $("#apw").value }); };
@@ -297,11 +338,11 @@
       document.body.classList.remove("admin"); adminHtmlCache = ""; return;
     }
     var a = st.admin;
-    var html = '<span class="atag">ADMIN</span><div class="achips">' + a.players.map(function (p) {
+    var html = '<span class="wh-admin__dot"></span><span class="atag">Admin</span><div class="achips">' + a.players.map(function (p) {
       return '<button class="achip' + (p.id === a.as ? " on" : "") + '" data-id="' + esc(p.id) + '">' + esc(p.name) + "</button>";
     }).join("") + "</div>" + (a.canAdd ? '<button class="aact" id="aAdd">+ Player</button>' : "") + '<button class="aact" id="aExit">Exit</button>';
     document.body.classList.add("admin");
-    if (!bar) { bar = document.createElement("div"); bar.id = "adminBar"; document.body.appendChild(bar); adminHtmlCache = ""; }
+    if (!bar) { bar = document.createElement("div"); bar.id = "adminBar"; bar.className = "wh-admin"; document.body.appendChild(bar); adminHtmlCache = ""; }
     if (html === adminHtmlCache) { return; }
     adminHtmlCache = html; bar.innerHTML = html;
     var cs = bar.querySelectorAll(".achip");
@@ -313,48 +354,21 @@
   var LEN_LABEL = { 30000: "30s", 60000: "1 min", 90000: "1 min 30", 120000: "2 min" };
   function lengthHtml(s, isHost) {
     var opts = s.limitOptions || [30000, 60000, 90000, 120000];
-    if (!isHost) { return '<div class="center h2" id="limitVal">' + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + "s") + "</div>"; }
-    return '<div class="seg">' + opts.map(function (ms) {
-      return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
-    }).join("") + "</div>";
+    if (!isHost) {
+      return '<div class="wh-setting"><div><div class="wh-setting__title">Round length</div><div class="wh-setting__sub">Set by the host</div></div>' +
+        '<span class="wh-time" id="limitVal">' + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + "s") + "</span></div>";
+    }
+    return '<div class="wh-setting wh-setting--col"><div class="wh-setting__title">Round length</div><div class="wh-seg">' + opts.map(function (ms) {
+      return '<button class="wh-seg__item segb' + (ms === s.limitMs ? " on" : "") + '" aria-pressed="' + (ms === s.limitMs) + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
+    }).join("") + "</div></div>";
   }
 
-  // One bold icon per pack, drawn in the same navy-outline style as the rest of the app.
-  var IC = 'viewBox="0 0 64 64" fill="none" stroke="#1b3447" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"';
-  var PACK_ICON = {
-    bangers: '<svg ' + IC + '><polygon points="32,5 39,24 59,24 43,36 49,57 32,45 15,57 21,36 5,24 25,24" fill="#fff"/></svg>',
-    sixties: '<svg ' + IC + '><circle cx="32" cy="32" r="24" fill="#fff"/><path d="M32 8V56M32 32L15 49M32 32L49 49"/></svg>',
-    seventies: '<svg ' + IC + '><path d="M32 4V12"/><circle cx="32" cy="36" r="22" fill="#fff"/><path d="M14 28H50M10 36H54M14 44H50M32 14V58"/><ellipse cx="32" cy="36" rx="10" ry="22"/></svg>',
-    eighties: '<svg ' + IC + '><rect x="6" y="14" width="52" height="36" rx="5" fill="#fff"/><circle cx="22" cy="30" r="6"/><circle cx="42" cy="30" r="6"/><path d="M17 50L21 41H43L47 50M22 30H42"/></svg>',
-    nineties: '<svg ' + IC + '><circle cx="32" cy="32" r="25" fill="#fff"/><circle cx="32" cy="32" r="8"/><circle cx="32" cy="32" r="2" fill="#1b3447"/><path d="M16 20A19 19 0 0 1 26 13"/></svg>',
-    noughties: '<svg ' + IC + '><rect x="16" y="5" width="32" height="54" rx="7" fill="#fff"/><rect x="21" y="11" width="22" height="16" rx="3"/><circle cx="32" cy="43" r="10"/><circle cx="32" cy="43" r="3" fill="#1b3447"/></svg>',
-    tens: '<svg ' + IC + '><rect x="17" y="5" width="30" height="54" rx="7" fill="#fff"/><path d="M32 40C25 34 24 27 29 26C31 25.5 32 27 32 28C32 27 33 25.5 35 26C40 27 39 34 32 40Z" fill="#fff"/><path d="M27 53H37"/></svg>',
-    today: '<svg ' + IC + '><path d="M30 5Q33 29 57 32Q33 35 30 59Q27 35 3 32Q27 29 30 5Z" fill="#fff"/><path d="M50 8V18M45 13H55"/></svg>',
-    rock: '<svg ' + IC + '><polygon points="37,4 14,36 28,36 24,60 50,26 35,26" fill="#fff"/></svg>',
-    party: '<svg ' + IC + '><path d="M8 56L22 22L42 42Z" fill="#fff"/><path d="M30 18Q34 8 42 12M46 28Q56 26 58 34M40 8V4M52 18L57 14"/><circle cx="48" cy="46" r="2"/><circle cx="26" cy="9" r="2"/></svg>',
-    soul: '<svg ' + IC + '><circle cx="32" cy="32" r="25" fill="#1b3447"/><circle cx="32" cy="32" r="16" stroke="#fff" stroke-width="1.5"/><circle cx="32" cy="32" r="8" fill="#fff"/><circle cx="32" cy="32" r="2" fill="#1b3447"/></svg>',
-    tv: '<svg ' + IC + '><path d="M24 17L16 6M40 17L48 6M18 51L16 58M46 51L48 58"/><rect x="6" y="17" width="52" height="34" rx="6" fill="#fff"/><rect x="12" y="23" width="30" height="22" rx="4"/><circle cx="50" cy="28" r="2.5"/><circle cx="50" cy="38" r="2.5"/></svg>',
-    film: '<svg ' + IC + '><rect x="8" y="26" width="48" height="30" rx="3" fill="#fff"/><path d="M8 24L56 12L58 20L10 32Z" fill="#fff"/><path d="M20 21L26 29M32 18L38 26M44 15L50 23"/><path d="M22 40H42"/></svg>',
-    disney: '<svg ' + IC + '><rect x="6" y="26" width="12" height="30" fill="#fff"/><rect x="46" y="26" width="12" height="30" fill="#fff"/><rect x="16" y="32" width="32" height="24" fill="#fff"/><rect x="25" y="14" width="14" height="18" fill="#fff"/><path d="M25 14L32 4L39 14M6 26L12 16L18 26M46 26L52 16L58 26M27 56V48A5 5 0 0 1 37 48V56"/></svg>',
-    halloween: '<svg ' + IC + '><ellipse cx="32" cy="37" rx="24" ry="19" fill="#fff"/><path d="M32 18Q24 37 32 56M32 18Q40 37 32 56"/><path d="M32 18Q31 11 37 7"/><path d="M20 34L27 34L23.5 27ZM37 34L44 34L40.5 27ZM21 44L27 48L32 43L37 48L43 44"/></svg>',
-    xmas: '<svg ' + IC + '><path d="M32 5L46 24H38L52 43H12L26 24H18Z" fill="#fff"/><rect x="27" y="43" width="10" height="12" fill="#fff"/><circle cx="26" cy="36" r="2.5"/><circle cx="38" cy="31" r="2.5"/><circle cx="32" cy="17" r="2"/></svg>',
-    beatles: '<svg ' + IC + '><circle cx="32" cy="16" r="7" fill="#fff"/><ellipse cx="32" cy="40" rx="15" ry="19" fill="#fff"/><path d="M32 23V59M28 10L23 3M36 10L41 3M17 30L6 25M17 41L5 41M18 51L8 58M47 30L58 25M47 41L59 41M46 51L56 58"/></svg>',
-    bowie: '<svg ' + IC + '><circle cx="32" cy="32" r="14" fill="#fff"/><ellipse cx="32" cy="32" rx="28" ry="8" transform="rotate(-20 32 32)"/><path d="M12 8V18M7 13H17M52 46V56M47 51H57"/></svg>',
-    gaga: '<svg ' + IC + '><polygon points="32,58 7,26 17,9 47,9 57,26" fill="#fff"/><path d="M7 26H57M17 9L26 26L32 58L38 26L47 9M26 26L32 9L38 26"/></svg>',
-    talkingheads: '<svg ' + IC + '><path d="M10 6H38A8 8 0 0 1 46 14V24A8 8 0 0 1 38 32H24L14 40V32H10A8 8 0 0 1 2 24V14A8 8 0 0 1 10 6Z" fill="#fff"/><path d="M28 34H54A8 8 0 0 1 62 42V50A8 8 0 0 1 54 58H50V64L42 58H28A8 8 0 0 1 20 50V42A8 8 0 0 1 28 34Z" fill="#fff" transform="translate(-4 -6)"/></svg>'
-  };
-
-  var TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 10 18.5 20 6"/></svg>';
-  var GROUPS = ["Start here", "Decades", "Genres", "Screen", "Seasonal", "Artists"];
-  var TABS = ["All", "Decades", "Genres", "Screen", "Seasonal", "Artists"];
-
   function packCard(p, on, ro) {
-    return '<button class="pack' + (on ? " on" : "") + (ro ? " ro" : "") + '" data-id="' + p.id + '" aria-pressed="' + on +
-      '" style="background:' + p.colour + ";color:" + p.ink + '">' +
-      '<span class="tick">' + TICK_SVG + "</span>" +
-      '<span class="pico">' + (PACK_ICON[p.id] || "") + "</span>" +
-      '<span class="pn">' + esc(p.name) + '</span>' +
-      '<span class="pb">' + esc(p.blurb) + "</span></button>";
+    return '<button class="wh-pack pack' + (on ? " on" : "") + (ro ? " ro wh-pack--readonly" : "") + '" data-id="' + p.id + '" aria-pressed="' + on + '">' +
+      '<span class="tick wh-tick" data-on="' + on + '">' + ico("tick") + "</span>" +
+      '<span class="pico">' + packArt(p.id, "wh-pack__art") + "</span>" +
+      '<span class="wh-pack__body"><span class="wh-pack__name pn">' + esc(p.name) + '</span>' +
+      '<span class="wh-pack__desc pb">' + esc(p.blurb) + "</span></span></button>";
   }
 
   // The lobby shows one short line about the chosen packs. The picker opens on top.
@@ -366,23 +380,24 @@
     var note = !on.length ? (isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
       : short ? "Not enough songs for this many turns: pick more packs or lower the rounds"
       : "No song is played twice in a game.";
-    return '<div class="card stack"><div class="packhead"><div class="top">Song packs</div>' +
-      '<button class="packall" id="openPacks">' + (isHost ? (on.length ? "Change" : "Choose packs") : "See packs") + "</button></div>" +
-      '<div class="packline">' + esc(line) + "</div>" +
-      '<div class="packnote' + (short || !on.length ? " bad" : "") + '">' + esc(note) + "</div></div>";
+    var thumbs = on.slice(0, 3).map(function (p) { return packArt(p.id, "pthumb"); }).join("");
+    return '<div class="wh-card wh-stack"><div class="packhead"><div class="wh-title">Song packs</div>' +
+      '<button class="wh-btn wh-btn--secondary wh-btn--sm" id="openPacks">' + (isHost ? (on.length ? "Change" : "Choose packs") : "See packs") + "</button></div>" +
+      '<div class="wh-packrow">' + (thumbs ? '<span class="pthumbs">' + thumbs + "</span>" : "") + '<div class="packline">' + esc(line) + "</div></div>" +
+      '<div class="packnote' + (short || !on.length ? " bad" : "") + '">' + (short || !on.length ? ico("info", "wh-i--sm") : "") + "<span>" + esc(note) + "</span></div></div>";
   }
 
   function pickerHtml(s, isHost) {
     var all = s.packs.length === s.selectedPacks.length;
     var cards = s.packs.map(function (p) { return packCard(p, s.selectedPacks.indexOf(p.id) !== -1, !isHost); }).join("");
     return '<div class="picker" id="picker"><div class="pwrap">' +
-      '<div class="phead"><div class="ptitle">Choose your song packs</div></div>' +
-      '<div class="pintro">' + (isHost ? "These decide which songs come up in the game. Tick one pack or as many as you like." : "These decide which songs come up in the game. The host picks them.") + "</div>" +
-      (isHost ? '<div class="pactions"><button class="packall" id="packAll">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") +
+      '<div class="phead"><div class="wh-title ptitle">Choose your song packs</div>' +
+      '<p class="wh-sub pintro">' + (isHost ? "These decide which songs come up in the game. Tick one pack or as many as you like." : "These decide which songs come up in the game. The host picks them.") + "</p>" +
+      (isHost ? '<div class="pactions"><button class="wh-chip" id="packAll">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") + "</div>" +
       '<div class="pbody"><div class="packs">' + cards + "</div>" +
-        (isHost ? "" : '<p class="note center">The host picks the packs</p>') + "</div>" +
+        (isHost ? "" : '<p class="wh-note center">The host picks the packs</p>') + "</div>" +
       '<div class="pfoot"><div class="pcount"><b>' + s.selectedPacks.length + "</b> of " + s.packs.length + " packs picked</div>" +
-        '<button class="btn" id="pkDone">Done</button></div>' +
+        '<button class="wh-btn wh-btn--block" id="pkDone">Done</button></div>' +
     "</div></div>";
   }
 
@@ -390,37 +405,37 @@
     var isHost = s.hostId === s.me;
     var turns = s.rounds * s.players.length;
     var list = s.players.map(function (p) {
-      return '<div class="pl"><span class="dot' + (p.connected ? " on" : "") + '"></span><span class="nm">' + esc(p.name) + "</span>" +
-        (p.id === s.hostId ? '<span class="tagc">HOST</span>' : "") +
-        (p.id === s.me ? '<span class="tagc you">YOU</span>' : "") + "</div>";
+      return '<div class="wh-prow pl">' + avatarHtml(s, p) + '<span class="wh-prow__name nm">' + esc(p.name) +
+        (p.id === s.hostId ? '<span class="wh-tag wh-tag--host">Host</span>' : "") +
+        (p.id === s.me ? '<span class="wh-tag wh-tag--you">You</span>' : "") + "</span>" +
+        '<span class="wh-prow__meta"><i class="pdot' + (p.connected ? " on" : "") + '"></i>' + (p.connected ? "Online" : "Away") + "</span></div>";
     }).join("");
     return {
-      key: "lobby",
+      key: "lobby", field: "cobalt",
       html:
         '<div class="screen">' +
-          '<div class="top">Game lobby</div>' +
-          '<div class="card codecard"><div class="gname">' + esc(pname(s, s.hostId)) + "'s game</div>" +
+          '<div class="wh-topbar"><div class="wh-topbar__title">Game lobby</div></div>' +
+          '<div class="codecard"><div class="gname wh-title">' + esc(pname(s, s.hostId)) + "'s game</div>" +
             '<span id="roomCode" hidden>' + esc(s.code) + "</span>" +
-            '<div class="note">Everyone else opens this web page and taps your game to join</div></div>' +
-          '<div class="top">Players (' + s.players.length + " of " + s.maxPlayers + ")</div>" +
-          '<div class="plist">' + list + "</div>" +
+            '<p class="wh-sub">Everyone else opens this web page and taps your game to join</p></div>' +
+          '<h2 class="wh-over">Players, ' + s.players.length + " of " + s.maxPlayers + "</h2>" +
+          '<div class="wh-list plist">' + list + "</div>" +
           packsSummaryHtml(s, isHost) +
-          '<div class="card stack">' +
-            '<div class="top">Rounds</div>' +
+          '<div class="wh-setting"><div><div class="wh-setting__title">Rounds</div>' +
+            '<div class="wh-setting__sub">' + turns + " turns in all, one whistle each per round</div></div>" +
             (isHost
-              ? '<div class="stepper"><button id="minus" class="btn">-</button><div class="val" id="roundsVal">' + s.rounds + '</div><button id="plus" class="btn">+</button></div>'
-              : '<div class="center h1" id="roundsVal">' + s.rounds + "</div>") +
-            '<p class="note center">Everyone whistles once per round: ' + turns + " turns in all</p>" +
+              ? '<div class="wh-stepper"><button id="minus" class="wh-stepper__btn" aria-label="Fewer rounds">' + ico("remove") + '</button><span class="wh-stepper__val" id="roundsVal">' + s.rounds + '</span><button id="plus" class="wh-stepper__btn" aria-label="More rounds">' + ico("add") + "</button></div>"
+              : '<span class="wh-stepper__val" id="roundsVal">' + s.rounds + "</span>") +
           "</div>" +
-          '<div class="card stack"><div class="top">Round length</div>' + lengthHtml(s, isHost) + "</div>" +
-          '<div class="stack" data-mic></div>' +
+          lengthHtml(s, isHost) +
+          '<div class="wh-stack" data-mic></div>' +
           '<div class="spacer"></div>' +
           (isHost
-            ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers || !s.selectedPacks.length || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
-              (s.players.length < s.minPlayers ? '<p class="note center">Waiting for at least ' + s.minPlayers + " players</p>" : "")
-            : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + " to start...</p>") +
-          '<button id="helpBtn" class="btn ghost">How to play</button>' +
-          '<button id="leaveBtn" class="link">Leave game</button>' +
+            ? '<button id="startBtn" class="wh-btn wh-btn--block"' + (s.players.length < s.minPlayers || !s.selectedPacks.length || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
+              (s.players.length < s.minPlayers ? '<p class="wh-note center">Waiting for at least ' + s.minPlayers + " players</p>" : "")
+            : '<p class="wh-sub center">Waiting for ' + esc(pname(s, s.hostId)) + " to start...</p>") +
+          '<div class="wh-row rowc"><button id="helpBtn" class="wh-btn wh-btn--ghost">How to play</button>' +
+          '<button id="leaveBtn" class="wh-btn wh-btn--ghost">Leave game</button></div>' +
           (pickerOpen ? pickerHtml(s, isHost) : "") +
         "</div>",
       bind: function () {
@@ -437,8 +452,10 @@
                 var id = this.getAttribute("data-id"), at = sel.indexOf(id);
                 if (at === -1) { sel.push(id); }
                 else { sel.splice(at, 1); }
-                this.classList.toggle("on", sel.indexOf(id) !== -1);
-                this.setAttribute("aria-pressed", sel.indexOf(id) !== -1);
+                var isOn = sel.indexOf(id) !== -1;
+                this.classList.toggle("on", isOn);
+                this.setAttribute("aria-pressed", isOn);
+                var tk = this.querySelector(".tick"); if (tk) { tk.setAttribute("data-on", isOn); }
                 sendPacks();
               };
             }
@@ -465,11 +482,11 @@
 
   function topLabel(s) {
     var T = s.turn;
-    return T.sd ? "Tie-break round " + s.sdRound : "Round " + T.round + " of " + s.rounds + " - Turn " + s.turnNumber + " of " + s.totalTurns;
+    return T.sd ? "Tie-break round " + s.sdRound : "Round " + T.round + " of " + s.rounds + ", turn " + s.turnNumber + " of " + s.totalTurns;
   }
 
   function topBar(s) {
-    return '<div class="top" id="topLabel">' + esc(topLabel(s)) + '</div><div id="lastRound"></div>';
+    return '<div class="wh-topbar"><div class="wh-topbar__title" id="topLabel">' + esc(topLabel(s)) + '</div></div><div id="lastRound"></div>';
   }
 
   // Kept up to date on every state change, even when the screen itself is not redrawn.
@@ -480,16 +497,16 @@
     var show = st.hostId === st.me && !st.turn.sd && !st.suddenDeath && st.turn.round === st.rounds;
     var has = !!$("#addRound");
     if (show && !has) {
-      b.innerHTML = '<button id="addRound" class="lastbanner">Last round. Tap to add an extra round</button>';
+      b.innerHTML = '<button id="addRound" class="wh-banner wh-banner--accent lastbanner">' + ico("add") + '<span class="wh-banner__text">Last round<small>Tap to add an extra round</small></span></button>';
       $("#addRound").onclick = function () { send({ t: "addRound" }); };
     } else if (!show && has) { b.innerHTML = ""; }
   }
 
   function skipHtml(s) {
     if (s.hostId !== s.me) { return ""; }
-    return '<div class="row">' +
-      (s.turn.stage !== "reveal" ? '<button id="skipBtn" class="link small">Skip this turn</button>' : "") +
-      '<button id="endBtn" class="link small">End game</button></div>';
+    return '<div class="wh-row rowc">' +
+      (s.turn.stage !== "reveal" ? '<button id="skipBtn" class="wh-btn wh-btn--ghost wh-btn--sm">' + ico("skip", "wh-i--sm") + "Skip this turn</button>" : "") +
+      '<button id="endBtn" class="wh-btn wh-btn--ghost wh-btn--sm">End game</button></div>';
   }
 
   function bindSkip() {
@@ -500,38 +517,40 @@
   }
 
   function lockHtml(note) {
-    return '<div class="lockov" id="lock" hidden><div class="lk1">SHUFFLE!</div><div class="lk2">5s penalty</div>' +
+    return '<div class="lockov wh-field wh-field--ink" id="lock" hidden><div class="lk1">Shuffle!</div><div class="lk2">5s penalty</div>' +
       '<div class="lknum" id="lknum">5</div><div class="lk3">' + note + "</div></div>";
   }
 
   function songCardHtml(T) {
     var d = T.difficulty;
-    return '<div class="card songcard"><div class="chips"><span class="chip ok">' + esc(d) + " x" + T.multiplier + "</span></div>" +
-      '<div class="t" id="songTitle">' + esc(T.song ? T.song.title : "") + "</div>" +
-      '<div class="a" id="songArtist">' + esc(T.song ? T.song.artist : "") + "</div></div>";
+    return '<div class="wh-card songcard"><span class="wh-chip wh-chip--static"><i style="--c:var(--' + (d || "easy") + ')"></i>' + esc(cap(d)) + ", x" + T.multiplier + "</span>" +
+      '<div class="t wh-title" id="songTitle">' + esc(T.song ? T.song.title : "") + "</div>" +
+      '<div class="a wh-sub" id="songArtist">' + esc(T.song ? T.song.artist : "") + "</div></div>";
   }
-
-  var REFRESH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><polyline points="20 3 20 8 15 8"/></svg>';
 
   function viewTurn(s) {
     var T = s.turn, isW = T.playerId === s.me, who = pname(s, T.playerId);
+    var dfield = DIFF_FIELD[T.difficulty] || "sun";
 
     // 1. Whistler choosing one of three songs
     if (T.stage === "choose" && isW && !T.difficulty) {
       var offs = (T.options || []).map(function (o, i) {
         var off = Math.round((1 - o.multiplier) * 100);
-        return '<button class="opt" data-i="' + i + '" data-d="' + o.difficulty + '"><span class="od">' + o.difficulty +
-          (off ? " - " + off + "% off your time" : " - normal score") + '</span><span class="ot">' + esc(o.title) +
-          '</span><span class="oa">' + esc(o.artist) + "</span></button>";
+        return '<button class="wh-song wh-song--' + o.difficulty + ' opt" data-i="' + i + '" data-d="' + o.difficulty + '">' +
+          '<span class="wh-song__mark">' + (SHAPE[o.difficulty] || "") + "</span>" +
+          '<span class="wh-song__meta od">' + esc(cap(o.difficulty)) + (off ? ", " + off + "% off your time" : ", normal score") + "</span>" +
+          '<span class="wh-song__title ot">' + esc(o.title) + "</span>" +
+          '<span class="wh-song__artist oa">' + esc(o.artist) + "</span></button>";
       }).join("");
       return {
-        key: "choose-" + T.id,
+        key: "choose-" + T.id, field: "ink",
         html: '<div class="screen">' + topBar(s) +
-          '<div class="h1">' + esc(who) + ", you're up!</div>" +
-          '<p class="sub">Pick a song. Choosing a harder song gives you a better score.</p>' + offs +
-          (T.canRefresh ? '<button id="refreshBtn" class="btn ghost refresh">' + REFRESH_SVG + "<span>Refresh options</span></button>" +
-            '<p class="note center">Don\'t know any of these? Refresh once for three new songs.</p>' : "") +
-          '<p class="note center">Only you can see these. Keep your screen to yourself.</p>' +
+          '<div class="wh-stack"><h1 class="wh-title">' + esc(who) + ", you're up</h1>" +
+          '<p class="wh-sub">Pick a song. A harder song takes time off your score.</p></div>' +
+          '<div class="wh-stack">' + offs + "</div>" +
+          (T.canRefresh ? '<button id="refreshBtn" class="wh-btn wh-btn--secondary wh-btn--block refresh">' + ico("refresh") + "<span>Refresh options</span></button>" +
+            '<p class="wh-note center">Don\'t know any of these? Refresh once for three new songs.</p>' : "") +
+          '<p class="wh-note center">' + ico("info", "wh-i--sm") + ' Only you can see these. Keep your screen to yourself.</p>' +
           '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: function () {
           var rf = $("#refreshBtn"); if (rf) { rf.onclick = function () { send({ t: "refreshOptions" }); }; }
@@ -547,12 +566,12 @@
     // 2. Whistler has picked and is getting ready
     if (T.stage === "choose" && isW) {
       return {
-        key: "ready-" + T.id,
+        key: "ready-" + T.id, field: dfield,
         html: '<div class="screen">' + topBar(s) +
-          '<div class="h1">Your song</div>' + songCardHtml(T) +
-          '<p class="note center">Only you can see this. Stuck once the clock is running? Shuffle gives you a new song but locks your screen for ' + T.penalty + ' seconds.</p>' +
+          '<h1 class="wh-title">Your song</h1>' + songCardHtml(T) +
+          '<p class="wh-note center">Only you can see this. Everyone else is waiting. A 3, 2, 1 countdown starts when you tap. Stuck once the clock is running? Shuffle gives you a new song but locks your screen for ' + T.penalty + 's.</p>' +
           '<div class="spacer"></div>' +
-          '<button id="readyBtn" class="btn">Ready?</button>' + skipHtml(s) + "</div>",
+          '<button id="readyBtn" class="wh-btn wh-btn--block">Ready</button>' + skipHtml(s) + "</div>",
         bind: function () {
           $("#readyBtn").onclick = function () { send({ t: "ready" }); };
           bindSkip();
@@ -563,11 +582,11 @@
     // 3. Everyone else while the whistler chooses
     if (T.stage === "choose") {
       return {
-        key: "wait-" + T.id,
+        key: "wait-" + T.id, field: "lilac",
         html: '<div class="screen">' + topBar(s) +
-          '<div class="h1">' + esc(who) + " is picking a song</div>" +
-          '<p class="sub">Get ready to guess. Say the title out loud or type it.</p>' +
-          '<div class="stack" data-mic></div><div class="spacer"></div>' + skipHtml(s) + "</div>",
+          '<div class="wh-stack midc"><div class="wh-spin"></div><h1 class="wh-title">' + esc(who) + " is picking a song</h1>" +
+          '<p class="wh-sub">Get ready to guess. Say the title out loud or type it.</p></div>' +
+          '<div class="wh-stack" data-mic></div><div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: bindSkip
       };
     }
@@ -575,10 +594,10 @@
     // 4. Countdown for everyone
     if (T.stage === "countdown") {
       return {
-        key: "cd-" + T.id,
+        key: "cd-" + T.id, field: isW ? dfield : "leaf",
         html: '<div class="screen">' + topBar(s) +
-          '<div class="h2 center">' + (isW ? "Get ready to whistle" : "Get ready to guess " + esc(who)) + "</div>" +
-          '<div class="cd" id="cd">3</div>' + (isW ? songCardHtml(T) : '<div class="stack" data-mic></div>') +
+          '<div class="wh-stack midc"><h1 class="wh-title">' + (isW ? "Get ready to whistle" : "Get ready to guess " + esc(who)) + "</h1>" +
+          '<div class="cd" id="cd">3</div></div>' + (isW ? songCardHtml(T) : '<div class="wh-stack" data-mic></div>') +
           '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: bindSkip
       };
@@ -587,17 +606,17 @@
     // 5. Whistling or confirming, whistler's phone
     if ((T.stage === "whistling" || T.stage === "confirming") && isW) {
       return {
-        key: "w-" + T.id,
+        key: "w-" + T.id, field: dfield,
         html: '<div class="screen">' + topBar(s) +
-          '<div class="timerbox"><div class="tlabel" id="tlabel">TIME</div><div class="bigtime" id="bigtime">0.0</div>' +
-          '<div class="bar"><i id="bar"></i></div></div>' + songCardHtml(T) +
+          '<div class="timerbox"><div class="wh-over" id="tlabel">Time</div><div class="wh-timer" id="bigtime">0.0</div>' +
+          '<div class="wh-progress"><i id="bar"></i></div></div>' + songCardHtml(T) +
           '<div class="spacer"></div>' +
-          '<div class="row"><button id="shuffleBtn" class="btn teal">Shuffle (' + T.penalty + 's penalty)</button>' +
-          '<button id="gotBtn" class="btn navy">Someone got it</button></div>' + skipHtml(s) +
+          '<button id="gotBtn" class="wh-btn wh-btn--block gotbtn">Someone got it</button>' +
+          '<button id="shuffleBtn" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("shuffle") + "Shuffle, " + T.penalty + "s penalty</button>" + skipHtml(s) +
           lockHtml("New song coming up.") +
-          '<div class="overlay" id="confirm" hidden><div class="card"><div class="h2">Did they get it?</div>' +
-          '<p class="sub">Heard: <b id="heardTxt"></b></p>' +
-          '<button id="yesBtn" class="btn">Yes, that\'s it</button><button id="noBtn" class="btn ghost">No, keep going</button></div></div></div>',
+          '<div class="ovl" id="confirm" hidden><div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">Did they get it?</h2>' +
+          '<p class="wh-sub">Heard: <b id="heardTxt"></b></p><div class="wh-modal__actions">' +
+          '<button id="yesBtn" class="wh-btn wh-btn--block">Yes, that\'s it</button><button id="noBtn" class="wh-btn wh-btn--secondary wh-btn--block">No, keep going</button></div></div></div></div>',
         bind: function () {
           $("#shuffleBtn").onclick = function () { send({ t: "shuffle" }); };
           $("#gotBtn").onclick = function () { send({ t: "gotIt" }); };
@@ -620,24 +639,24 @@
     // 6. Whistling or confirming, guesser's phone
     if (T.stage === "whistling" || T.stage === "confirming") {
       return {
-        key: "g-" + T.id + (mic.typeMode ? "-t" : "-m"),
+        key: "g-" + T.id + (mic.typeMode ? "-t" : "-m"), field: T.stage === "confirming" ? "sky" : "leaf",
         html: '<div class="screen">' + topBar(s) +
-          '<div class="timerbox"><div class="tlabel" id="tlabel">TIME</div><div class="bigtime" id="bigtime">0.0</div>' +
-          '<div class="bar"><i id="bar"></i></div></div>' +
+          '<div class="timerbox"><div class="wh-over" id="tlabel">Time</div><div class="wh-timer" id="bigtime">0.0</div>' +
+          '<div class="wh-progress"><i id="bar"></i></div></div>' +
           (mic.typeMode
-            ? '<div class="card stack"><div class="h2">Type your guess</div>' +
-              '<form id="gform" class="stack"><input id="ginput" class="input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title">' +
-              '<button class="btn" type="submit">Send guess</button></form>' +
-              (SR ? '<button id="toMic" class="link">\u2190 Go back to mic mode</button>' : "") + "</div>"
-            : '<div class="card stack center"><div class="orb off" id="orb">' + MIC_SVG + '</div>' +
-              '<div class="h1" id="listenHead">Listening</div>' +
-              '<p class="sub">Shout your guesses! The game pauses by itself when it hears the right answer.</p>' +
-              '<div data-mic="quiet"></div><div class="heard" id="heard"></div></div>' +
-              '<button id="toType" class="link">Mic not working? Type your answer \u2192</button>') +
+            ? '<div class="wh-card wh-stack"><h2 class="wh-title">Type your guess</h2>' +
+              '<form id="gform" class="wh-stack"><input id="ginput" class="wh-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title">' +
+              '<button class="wh-btn wh-btn--block" type="submit">Send guess</button></form>' +
+              (SR ? '<button id="toMic" class="wh-btn wh-btn--ghost wh-btn--sm">' + ico("mic", "wh-i--sm") + 'Back to mic mode</button>' : "") + "</div>"
+            : '<div class="wh-stack midc"><div class="wh-orb wh-orb--off off" id="orb"><span class="wh-orb__core">' + ico("mic-off") + '</span></div>' +
+              '<h2 class="wh-title" id="listenHead">Listening</h2>' +
+              '<p class="wh-sub">Shout your guesses. The game pauses by itself when it hears the right answer.</p>' +
+              '<div class="wh-stack" data-mic="quiet"></div><div class="heard wh-note" id="heard"></div></div>' +
+              '<button id="toType" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("keyboard") + 'Mic not working? Type your answer</button>') +
           '<div class="spacer"></div>' + skipHtml(s) +
           lockHtml("Song changing. Guessing is paused.") +
-          '<div class="overlay" id="checking" hidden><div class="card"><div class="h2">Checking...</div>' +
-          '<p class="sub">Someone may have got it. Hold tight.</p></div></div></div>',
+          '<div class="wh-overlay wh-field wh-field--sky fixedov" id="checking" hidden><div class="wh-spin"></div><h2 class="wh-title">Checking...</h2>' +
+          '<p class="wh-sub">Someone may have got it. Hold tight.</p></div></div>',
         bind: function () {
           var f = $("#gform");
           if (f) {
@@ -661,13 +680,13 @@
     }
 
     // 7. Reveal
-    var R = T.result, p = player(s, T.playerId), head, lines = "";
+    var R = T.result, head, lines = "";
     if (R.outcome === "correct") {
-      head = esc(who) + " got it!";
+      head = esc(who) + " got it";
       lines = "Time " + fmt(R.timeMs / 1000) + "s" + (R.difficulty ? " x " + R.multiplier + " (" + R.difficulty + ")" : "") +
         (R.shuffles ? " + " + (R.shuffles * T.penalty) + "s for " + R.shuffles + " shuffle" + (R.shuffles > 1 ? "s" : "") : "");
     } else if (R.outcome === "timeout") {
-      head = "Time's up!";
+      head = "Time's up";
       lines = "Nobody guessed " + esc(who) + "'s song, so it scores the full " + fmt(R.timeMs / 1000) + "s.";
     } else {
       head = "Turn skipped";
@@ -675,16 +694,16 @@
     }
     var last = s.turnNumber >= s.totalTurns;
     return {
-      key: "reveal-" + T.id + "-" + s.totalTurns,
+      key: "reveal-" + T.id + "-" + s.totalTurns, field: "cobalt",
       html: '<div class="screen">' + topBar(s) +
-        '<div class="winline">' + head + "</div>" +
-        (R.song ? '<div class="card songcard"><div class="note">The song was</div><div class="t">' + esc(R.song.title) + '</div><div class="a">' + esc(R.song.artist) + "</div></div>" : "") +
-        '<div class="card stack"><div class="breakdown">' + lines + '</div><div class="score">' + fmt(R.score) + "s</div></div>" +
-        '<div class="top">' + (T.sd ? "Tie-break" : "Standings") + "</div>" + standingsHtml(s, !T.sd, null) +
+        '<h1 class="wh-title winline">' + head + "</h1>" +
+        (R.song ? '<div class="wh-card songcard"><div class="wh-over">The song was</div><div class="t wh-title">' + esc(R.song.title) + '</div><div class="a wh-sub">' + esc(R.song.artist) + "</div></div>" : "") +
+        '<div class="wh-card scorecard"><div class="breakdown wh-sub">' + lines + '</div><div class="score">' + fmt(R.score) + "s</div></div>" +
+        '<h2 class="wh-over">' + (T.sd ? "Tie-break" : "Standings") + "</h2>" + standingsHtml(s, !T.sd, null) +
         '<div class="spacer"></div>' +
         (s.hostId === s.me
-          ? '<button id="nextBtn" class="btn">' + (last ? "Finish" : "Next player") + "</button>"
-          : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") + skipHtml(s) + "</div>",
+          ? '<button id="nextBtn" class="wh-btn wh-btn--block">' + (last ? "Finish" : "Next player") + "</button>"
+          : '<p class="wh-sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") + skipHtml(s) + "</div>",
       bind: function () { var b = $("#nextBtn"); if (b) { b.onclick = function () { send({ t: "next" }); }; } bindSkip(); }
     };
   }
@@ -692,16 +711,19 @@
   function viewOver(s) {
     var isHost = s.hostId === s.me;
     var names = (s.winners || []).map(function (id) { return pname(s, id); });
-    var head = names.length > 1 ? "It's a draw: " + names.map(esc).join(" and ") : esc(names[0] || "Nobody") + " wins!";
+    var head = names.length > 1 ? "It's a draw: " + names.map(esc).join(" and ") : esc(names[0] || "Nobody") + " wins";
     return {
-      key: "over",
-      html: '<div class="screen"><div class="top">Game over</div>' +
-        '<div class="h1">' + head + "</div>" +
-        (s.tieBreakWon ? '<p class="sub">Settled in a tie-break.</p>' : "") +
-        '<div class="top">Final scores (lower is better)</div>' + standingsHtml(s, false, s.winners) +
+      key: "over", field: "sun",
+      html: '<div class="screen">' +
+        blob("width:170px;height:170px;right:-70px;top:-60px;background:var(--blush)") +
+        blob("width:120px;height:120px;left:-60px;bottom:90px;background:var(--lilac)") +
+        '<div class="wh-topbar"><div class="wh-topbar__title">Game over</div></div>' +
+        '<h1 class="wh-title">' + head + "</h1>" +
+        (s.tieBreakWon ? '<p class="wh-sub">Settled in a tie-break.</p>' : "") +
+        '<h2 class="wh-over">Final scores, lower is better</h2>' + standingsHtml(s, false, s.winners) +
         '<div class="spacer"></div>' +
-        (isHost ? '<button id="againBtn" class="btn">Play again</button>' : '<p class="sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") +
-        '<button id="leaveBtn" class="link">Leave room</button></div>',
+        (isHost ? '<button id="againBtn" class="wh-btn wh-btn--block">Play again</button>' : '<p class="wh-sub center">Waiting for ' + esc(pname(s, s.hostId)) + "...</p>") +
+        '<button id="leaveBtn" class="wh-btn wh-btn--ghost">Leave room</button></div>',
       bind: function () {
         var a = $("#againBtn"); if (a) { a.onclick = function () { send({ t: "playAgain" }); }; }
         $("#leaveBtn").onclick = leaveRoom;
@@ -712,14 +734,17 @@
   function showHelp() {
     var o = document.createElement("div");
     o.className = "overlay modal";
-    o.innerHTML = '<div class="card stack"><div class="h2">How to play</div>' +
-      "<p class=\"sub\">The aim of the game is to get everyone to guess your song as quickly as possible. Points are the seconds it takes, so more seconds means more points \u2013 but in this game the fewest points wins!</p><ol>" +
-      "<li>On your turn, pick one of three songs: Easy, Medium or Hard. Harder songs take points off your time.</li>" +
-      "<li>You'll see a song on your phone. Whistle it! Only you can see it \u2013 so don't show anyone else!</li>" +
-      "<li>Everyone else shouts (or types) guesses. The clock stops when the mic detects the correct answer.</li>" +
-      "<li>Stuck? Shuffle for a new song, but your screen locks for 5 seconds. No guess before time runs out scores the full time.</li>" +
-      "<li>After the last round, the lowest total wins.</li>" +
-      '</ol><button class="btn" id="helpClose">Got it</button></div>';
+    var steps = [
+      "On your turn, pick one of three songs: easy, medium or hard. Harder songs take time off your score.",
+      "Whistle the song on your phone. Only you can see it, so keep your screen to yourself.",
+      "Everyone else shouts or types guesses. The clock stops when the mic hears the right answer.",
+      "Stuck? Shuffle for a new song, but your screen locks for 5 seconds. If nobody guesses in time, you score the full time.",
+      "After the last round, the lowest total wins."
+    ];
+    o.innerHTML = '<div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">How to play</h2>' +
+      '<p class="wh-sub">Get everyone to guess your song as quickly as you can. Your score is the seconds it takes, so the fewest points wins.</p>' +
+      '<ol class="wh-steps">' + steps.map(function (t, i) { return "<li><b>" + (i + 1) + "</b><span>" + t + "</span></li>"; }).join("") + "</ol>" +
+      '<div class="wh-modal__actions"><button class="wh-btn wh-btn--block" id="helpClose">Got it</button></div></div>';
     document.body.appendChild(o);
     $("#helpClose", o).onclick = function () { document.body.removeChild(o); };
   }
@@ -735,6 +760,7 @@
     else if (st.phase === "turn" && st.turn) { view = viewTurn(st); }
     else { view = viewOver(st); }
 
+    app.className = "wh-field wh-field--" + (view.field || "sun") + (document.body.classList.contains("danger") ? " wh-urgent" : "");
     if (view.key === lastKey && view.update) {
       view.update();
     } else {
@@ -749,6 +775,19 @@
     refreshMic();
     refreshTop();
     refreshAdmin();
+    syncBg();
+  }
+
+  // Keep the page behind the app (overscroll, notch) the same colour as the current field.
+  var lastBg = "";
+  function syncBg() {
+    try {
+      var c = getComputedStyle(app).backgroundColor;
+      if (c && c !== lastBg) {
+        lastBg = c; document.documentElement.style.background = c;
+        var m = document.querySelector('meta[name="theme-color"]'); if (m) { m.setAttribute("content", c); }
+      }
+    } catch (e) {}
   }
 
   // The clock and countdown run locally between server messages.
@@ -761,9 +800,9 @@
     requestAnimationFrame(tick);
     mic.level = Math.max(0, mic.level - 0.03);
     var orb = document.getElementById("orb");
-    if (orb) { orb.style.setProperty("--lvl", mic.state === "on" ? mic.level.toFixed(2) : "0"); }
+    if (orb) { orb.style.setProperty("--level", mic.state === "on" ? mic.level.toFixed(2) : "0"); }
     var T = st && st.turn;
-    if (!T) { document.body.classList.remove("danger"); return; }
+    if (!T) { if (document.body.classList.contains("danger")) { document.body.classList.remove("danger"); app.classList.remove("wh-urgent"); syncBg(); } return; }
     var lk = document.getElementById("lock");
     if (lk) {
       var L = T.lockUntil, on = !!(L && L > nowS() && T.stage === "whistling");
@@ -786,11 +825,13 @@
     }
     if (T.stage === "whistling" || T.stage === "confirming") {
       var el = elapsedMs(T), remain = T.limitMs - el, danger = remain <= 10000;
-      document.body.classList.toggle("danger", danger);
+      if (document.body.classList.contains("danger") !== danger) {
+        document.body.classList.toggle("danger", danger); app.classList.toggle("wh-urgent", danger); syncBg();
+      }
       var big = $("#bigtime"), lab = $("#tlabel"), bar = $("#bar");
       if (big) {
-        if (danger) { big.textContent = Math.max(0, Math.ceil(remain / 1000)); if (lab) { lab.textContent = "SECONDS LEFT"; } }
-        else { big.textContent = fmt(el / 1000); if (lab) { lab.textContent = "TIME SO FAR"; } }
+        if (danger) { big.textContent = Math.max(0, Math.ceil(remain / 1000)); if (lab) { lab.textContent = "Seconds left"; } }
+        else { big.textContent = fmt(el / 1000); if (lab) { lab.textContent = "Time so far"; } }
       }
       if (bar) { bar.style.width = Math.min(100, (el / T.limitMs) * 100) + "%"; }
       if (danger && T.stage === "whistling") {
@@ -798,7 +839,8 @@
         if (sec !== lastSecond) { lastSecond = sec; try { if (navigator.vibrate) { navigator.vibrate(40); } } catch (e) {} }
       } else { lastSecond = null; }
     } else {
-      document.body.classList.remove("danger"); lastSecond = null;
+      if (document.body.classList.contains("danger")) { document.body.classList.remove("danger"); app.classList.remove("wh-urgent"); syncBg(); }
+      lastSecond = null;
     }
   }
 

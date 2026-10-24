@@ -114,7 +114,7 @@ function phone(port, name) {
     if (turn === 2) {
       W.click("#shuffleBtn");
       await until(function () { return W.q("#lock") && !W.q("#lock").hidden && others.every(function (p) { return p.q("#lock") && !p.q("#lock").hidden; }); }, 2000, "shuffle lock shown on all phones");
-      check("lock shows SHUFFLE and penalty", /SHUFFLE/.test(W.q("#lock").textContent) && /5s penalty/.test(W.q("#lock").textContent));
+      check("lock shows SHUFFLE and penalty", /Shuffle!/.test(W.q("#lock").textContent) && /5s penalty/.test(W.q("#lock").textContent));
       check("shuffle buttons disabled during lock", W.q("#shuffleBtn").disabled);
       await until(function () { return W.q("#lock").hidden; }, 7000, "lock clears");
       await until(function () { return W.q("#songTitle").textContent.length > 1; }, 2000, "new song shown after lock");
@@ -142,7 +142,7 @@ function phone(port, name) {
     A.click("#nextBtn");
   }
   await until(function () { return all.every(function (p) { return /Game over/.test(p.text()); }); }, 4000, "game over everywhere");
-  check("game over shows winner line", /wins!|draw/.test(A.text()));
+  check("game over shows winner line", / wins|draw/.test(A.text()));
   check("host can play again", !!A.q("#againBtn"));
   A.click("#againBtn");
   await until(function () { return B.q("#roomCode"); }, 3000, "back to lobby");
