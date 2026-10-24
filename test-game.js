@@ -78,7 +78,7 @@ async function mainScenario() {
   console.log("\n--- Scenario 1: full game, three players ---");
   // Short timers so the test runs fast. In the real game the limit is 60s and
   // a shuffle costs 5s; the maths is the same.
-  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5, hintPenaltyS: 0.5 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5, hintPenaltiesS: [0.1, 0.1, 0.1] });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
 
@@ -205,13 +205,19 @@ async function mainScenario() {
   await C.waitFor(turnId(C.playerId), "turn 3 is Cat's");
   await startTurnAs(cs, C, "medium");
   B.send({ t: "hint" }); await sleep(80);
-  check("only the whistler can take a hint", !C.state.turn.hint && B.state.turn.hints === 0);
+  check("only the whistler can take a hint", B.state.turn.hints === 0 && !B.state.turn.hintLines);
   C.send({ t: "hint" });
-  await C.waitFor(function (st) { return !!st.turn.hint; }, "hint shown");
-  check("the hint has clues and never the answer", C.state.turn.hint.length >= 1 && C.state.turn.hint.join(" ").toLowerCase().indexOf(C.state.turn.song.title.toLowerCase()) === -1, C.state.turn.hint.join(" | "));
-  check("guessers cannot see the hint", !B.state.turn.hint && B.state.turn.hints === 1);
+  await C.waitFor(function (st) { return !!st.turn.hintLines; }, "hint shown");
+  check("hint 1 is about the title length", /The title has \d+ words?/.test(C.state.turn.hintLines[0]) && C.state.turn.hintLines.length === 1, C.state.turn.hintLines.join(" | "));
+  await B.waitFor(function (st) { return !!st.turn.hintLines; }, "guessers see the hint");
+  check("guessers see the hint too, and never the song", B.state.turn.hintLines.length === 1 && !B.state.turn.song);
+  C.send({ t: "hint" }); await C.waitFor(function (st) { return st.turn.hints === 2; }, "hint 2");
+  check("hint 2 is the year", /^(From \d{4}|A traditional carol)$/.test(C.state.turn.hintLines[1]), C.state.turn.hintLines.join(" | "));
+  C.send({ t: "hint" }); await C.waitFor(function (st) { return st.turn.hints === 3; }, "hint 3");
+  check("hint 3 is who it is by", C.state.turn.hintLines.length === 3 && C.state.turn.hintLines[2].length > 3, C.state.turn.hintLines.join(" | "));
+  check("no hint gives away the title", C.state.turn.hintLines.join(" ").toLowerCase().indexOf(C.state.turn.song.title.toLowerCase()) === -1);
   C.send({ t: "hint" }); await sleep(80);
-  check("only one hint per song", C.state.turn.hints === 1);
+  check("only three hints per song", C.state.turn.hints === 3 && C.state.turn.nextHintCost === null);
   A.send({ t: "mic", state: "off" }); await sleep(80);
   check("a phone can report its mic is off", C.state.players.filter(function (p) { return p.id === A.playerId; })[0].mic === "off");
   C.send({ t: "gotIt" });
@@ -225,7 +231,7 @@ async function mainScenario() {
   check("each named guesser is awarded separately, never the whistler twice or a stranger", r3.awards.length === 3 && r3.awards.filter(function (a) { return a.role === "guesser"; }).length === 2, JSON.stringify(r3.awards));
   check("each guesser earns half the whistler's points", r3.awards.filter(function (a) { return a.role === "guesser"; }).every(function (a) { return a.points === Math.round(r3.score / 2); }));
   check("medium is worth 10% more than the same speed on easy", r3.score === Math.round(r3.afterHint * 1.1));
-  check("a hint costs seconds, so it costs points", r3.hints === 1 && r3.hintS === 0.5 && r3.afterHint < r3.afterShuffle, r3.afterHint + " < " + r3.afterShuffle);
+  check("hints cost seconds, so they cost points", r3.hints === 3 && Math.abs(r3.hintS - 0.3) < 1e-9 && r3.afterHint < r3.afterShuffle, r3.afterHint + " < " + r3.afterShuffle);
 
   A.send({ t: "next" });
   await A.waitFor(function (s) { return s.phase === "gameover"; }, "game over");

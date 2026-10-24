@@ -1,0 +1,199 @@
+# Year shown in the hint lifeline for songs with no release year of their own (films, shows, themes).
+# It is the year the film, show or theme first appeared. Not used for decade packs. Format: Title | year
+Let It Go | 2013
+Do You Want to Build a Snowman? | 2013
+For the First Time in Forever | 2013
+Into the Unknown | 2019
+Love Is an Open Door | 2013
+Circle of Life | 1994
+Hakuna Matata | 1994
+I Just Can't Wait to Be King | 1994
+Can You Feel the Love Tonight | 1994
+Under the Sea | 1989
+Part of Your World | 1989
+Kiss the Girl | 1989
+Be Our Guest | 1991
+Beauty and the Beast | 1991
+A Whole New World | 1992
+Friend Like Me | 1992
+Colors of the Wind | 1995
+Reflection | 1998
+I'll Make a Man Out of You | 1998
+You'll Be in My Heart | 1999
+You've Got a Friend in Me | 1995
+We Don't Talk About Bruno | 2021
+How Far I'll Go | 2016
+You're Welcome | 2016
+The Bare Necessities | 1967
+Zip-a-Dee-Doo-Dah | 1946
+When You Wish Upon a Star | 1940
+Whistle While You Work | 1937
+Some Day My Prince Will Come | 1937
+Bibbidi-Bobbidi-Boo | 1950
+A Dream Is a Wish Your Heart Makes | 1950
+Once Upon a Dream | 1959
+Let's Go Fly a Kite | 1964
+A Spoonful of Sugar | 1964
+Supercalifragilisticexpialidocious | 1964
+Chim Chim Cher-ee | 1964
+Do-Re-Mi | 1959
+My Favorite Things | 1959
+Climb Ev'ry Mountain | 1959
+Edelweiss | 1959
+So Long, Farewell | 1959
+Maria | 1957
+Tonight | 1957
+America | 1957
+I Feel Pretty | 1957
+Somewhere | 1957
+Consider Yourself | 1960
+Food, Glorious Food | 1960
+You've Got to Pick a Pocket or Two | 1960
+As Long as He Needs Me | 1960
+Tomorrow | 1977
+It's the Hard-Knock Life | 1977
+Memory | 1981
+I Dreamed a Dream | 1985
+One Day More | 1985
+On My Own | 1985
+Do You Hear the People Sing? | 1985
+Don't Cry for Me Argentina | 1976
+Defying Gravity | 2003
+Popular | 2003
+For Good | 2003
+My Shot | 2015
+The Room Where It Happens | 2015
+You'll Be Back | 2015
+This Is Me | 2017
+A Million Dreams | 2017
+Never Enough | 2017
+Luck Be a Lady | 1950
+Sit Down You're Rockin' the Boat | 1950
+Tradition | 1964
+I Could Have Danced All Night | 1956
+On the Street Where You Live | 1956
+Cabaret | 1966
+Me and My Girl | 1937
+The Lambeth Walk | 1937
+Star Wars Main Theme | 1977
+The Imperial March | 1980
+Raiders March | 1981
+Hedwig's Theme | 2001
+He's a Pirate | 2003
+Superman Theme | 1978
+Jurassic Park Theme | 1993
+The Godfather Theme | 1972
+E.T. Flying Theme | 1982
+Now We Are Free | 2000
+Back to the Future Theme | 1985
+Lord of the Rings Theme | 2001
+Ride of the Valkyries | 1856
+Also Sprach Zarathustra | 1896
+Dambusters March | 1954
+The Great Escape March | 1963
+The Magnificent Seven | 1960
+Good, the Bad and the Ugly | 1966
+Lara's Theme | 1965
+Coronation Street Theme | 1960
+EastEnders Theme | 1985
+Emmerdale Theme | 1972
+Hollyoaks Theme | 1995
+Casualty Theme | 1986
+Neighbours Theme | 1985
+Home and Away Theme | 1988
+Downton Abbey Theme | 2010
+Line of Duty Theme | 2012
+Sherlock Theme | 2010
+Doctor Who Theme | 1963
+Call the Midwife Theme | 2012
+Poldark Theme | 2015
+Midsomer Murders Theme | 1997
+Poirot Theme | 1989
+Broadchurch Theme | 2013
+The Crown Theme | 2016
+Only Fools and Horses Theme | 1981
+Blackadder Theme | 1983
+Father Ted Theme | 1995
+Mr. Bean Theme | 1990
+The Vicar of Dibley Theme | 1994
+Monty Python Theme | 1969
+The Chase Theme | 2009
+Who Wants to Be a Millionaire Theme | 1998
+Bargain Hunt Theme | 2000
+Pointless Theme | 2009
+Deal or No Deal Theme | 2005
+The Weakest Link Theme | 2000
+Catchphrase Theme | 1986
+Family Fortunes Theme | 1980
+University Challenge Theme | 1962
+Mastermind Theme | 1972
+Dragons' Den Theme | 2005
+The Apprentice Theme | 2005
+Antiques Roadshow Theme | 1979
+The Great British Bake Off Theme | 2010
+Strictly Come Dancing Theme | 2004
+Gladiators Theme | 1992
+Top Gear Theme | 2002
+Grand Designs Theme | 1999
+Match of the Day Theme | 1964
+Blue Peter Theme | 1958
+The Archers Theme | 1950
+Eurovision Theme | 1954
+Have I Got News for You Theme | 1990
+Taskmaster Theme | 2015
+Postman Pat Theme | 1981
+Peppa Pig Theme | 2004
+Bluey Theme | 2018
+Paw Patrol Theme | 2013
+Hey Duggee Theme | 2014
+Teletubbies Theme | 1997
+In the Night Garden Theme | 2007
+Thomas the Tank Engine Theme | 1984
+Fireman Sam Theme | 1987
+Wallace and Gromit Theme | 1989
+Danger Mouse Theme | 1981
+Thunderbirds Theme | 1965
+Horrible Histories Theme | 2009
+Balamory Theme | 2002
+Game of Thrones Theme | 2011
+Stranger Things Theme | 2016
+Succession Theme | 2018
+The Mandalorian Theme | 2019
+The Simpsons Theme | 1989
+Scooby-Doo Theme | 1969
+Pink Panther Theme | 1963
+SpongeBob SquarePants Theme | 1999
+The Office Theme | 2001
+Seinfeld Theme | 1989
+Frasier Theme | 1993
+Cheers Theme | 1982
+Happy Days Theme | 1974
+The Fresh Prince of Bel-Air Theme | 1990
+Curb Your Enthusiasm Theme | 2000
+Family Guy Theme | 1999
+South Park Theme | 1997
+Rick and Morty Theme | 2013
+The X-Files Theme | 1993
+Twin Peaks Theme | 1990
+Star Trek Theme | 1966
+Law and Order Theme | 1990
+The Twilight Zone Theme | 1959
+Batman Theme | 1966
+The Addams Family Theme | 1964
+The Munsters Theme | 1964
+The Muppet Show Theme | 1976
+Sesame Street Theme | 1969
+The Flintstones Theme | 1960
+The Jetsons Theme | 1962
+Inspector Gadget Theme | 1983
+DuckTales Theme | 1987
+Pokemon Theme | 1997
+Mission: Impossible Theme | 1966
+James Bond Theme | 1962
+The A-Team Theme | 1983
+Knight Rider Theme | 1982
+Magnum P.I. Theme | 1980
+Miami Vice Theme | 1984
+Dallas Theme | 1978
+Hawaii Five-0 Theme | 1968
+Holidays Are Coming | 1995

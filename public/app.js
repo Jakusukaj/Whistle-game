@@ -574,6 +574,17 @@
       '<div class="a wh-sub" id="songArtist">' + esc(T.song ? T.song.artist : "") + "</div></div>";
   }
 
+  function hintCostText(t) { return t.nextHintCost === null ? "No hints left" : t.nextHintCost + "s penalty"; }
+  // The hints revealed so far, shown on every phone.
+  function showHints(t) {
+    var hb = $("#hintBox"); if (!hb) { return; }
+    var lines = t.hintLines || [];
+    if (!lines.length) { hb.hidden = true; return; }
+    var html = '<div class="wh-over">Hint' + (lines.length > 1 ? "s" : "") + "</div>" + lines.map(function (l) { return '<div class="wh-sub">' + esc(l) + "</div>"; }).join("");
+    if (hb.getAttribute("data-h") !== html) { hb.innerHTML = html; hb.setAttribute("data-h", html); }
+    hb.hidden = false;
+  }
+
   // "Who got it?" sheet on the whistler's phone. Picks survive state updates for the same turn.
   var whoState = { built: null, picks: [] };
   function buildWho(t) {
@@ -685,7 +696,7 @@
           '<div class="spacer"></div>' +
           '<button id="gotBtn" class="wh-btn wh-btn--block gotbtn">Someone got it</button>' +
           '<div class="lifelines"><button id="shuffleBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("shuffle") + "<span>Shuffle<small>" + T.penalty + "s penalty</small></span></button>" +
-          '<button id="hintBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("info") + "<span>Hint<small>" + T.hintPenalty + "s penalty</small></span></button></div>" + skipHtml(s) +
+          '<button id="hintBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("info") + "<span>Hint<small id=\"hintCost\">" + hintCostText(T) + "</small></span></button></div>" + skipHtml(s) +
           lockHtml("New song coming up.") +
           '<div class="ovl" id="confirm" hidden><div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">Who got it?</h2>' +
           '<p class="wh-sub" id="confSub"></p><div class="whogrid" id="whoGrid"></div><div class="wh-modal__actions">' +
@@ -704,10 +715,9 @@
           $("#songArtist").textContent = t.song ? t.song.artist : "";
           $("#confirm").hidden = !conf;
           if (conf) { buildWho(t); } else { whoState.built = null; }
-          var hbx = $("#hintBox");
-          if (t.hint) { hbx.hidden = false; hbx.innerHTML = '<div class="wh-over">Hint</div>' + t.hint.map(function (l) { return '<div class="wh-sub">' + esc(l) + "</div>"; }).join(""); }
-          else { hbx.hidden = true; }
-          $("#hintBtn").disabled = t.stage === "confirming" || !!t.hint;
+          showHints(t);
+          $("#hintCost").textContent = hintCostText(t);
+          $("#hintBtn").disabled = t.stage === "confirming" || t.nextHintCost === null;
           $("#shuffleBtn").disabled = t.stage === "confirming";
           $("#gotBtn").disabled = t.stage === "confirming";
         }
@@ -721,6 +731,7 @@
         html: '<div class="screen">' + topBar(s) +
           '<div class="timerbox"><div class="wh-over" id="tlabel">Time</div><div class="wh-timer" id="bigtime">0.0</div>' +
           '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' +
+          '<div class="wh-card hintcard" id="hintBox" hidden></div>' +
           (mic.typeMode
             ? '<div class="wh-card wh-stack"><h2 class="wh-title">Type your guess</h2>' +
               '<form id="gform" class="wh-stack"><input id="ginput" class="wh-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title">' +
@@ -752,6 +763,7 @@
         },
         update: function () {
           $("#checking").hidden = st.turn.stage !== "confirming";
+          showHints(st.turn);
           var h = $("#heard"); if (h && mic.heard) { h.textContent = "Heard: " + mic.heard; }
         }
       };
@@ -936,7 +948,7 @@
         var lp = lk.querySelector(".lk2"); if (lp) { lp.textContent = T.penalty + "s penalty"; }
       }
       var sb = document.getElementById("shuffleBtn"), gb = document.getElementById("gotBtn"), hbn = document.getElementById("hintBtn");
-      if (hbn) { hbn.disabled = on || T.stage === "confirming" || !!T.hint; }
+      if (hbn) { hbn.disabled = on || T.stage === "confirming" || T.nextHintCost === null; }
       if (sb) { sb.disabled = on || T.stage === "confirming"; }
       if (gb) { gb.disabled = on || T.stage === "confirming"; }
     }
@@ -980,7 +992,7 @@
       if (bar) { bar.style.width = Math.min(100, (el / T.limitMs) * 100) + "%"; }
       var wv = $("#worth");
       if (wv) {
-        var worth = Math.max(0, Math.round(1000 * (1 - (el / 1000 + (T.hints || 0) * (T.hintPenalty || 0)) / (T.limitMs / 1000)) * (T.multiplier || 1))), wt = "Worth " + pts(worth) + " points";
+        var worth = Math.max(0, Math.round(1000 * (1 - (el / 1000 + (T.hintCost || 0)) / (T.limitMs / 1000)) * (T.multiplier || 1))), wt = "Worth " + pts(worth) + " points";
         if (wv.textContent !== wt) { wv.textContent = wt; }
       }
       if (danger && T.stage === "whistling") {
