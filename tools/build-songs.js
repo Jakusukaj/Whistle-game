@@ -75,13 +75,8 @@ Object.keys(songs).forEach(function (k) { if (songs[k].year === null && hintYear
 // Pop Off Diva: these artists are in the pack automatically. Other songs join with the V flag.
 var DIVA_GAGA_SKIP = ["disease","joanne","perfect illusion","dance in the dark","speechless","gypsy","bloody mary","eh eh nothing else i can say","911","do what u want","i ll never love again","always remember us this way"];
 var DIVA = new RegExp("\\b(" + [
-  "lady gaga",
-  "beyonce", "britney spears", "madonna", "kylie minogue", "dua lipa", "taylor swift", "rihanna", "katy perry", "ariana grande",
-  "adele", "lizzo", "whitney houston", "mariah carey", "christina aguilera", "spice girls", "little mix", "girls aloud", "sugababes",
-  "doja cat", "sabrina carpenter", "chappell roan", "olivia rodrigo", "billie eilish", "miley cyrus", "shakira", "cher", "cyndi lauper",
-  "diana ross", "donna summer", "gloria gaynor", "destiny s child", "tlc", "jennifer lopez", "charli xcx", "kelly clarkson",
-  "sia", "carly rae jepsen", "ava max", "meghan trainor", "camila cabello", "tate mcrae", "raye", "rita ora", "selena gomez", "janet jackson",
-  "tina turner", "all saints", "natasha bedingfield", "lorde", "alicia keys", "jess glynne", "ellie goulding", "anne marie", "mabel", "paloma faith", "cheryl", "kim wilde", "bananarama", "dido", "anastacia", "sheena easton", "salt n pepa", "eternal", "atomic kitten", "mel c", "geri halliwell"
+  "lady gaga", "dua lipa", "billie eilish", "sabrina carpenter", "miley cyrus", "ariana grande", "little mix", "lizzo", "charli xcx", "taylor swift", "beyonce",
+  "olivia rodrigo", "doja cat", "chappell roan", "raye", "addison rae", "zara larsson"
 ].join("|") + ")\\b");
 
 // Big Hair 80s is British only: a song from 1980 to 1989 joins it if its artist matches or it has the U flag.
@@ -117,7 +112,9 @@ fs.readdirSync(dir).filter(function (f) { return /^hints.*\.txt$/.test(f); }).so
 function packsFor(s) {
   var out = [], y = s.year, f = s.flags;
   if (f.indexOf("B") !== -1) { out.push("bangers"); }
-  if (f.indexOf("V") !== -1 || ((DIVA.test(M.normalise(s.artist)) && !(/gaga/.test(M.normalise(s.artist)) && DIVA_GAGA_SKIP.indexOf(M.normalise(s.title)) !== -1)) || M.normalise(s.artist) === "pink")) { out.push("diva"); }
+  var isGaga = /gaga/.test(M.normalise(s.artist));
+  var divaArtist = (DIVA.test(M.normalise(s.artist)) || M.normalise(s.artist) === "pink") && !(isGaga && DIVA_GAGA_SKIP.indexOf(M.normalise(s.title)) !== -1);
+  if (divaArtist && (isGaga || y === null || y >= 2010)) { out.push("diva"); }
   if (y !== null && f.indexOf("A") === -1) {
     if (y >= 1960 && y <= 1969) { out.push("sixties"); }
     if (y >= 1970 && y <= 1979) { out.push("seventies"); }

@@ -1,0 +1,82 @@
+# Pop Off Diva additions (2010 onwards). Artists on the DIVA list in tools/build-songs.js join the pack automatically.
+Bad Blood | Taylor Swift | m | 2015 | 
+Look What You Made Me Do | Taylor Swift | e | 2017 | 
+Willow | Taylor Swift | m | 2020 | 
+Lavender Haze | Taylor Swift | m | 2022 | 
+Karma | Taylor Swift | m | 2022 | 
+Fortnight | Taylor Swift and Post Malone | m | 2024 | 
+The Fate of Ophelia | Taylor Swift | m | 2025 | 
+Wildest Dreams | Taylor Swift | m | 2014 | 
+Physical | Dua Lipa | e | 2020 | 
+Break My Heart | Dua Lipa | m | 2020 | 
+Dance the Night | Dua Lipa | m | 2023 | 
+Yes, And? | Ariana Grande | m | 2024 | 
+We Can't Be Friends (Wait for Your Love) | Ariana Grande | m | 2024 | 
+Positions | Ariana Grande | m | 2020 | 
+Problem | Ariana Grande | e | 2014 | 
+Into You | Ariana Grande | m | 2016 | 
+God Is a Woman | Ariana Grande | m | 2018 | 
+No Tears Left to Cry | Ariana Grande | m | 2018 | 
+Break Free | Ariana Grande and Zedd | m | 2014 | 
+Happier Than Ever | Billie Eilish | m | 2021 | 
+Lunch | Billie Eilish | m | 2024 | 
+Everything I Wanted | Billie Eilish | m | 2019 | 
+Therefore I Am | Billie Eilish | m | 2020 | 
+When the Party's Over | Billie Eilish | m | 2018 | 
+Nonsense | Sabrina Carpenter | m | 2022 | 
+Feather | Sabrina Carpenter | m | 2023 | 
+We Can't Stop | Miley Cyrus | e | 2013 | 
+Used to Be Young | Miley Cyrus | m | 2022 | 
+Prisoner | Miley Cyrus and Dua Lipa | m | 2020 | 
+Woman Like Me | Little Mix | m | 2018 | 
+Power | Little Mix | m | 2016 | 
+Secret Love Song | Little Mix | m | 2015 | 
+DNA | Little Mix | m | 2012 | 
+Try | Pink | e | 2012 | 
+Just Like Fire | Pink | m | 2016 | 
+Blow Me (One Last Kiss) | Pink | m | 2012 | 
+Rumors | Lizzo and Cardi B | m | 2021 | 
+Boys | Lizzo | m | 2018 | 
+I Love It | Icona Pop and Charli XCX | e | 2012 | 
+Fancy | Iggy Azalea and Charli XCX | e | 2014 | 
+Apple | Charli XCX | m | 2024 | 
+Boys | Charli XCX | m | 2017 | 
+Texas Hold 'Em | Beyonce | m | 2024 | 
+Cuff It | Beyonce | m | 2022 | 
+Hold Up | Beyonce | m | 2016 | 
+Sorry | Beyonce | m | 2016 | 
+Partition | Beyonce | m | 2013 | 
+Alien Superstar | Beyonce | m | 2022 | 
+7/11 | Beyonce | m | 2014 | 
+brutal | Olivia Rodrigo | m | 2021 | 
+deja vu | Olivia Rodrigo | m | 2021 | 
+bad idea right? | Olivia Rodrigo | m | 2023 | 
+get him back! | Olivia Rodrigo | m | 2023 | 
+traitor | Olivia Rodrigo | m | 2021 | 
+Mooo! | Doja Cat | m | 2018 | 
+Woman | Doja Cat | m | 2021 | 
+Streets | Doja Cat | m | 2019 | 
+Casual | Chappell Roan | m | 2023 | 
+Red Wine Supernova | Chappell Roan | m | 2023 | 
+Femininomenon | Chappell Roan | m | 2023 | 
+My Kink Is Karma | Chappell Roan | m | 2024 | 
+Naked in Manhattan | Chappell Roan | m | 2023 | 
+Oscar Winning Tears | Raye | m | 2023 | 
+Black Mascara | Raye | m | 2023 | 
+Hard Out Here | Raye | m | 2023 | 
+Where Is My Husband! | Raye | m | 2023 | 
+You Don't Know Me | Jax Jones and RAYE | m | 2016 | 
+Bed | Joel Corry, RAYE and David Guetta | m | 2021 | 
+Diet Pepsi | Addison Rae | m | 2023 | 
+Headphones On | Addison Rae | m | 2023 | 
+Aquamarine | Addison Rae | m | 2025 | 
+Fame Is a Gun | Addison Rae | m | 2025 | 
+High Fashion | Addison Rae | m | 2023 | 
+Lush Life | Zara Larsson | e | 2015 | 
+Never Forget You | Zara Larsson and MNEK | e | 2015 | 
+Symphony | Clean Bandit and Zara Larsson | e | 2017 | 
+Ruin My Life | Zara Larsson | m | 2018 | 
+Can't Tame Her | Zara Larsson | m | 2019 | 
+End of Time | Zara Larsson | m | 2021 | 
+Uncover | Zara Larsson | m | 2013 | 
+So Good | Ty Dolla $ign and Zara Larsson | m | 2017 | 

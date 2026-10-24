@@ -54,7 +54,6 @@ Love Game
 Mr. Know It All
 Beautiful Liar
 Naughty Girl
-Deja Vu
 Baby Boy
 Sweet Dreams | Beyonce
 Me and Mr Jones
@@ -133,11 +132,9 @@ Send My Love
 When We Were Young
 Hometown Glory
 Style
-Look What You Made Me Do
 Delicate
 Lover
 You Need to Calm Down
-Bad Blood
 Treasure
 Count on Me
 Sing
@@ -185,45 +182,21 @@ Flowers Miley
 Don't Stop Me Eatin'
 Kiwi
 Training Season
-Traitor
-Brutal
-Therefore I Am
-Lunch
 Need to Know
-Woman
 Snooze
 Good Days
 Permission to Dance
-Texas Hold 'Em
-Cuff It
-Nonsense
-Feather
-Red Wine Supernova
 Stick Season
 Easy | Troye Sivan
-Break My Heart
-Dance the Night
 Is It Over Now?
-Fortnight
 Bejeweled
 Cardigan
-Willow
-Karma
-Lavender Haze
-Bad Idea Right?
-Get Him Back!
 Deja Vu | Olivia Rodrigo
 Golden
 Adore You
 Mood
-Positions
 Side to Side
-Into You
-God Is a Woman
-No Tears Left to Cry
 Dangerous Woman
-Break Free
-Problem
 The Hills
 Die for You
 Starboy
@@ -370,7 +343,6 @@ Reach Out I'll Be There
 Back to Black
 People Are People
 Gimme! Gimme! Gimme!
-We Can't Stop
 I Feel Love
 G.U.Y.
 Free as a Bird
@@ -410,3 +382,8 @@ The Little Drummer Boy | Bing Crosby and David Bowie
 Holidays Are Coming | Coca-Cola
 Hold On, I'm Comin' | Sam and Dave
 Back to Life | Soul II Soul
+
+Physical | Olivia Newton-John
+Sorry | Justin Bieber
+Never Forget You | Noisettes
+Symphony | Clean Bandit
