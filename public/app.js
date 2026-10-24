@@ -1288,31 +1288,31 @@
     var AV = function (n, c) { return '<span class="avatar pc pc' + c + ' avatar--md">' + n.charAt(0) + "</span>"; };
     var scenes = [
       { ms: 4200, bg: FIELD_BG.orange, fg: "#111", html:
-        '<div class="hv-c"><p class="label hv-in">How to play</p><h1 class="display hv-in hv-d1">One person whistles.</h1><h1 class="display hv-in hv-d2">Everyone else guesses.</h1><p class="title hv-in hv-d3">Take turns. The quicker the guess, the more points.</p></div>' },
+        '<div class="hv-c"><p class="label hv-in">How to play</p><h1 class="display hv-in hv-d1">One person whistles.</h1><h1 class="display hv-in hv-d2">Everyone else listens and guesses.</h1><p class="title hv-in hv-d3">Take turns. The quicker the guess, the more points.</p></div>' },
       { ms: 5200, bg: FIELD_BG.ground, fg: "#111", html:
-        '<div class="hv-c"><p class="label hv-in">The whistler</p><h1 class="headline hv-in hv-d1">Pick a song</h1><div class="hv-cards">' +
+        '<div class="hv-c"><p class="hv-role w hv-in">Your turn to whistle</p><h1 class="headline hv-in hv-d1">Pick a song</h1><div class="hv-cards">' +
         '<div class="hv-card hv-in hv-d2"><span class="label">Easy</span><b>Dancing Queen</b><i>ABBA</i></div>' +
         '<div class="hv-card hv-pick hv-in hv-d3"><span class="label">Medium</span><b>Wonderwall</b><i>Oasis</i></div>' +
         '<div class="hv-card hv-in hv-d4"><span class="label">Hard</span><b>Rolling in the Deep</b><i>Adele</i></div></div>' +
         '<p class="title hv-in hv-d5">Only you can see the song. Harder songs earn bonus points.</p></div>' },
       { ms: 5200, bg: FIELD_BG.green, fg: "#111", html:
-        '<div class="hv-c hv-mid"><div class="hv-disc"><div class="hv-num" data-seq="3,2,1,Go" data-step="900">3</div></div>' +
+        '<div class="hv-c hv-mid"><p class="hv-role e hv-in">Everyone</p><div class="hv-disc"><div class="hv-num" data-seq="3,2,1,Go" data-step="900">3</div></div>' +
         '<h1 class="headline hv-in hv-d1">Wait for the countdown</h1><p class="title hv-in hv-d3">Then whistle the tune. No words.</p></div>' },
       { ms: 6200, bg: FIELD_BG.green, fg: "#111", html:
-        '<div class="hv-c hv-mid"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
+        '<div class="hv-c hv-mid"><p class="hv-role l hv-in">Your turn to listen</p><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
         '<div class="hv-say hv-in hv-d2"><span class="label">Theo says</span><b>Dancing Queen</b></div>' +
-        '<h1 class="headline hv-in hv-d3">Say the title out loud</h1><p class="title hv-in hv-d4">Your phone mic should pick it up by itself. If it does not, tap Type instead.</p></div>' },
+        '<h1 class="headline hv-in hv-d3">Say the title out loud</h1><p class="title hv-in hv-d4">Someone else is whistling. Your phone mic should pick it up by itself. If it does not, tap Type instead.</p></div>' },
       { ms: 5200, bg: FIELD_BG.ground, fg: "#111", html:
-        '<div class="hv-c"><p class="label hv-in">The whistler</p><h1 class="headline hv-in hv-d1">Who got it</h1><div class="hv-who">' +
+        '<div class="hv-c"><p class="hv-role w hv-in">Your turn to whistle</p><h1 class="headline hv-in hv-d1">Who got it</h1><div class="hv-who">' +
         '<div class="hv-row hv-on hv-in hv-d2">' + AV("Theo", 1) + '<b>Theo</b><span class="tag">Got it</span></div>' +
         '<div class="hv-row hv-in hv-d3">' + AV("Priya", 2) + '<b>Priya</b></div>' +
         '<div class="hv-row hv-in hv-d4">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="hv-btn hv-in hv-d4">Confirm</div>' +
         '<p class="title hv-in hv-d5">Tap everyone who named the song, then confirm.</p></div>' },
       { ms: 5600, bg: FIELD_BG.blue, fg: "#ECEAE4", html:
-        '<div class="hv-c"><p class="label hv-in">The score</p><div class="hv-big" data-count="917" data-ms="1600">0</div><p class="label">Guessed in 12.4s</p>' +
+        '<div class="hv-c"><p class="hv-role e hv-in">Everyone sees the score</p><div class="hv-big" data-count="917" data-ms="1600">0</div><p class="label">Guessed in 12.4s</p>' +
         '<h1 class="headline hv-in hv-d2">Faster guesses score more</h1><p class="title hv-in hv-d3">The whistler earns the full score. Each guesser earns half.</p></div>' },
       { ms: 5600, bg: FIELD_BG.pink, fg: "#111", html:
-        '<div class="hv-c"><p class="label hv-in">After the last round</p><h1 class="headline hv-in hv-d1">Most points wins</h1><div class="hv-board">' +
+        '<div class="hv-c"><p class="hv-role e hv-in">After the last round</p><h1 class="headline hv-in hv-d1">Most points wins</h1><div class="hv-board">' +
         '<div class="hv-row hv-in hv-d2"><b>1</b>' + AV("Maya", 0) + '<b>Maya</b><span>2,140</span></div>' +
         '<div class="hv-row hv-in hv-d3"><b>2</b>' + AV("Theo", 1) + '<b>Theo</b><span>1,820</span></div>' +
         '<div class="hv-row hv-in hv-d4"><b>3</b>' + AV("Priya", 2) + '<b>Priya</b><span>1,310</span></div></div>' +
@@ -1329,14 +1329,14 @@
     var bars = o.querySelectorAll(".hv-bars i");
     var stage = $("#hvStage", o);
     var clearAll = function () { clearTimeout(timer); ints.forEach(clearInterval); ints = []; };
-    var close = function () { clearAll(); document.body.classList.remove("noscroll"); if (o.parentNode) { o.parentNode.removeChild(o); } syncBg(); };
+    var close = function () { clearAll(); document.body.classList.remove("noscroll"); if (o.parentNode) { o.parentNode.removeChild(o); } lastBg = ""; syncBg(); };
     var go = function (n) {
       clearAll();
       if (n >= scenes.length) { close(); return; }
       idx = Math.max(0, n);
       var sc = scenes[idx];
       o.style.background = sc.bg; o.style.color = sc.fg;
-      try { document.querySelector('meta[name="theme-color"]').setAttribute("content", sc.bg); document.documentElement.style.background = sc.bg; } catch (e) {}
+      try { document.querySelector('meta[name="theme-color"]').setAttribute("content", sc.bg); document.documentElement.style.background = sc.bg; document.body.style.background = sc.bg; var bf = document.getElementById("bgfill"); if (bf) { bf.style.background = sc.bg; } } catch (e) {}
       stage.innerHTML = sc.html;
       for (var b = 0; b < bars.length; b++) {
         bars[b].style.transition = "none"; bars[b].style.width = b < idx ? "100%" : "0%";
