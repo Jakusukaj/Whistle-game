@@ -513,3 +513,13 @@ p,.wh-sub,.wh-note,.wh-help,.wh-pack__desc,.wh-setting__sub,.packnote,.packline,
 
 .lastbanner.voted{background:var(--ink);color:var(--paper)}
 #adminBar .aact.aon{background:var(--lime);color:var(--ink)}
+
+/* picker header stays small so the packs stay visible */
+.pranking{padding:10px 16px;border-radius:24px;margin-top:6px;gap:0}
+.pranking .ranking{gap:2px}
+.pranking .rkrow{min-height:32px;gap:10px;font:600 13px/16px var(--font-sans)}
+.pranking .rkart{width:26px;height:26px}
+.pranking .rkn{font-size:12px}
+.pranking .rkrow.in .rkn{padding:3px 8px}
+.pranking .wh-note{display:none}
+.pranking>.wh-note{display:block;margin:0;font-size:12px}

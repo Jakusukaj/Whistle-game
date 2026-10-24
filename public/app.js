@@ -435,7 +435,7 @@
     return '<div class="picker" id="picker"><div class="pwrap">' +
       '<div class="phead"><div class="wh-title ptitle">' + (room ? "Vote for song packs" : "Choose your song packs") + "</div>" +
       '<p class="wh-sub pintro">' + intro + "</p>" +
-      (room ? '<div class="pranking"><div class="wh-over">Most popular</div>' + rankingHtml(s, 5) + "</div>" : "") +
+      (room ? '<div class="pranking">' + rankingHtml(s, 3) + "</div>" : "") +
       (isHost && !room ? '<div class="pactions"><button class="wh-chip" id="packAll">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") + "</div>" +
       '<div class="pbody"><div class="packs">' + cards + "</div>" +
         (!isHost && !room ? '<p class="wh-note center">The host picks the packs</p>' : "") + "</div>" +
