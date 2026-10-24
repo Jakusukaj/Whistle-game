@@ -41,14 +41,12 @@ function phone(port, name) {
   await sleep(300);
 
   A.type("#name", "Ann"); A.click("#hostBtn");
-  await until(function () { return A.q("#roomCode"); }, 3000, "host lobby");
-  var code = A.q("#roomCode").textContent;
-  check("room code is 4 letters", /^[A-Z]{4}$/.test(code));
+  await until(function () { return A.q(".pgrid"); }, 3000, "host lobby");
   [B, C].forEach(function (p) { p.type("#name", p.name); });
   await until(function () { return B.q(".gamebtn") && C.q(".gamebtn"); }, 6000, "open game listed on home");
   check("home lists the open game by host name", /'s game/.test(B.q(".gamebtn").textContent) && !B.q("#codeIn"));
   [B, C].forEach(function (p) { p.click(".gamebtn"); });
-  await until(function () { return B.q("#roomCode") && C.q("#roomCode"); }, 3000, "joiners in lobby");
+  await until(function () { return B.q(".pgrid") && C.q(".pgrid"); }, 3000, "joiners in lobby");
   await until(function () { return /Cat/.test(A.text()) && /Bob/.test(A.text()); }, 3000, "host sees players");
   check("host has start button", !!A.q("#startBtn") && !A.q("#startBtn").disabled);
   check("guest has no start button", !B.q("#startBtn"));
@@ -57,17 +55,16 @@ function phone(port, name) {
   check("host sees round length choices", A.w.document.querySelectorAll(".segb").length === 4);
   check("guest sees round length as text", !!B.q("#limitVal"));
   var A_ = A.w.document, ticked = function (d) { return d.querySelectorAll(".pack.on").length; };
-  check("room code is not shown", !/\b[A-Z]{4}\b/.test(A.q(".codecard").textContent.replace(/[a-z' ]+game/i, "")) || true);
   check("lobby summary shows the chosen pack", /All Time Bangers/.test(A.q(".packline").textContent) && !A_.querySelector(".pack"));
   A.click("#openPacks"); B.click("#openPacks");
   check("picker shows 20 pack cards", A_.querySelectorAll(".pack").length === 20 && B.w.document.querySelectorAll(".pack").length === 20);
-  check("every pack card has an icon", A_.querySelectorAll(".pack .pico svg").length === 20);
+  check("pack cards are grouped under four collapsible rows", A_.querySelectorAll(".pgroup__row").length === 4);
   check("first pack is All Time Bangers", /All Time Bangers/.test(A_.querySelector(".pack").textContent));
   check("nothing is ticked by default in a real room", true);
   A_.querySelectorAll(".pack")[3].click();
   await until(function () { return ticked(B.w.document) === 2; }, 3000, "tick reaches guest");
   check("host tap ticks a pack for everyone", ticked(A_) === 2 && ticked(B.w.document) === 2);
-  check("tick icon present on ticked pack", !!A_.querySelector(".pack.on .tick svg"));
+  check("tick icon present on ticked pack", !!A_.querySelector(".pack.on .tickc svg"));
   A_.querySelector("#packAll").click();
   await until(function () { return ticked(B.w.document) === 20; }, 3000, "select all");
   check("select all ticks every pack", ticked(A_) === 20);
@@ -75,7 +72,7 @@ function phone(port, name) {
   A.click("#pkDone"); B.click("#pkDone");
   check("picker closes", !A_.querySelector("#picker"));
   A.w.document.querySelector('.segb[data-ms="30000"]').click();
-  await until(function () { return /30s/.test(B.q("#limitVal").textContent); }, 2000, "length synced to guest");
+  await until(function () { return /30 s/.test(B.q("#limitVal").textContent); }, 2000, "length synced to guest");
   A.click("#startBtn");
 
   var all = [A, B, C];
@@ -84,7 +81,7 @@ function phone(port, name) {
     await until(function () { W = all.filter(function (p) { return p.q(".opt"); })[0]; return W; }, 4000, "turn " + turn + " whistler picks");
     if (!W) { break; }
     var others = all.filter(function (p) { return p !== W; });
-    check("turn " + turn + ": guessers see no song", others.every(function (p) { return !p.q("#songTitle") && /picking a song/.test(p.text()); }));
+    check("turn " + turn + ": guessers see no song", others.every(function (p) { return !p.q("#songTitle") && /choosing a song/.test(p.text()); }));
     check("turn " + turn + ": three song cards offered", W.w.document.querySelectorAll(".opt").length === 3);
     check("turn " + turn + ": harder-song copy shown", /harder song/i.test(W.text()));
     check("turn " + turn + ": last-round banner only for host in final round", !!A.q("#addRound") && !B.q("#addRound") && !C.q("#addRound") || turn > 0);
@@ -95,9 +92,9 @@ function phone(port, name) {
     W.click("#readyBtn");
     await until(function () { return W.q("#bigtime") && others.every(function (p) { return p.q("#toType") || p.q("#ginput"); }); }, 3000, "whistling started");
     if (turn === 1) {
-      check("guesser sees orb and shout copy", !!others[0].q("#orb") && /Shout your guesses/.test(others[0].text()));
-      check("mic off until switched on", /turn on your mic/.test(others[0].text()));
-      others[0].click("#micBtn");
+      check("guesser sees the mic and the type instead button", !!others[0].q("#orb") && /Type instead/i.test(others[0].text()));
+      check("mic off until switched on", /tap to turn on/.test(others[0].text()));
+      others[0].click("#orb");
       await until(function () { return /Listening/.test(others[0].text()); }, 2000, "listening headline after mic on");
       check("mic orb no longer greyed", !others[0].q("#orb").classList.contains("off"));
     }
@@ -138,14 +135,14 @@ function phone(port, name) {
     check("turn " + turn + ": reveal names song", all.every(function (p) { return p.text().indexOf(title) !== -1; }) || turn === 3);
     A.click("#nextBtn");
   }
-  await until(function () { return all.every(function (p) { return /Game over|Awards/.test(p.text()); }); }, 4000, "game over everywhere");
-  check("awards show before the final scores", /Awards/.test(A.text()) ? true : /Game over/.test(A.text()));
+  await until(function () { return all.every(function (p) { return /Game over|Game awards/.test(p.text()); }); }, 4000, "game over everywhere");
+  check("awards show before the final scores", /Game awards/.test(A.text()) ? true : /Game over/.test(A.text()));
   all.forEach(function (p) { if (p.q("#awardSkip")) { p.click("#awardSkip"); } });
   await until(function () { return all.every(function (p) { return /Game over/.test(p.text()); }); }, 4000, "final scores everywhere");
   check("game over shows winner line", / wins|draw/.test(A.text()));
   check("host can play again", !!A.q("#againBtn"));
   A.click("#againBtn");
-  await until(function () { return B.q("#roomCode"); }, 3000, "back to lobby");
+  await until(function () { return B.q(".pgrid"); }, 3000, "back to lobby");
 
   // extra round banner
   for (var q = 0; q < 4; q++) { A.click("#minus"); }

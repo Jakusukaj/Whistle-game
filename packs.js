@@ -4,7 +4,7 @@
 // colour = card background, ink = text colour on it (kept dark for legibility),
 // group = which section of the picker it sits in.
 module.exports = [
-  { id: "bangers",      group: "Start here",    name: "All Time Bangers",     blurb: "Songs literally everyone knows",       colour: "#ffd84d", ink: "#3a2a00" },
+  { id: "bangers",      group: "Start here",    name: "All Time Bangers",     blurb: "Songs everyone knows",       colour: "#ffd84d", ink: "#3a2a00" },
 
   { id: "sixties",      group: "Decades",       name: "The Swinging 60s",     blurb: "Beatles, Stones and Motown",           colour: "#ffc2d6", ink: "#5a1030" },
   { id: "seventies",    group: "Decades",       name: "Glitter Ball 70s",     blurb: "Disco, glam and stadium rock",         colour: "#ffd1a1", ink: "#5a2a00" },
