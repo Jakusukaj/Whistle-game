@@ -134,12 +134,14 @@
       if (mic.rec === rec && mic.state === "starting") { mic.state = "stopped"; refreshMic(); }
     }, 3500);
     rec.onsoundstart = rec.onspeechstart = function () { mic.level = Math.max(mic.level, 0.7); };
-    rec.onstart = function () { clearTimeout(startTimer); if (mic.rec === rec) { mic.state = "on"; refreshMic(); } };
+    rec.onstart = function () { mic.base = 0; mic.total = 0; clearTimeout(startTimer); if (mic.rec === rec) { mic.state = "on"; refreshMic(); } };
     rec.onresult = function (e) {
       var text = "", i, k;
-      for (i = 0; i < e.results.length; i++) { text += e.results[i][0].transcript + " "; }
+      mic.total = e.results.length;
+      for (i = Math.min(mic.base || 0, e.results.length); i < e.results.length; i++) { text += e.results[i][0].transcript + " "; }
       mic.level = 1;
       mic.heard = text.replace(/\s+/g, " ").trim().slice(-90);
+      mic.heardFor = st && st.turn ? st.turn.id : null;
       var h = $("#heard"); if (h) { h.textContent = mic.heard ? "Heard: " + mic.heard : ""; }
       if (!isGuessing()) { return; }
       for (i = e.resultIndex; i < e.results.length; i++) {
@@ -745,8 +747,9 @@
           '<div class="spacer"></div>' + skipHtml(s) +
           lockHtml("Song changing. Guessing is paused.") +
           '<div class="wh-overlay wh-field wh-field--sky fixedov" id="checking" hidden><div class="wh-spin"></div><h2 class="wh-title">Checking...</h2>' +
-          '<p class="wh-sub">Someone may have got it. Waiting for the whistler to confirm.</p></div></div>',
+          '<p class="wh-sub">Someone may have got it.<br>Waiting for the whistler to confirm.</p></div></div>',
         bind: function () {
+          if (mic.turnSeen !== st.turn.id) { mic.turnSeen = st.turn.id; mic.base = mic.total || 0; mic.heard = ""; }
           var f = $("#gform");
           if (f) {
             f.onsubmit = function (e) {
@@ -764,7 +767,8 @@
         update: function () {
           $("#checking").hidden = st.turn.stage !== "confirming";
           showHints(st.turn);
-          var h = $("#heard"); if (h && mic.heard) { h.textContent = "Heard: " + mic.heard; }
+          if (mic.turnSeen !== st.turn.id) { mic.turnSeen = st.turn.id; mic.base = mic.total || 0; mic.heard = ""; }
+          var h = $("#heard"); if (h) { h.textContent = mic.heard ? "Heard: " + mic.heard : ""; }
         }
       };
     }
