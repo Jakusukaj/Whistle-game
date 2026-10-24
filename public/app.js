@@ -388,7 +388,7 @@
     return '<div class="wh-card wh-stack"><div class="packhead"><div class="wh-title">Song packs</div>' +
       '<button class="wh-btn wh-btn--secondary wh-btn--sm" id="openPacks">' + (isHost ? (on.length ? "Change" : "Choose packs") : "See packs") + "</button></div>" +
       '<div class="wh-packrow">' + (thumbs ? '<span class="pthumbs">' + thumbs + "</span>" : "") + '<div class="packline">' + esc(line) + "</div></div>" +
-      '<div class="packnote' + (short || !on.length ? " bad" : "") + '">' + (short || !on.length ? ico("info", "wh-i--sm") : "") + "<span>" + esc(note) + "</span></div></div>";
+      '<div class="packnote' + (isHost && (short || !on.length) ? " bad" : "") + '">' + (isHost && (short || !on.length) ? ico("info", "wh-i--sm") : "") + "<span>" + esc(note) + "</span></div></div>";
   }
 
   function pickerHtml(s, isHost) {
@@ -599,7 +599,7 @@
         key: "ready-" + T.id, field: dfield,
         html: '<div class="screen">' + topBar(s) +
           '<h1 class="wh-title">Your song</h1>' + songCardHtml(T) +
-          '<p class="wh-note center">Only you can see this. Everyone else is waiting. A 3, 2, 1 countdown starts when you tap. Stuck once the clock is running? Shuffle gives you a new song but locks your screen for ' + T.penalty + 's.</p>' +
+          '<p class="wh-note center">Only you can see this. Tap Ready and a 3, 2, 1 countdown starts for everyone.</p>' +
           '<div class="spacer"></div>' +
           '<button id="readyBtn" class="wh-btn wh-btn--block">Ready</button>' + skipHtml(s) + "</div>",
         bind: function () {
@@ -614,8 +614,8 @@
       return {
         key: "wait-" + T.id, field: "lilac",
         html: '<div class="screen">' + topBar(s) +
-          '<div class="wh-stack midc"><div class="wh-spin"></div><h1 class="wh-title">' + esc(who) + " is picking a song</h1>" +
-          '<p class="wh-sub">Get ready to guess. Say the title out loud or type it.</p></div>' +
+          '<div class="wh-stack midc"><div class="wh-spin"></div><h1 class="wh-title">' + esc(who) + (T.difficulty ? " is getting ready" : " is picking a song") + "</h1>" +
+          '<p class="wh-sub">' + (T.difficulty ? "A 3, 2, 1 countdown starts as soon as they tap Ready." : "Get ready to guess. Say the title out loud or type it.") + "</p></div>" +
           '<div class="wh-stack" data-mic></div><div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: bindSkip
       };
