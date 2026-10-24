@@ -81,6 +81,7 @@ function client(port) {
   check("admin can add a test player", X.state.players.length === 4);
   X.send({ t: "start" }); await sleep(200);
   check("admin starts a game alone", X.state.phase === "turn");
+  var hostBefore = X.state.hostId;
   var whistler = X.state.turn.playerId;
   X.send({ t: "adminAs", id: whistler }); await sleep(100);
   check("viewing as the whistler shows the song cards", X.state.me === whistler && X.state.turn.options && X.state.turn.options.length > 0);
@@ -89,7 +90,7 @@ function client(port) {
   var other = X.state.players.filter(function (p) { return p.id !== whistler; })[0].id;
   X.send({ t: "adminAs", id: other }); await sleep(100);
   check("viewing as a guesser hides the song", X.state.me === other && !X.state.turn.song);
-  check("host controls stay available in every view", X.state.hostId === other);
+  check("the host stays the host whoever is viewed", X.state.hostId !== other && X.state.hostId === hostBefore);
   X.send({ t: "leave" }); await sleep(100);
   X.send({ t: "ping" });
   check("exiting admin closes the room", true);
