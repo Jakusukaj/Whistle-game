@@ -142,7 +142,6 @@
       mic.level = 1;
       mic.heard = text.replace(/\s+/g, " ").trim().slice(-90);
       mic.heardFor = st && st.turn ? st.turn.id : null;
-      var h = $("#heard"); if (h) { h.textContent = mic.heard ? "Heard: " + mic.heard : ""; }
       if (!isGuessing()) { return; }
       for (i = e.resultIndex; i < e.results.length; i++) {
         var alts = [];
@@ -351,13 +350,14 @@
     var a = st.admin;
     var html = '<span class="wh-admin__dot"></span><span class="atag">Admin</span><div class="achips">' + a.players.map(function (p) {
       return '<button class="achip' + (p.id === a.as ? " on" : "") + '" data-id="' + esc(p.id) + '">' + esc(p.name) + "</button>";
-    }).join("") + "</div>" + (a.canAdd ? '<button class="aact" id="aAdd">+ Player</button>' : "") + '<button class="aact" id="aExit">Exit</button>';
+    }).join("") + "</div>" + (a.canAdd ? '<button class="aact" id="aAdd">+ Player</button>' : "") + '<button class="aact' + (a.autoplay ? " aon" : "") + '" id="aAuto">Bots ' + (a.autoplay ? "on" : "off") + "</button>" + '<button class="aact" id="aExit">Exit</button>';
     document.body.classList.add("admin");
     if (!bar) { bar = document.createElement("div"); bar.id = "adminBar"; bar.className = "wh-admin"; document.body.appendChild(bar); adminHtmlCache = ""; }
     if (html === adminHtmlCache) { return; }
     adminHtmlCache = html; bar.innerHTML = html;
     var cs = bar.querySelectorAll(".achip");
     for (var i = 0; i < cs.length; i++) { cs[i].onclick = function () { send({ t: "adminAs", id: this.getAttribute("data-id") }); }; }
+    var au = document.getElementById("aAuto"); if (au) { au.onclick = function () { send({ t: "adminAutoplay", on: !(st && st.admin && st.admin.autoplay) }); }; }
     var add = document.getElementById("aAdd"); if (add) { add.onclick = function () { send({ t: "adminAddBot" }); }; }
     document.getElementById("aExit").onclick = function () { adminHtmlCache = ""; pickerOpen = false; leaveRoom(); };
   }
@@ -374,47 +374,79 @@
     }).join("") + "</div></div>";
   }
 
-  function packCard(p, on, ro) {
+  function packCard(p, on, ro, voters) {
+    var vh = voters && voters.length ? '<span class="voters">' + voters.slice(0, 5).map(function (v) { return v; }).join("") + (voters.length > 5 ? '<span class="vmore">+' + (voters.length - 5) + "</span>" : "") + "</span>" : "";
     return '<button class="wh-pack pack' + (on ? " on" : "") + (ro ? " ro wh-pack--readonly" : "") + '" data-id="' + p.id + '" aria-pressed="' + on + '">' +
       '<span class="tick wh-tick" data-on="' + on + '">' + ico("tick") + "</span>" +
-      '<span class="pico">' + packArt(p.id, "wh-pack__art") + "</span>" +
+      '<span class="pico">' + packArt(p.id, "wh-pack__art") + vh + "</span>" +
       '<span class="wh-pack__body"><span class="wh-pack__name pn">' + esc(p.name) + '</span>' +
       '<span class="wh-pack__desc pb">' + esc(p.blurb) + "</span></span></button>";
   }
 
+  // Packs with votes, most popular first.
+  function rankingList(s) {
+    var votes = s.packVotes || {};
+    return s.packs.map(function (p, i) { return { p: p, n: (votes[p.id] || []).length, i: i }; })
+      .filter(function (r) { return r.n > 0; })
+      .sort(function (a, b) { return b.n - a.n || a.i - b.i; });
+  }
+  function rankingHtml(s, limit) {
+    var r = rankingList(s);
+    if (!r.length) { return '<p class="wh-note">No votes yet</p>'; }
+    var shown = limit ? r.slice(0, limit) : r;
+    return '<div class="ranking">' + shown.map(function (x) {
+      var inn = s.selectedPacks.indexOf(x.p.id) !== -1;
+      return '<div class="rkrow' + (inn ? " in" : "") + '">' + packArt(x.p.id, "rkart") + '<span class="rkname">' + esc(x.p.name) + '</span><span class="rkn">' + x.n + (x.n === 1 ? " vote" : " votes") + "</span></div>";
+    }).join("") + (limit && r.length > limit ? '<p class="wh-note">+' + (r.length - limit) + " more with votes</p>" : "") + "</div>";
+  }
+
   // The lobby shows one short line about the chosen packs. The picker opens on top.
   function packsSummaryHtml(s, isHost) {
+    var room = s.packMode === "room";
     var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
     var need = s.rounds * s.players.length + 5, short = s.songsInPlay < need;
     var line = !on.length ? "No packs picked yet"
       : on.slice(0, 2).map(function (p) { return p.name; }).join(", ") + (on.length > 2 ? " +" + (on.length - 2) + " more" : "");
-    var note = !on.length ? (isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
+    var note = !on.length ? (room ? "Everyone votes for up to 3 packs" : isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
       : short ? "Not enough songs for this many turns: pick more packs or lower the rounds"
-      : "No song is played twice in a game.";
+      : room ? "The top 3 packs play. Ties all play." : "No song is played twice in a game.";
+    var bad = (isHost || room) && (short || !on.length) && !(room && !on.length);
     var thumbs = on.slice(0, 3).map(function (p) { return packArt(p.id, "pthumb"); }).join("");
+    var mode = isHost
+      ? '<div class="wh-seg packmode"><button class="wh-seg__item pmode" data-m="host" aria-pressed="' + !room + '">Host picks</button><button class="wh-seg__item pmode" data-m="room" aria-pressed="' + room + '">Room picks</button></div>'
+      : "";
+    var btn = room ? (s.myPackVotes.length ? "Change votes" : "Vote for packs") : (isHost ? (on.length ? "Change" : "Choose packs") : "See packs");
     return '<div class="wh-card wh-stack"><div class="packhead"><div class="wh-title">Song packs</div>' +
-      '<button class="wh-btn wh-btn--secondary wh-btn--sm" id="openPacks">' + (isHost ? (on.length ? "Change" : "Choose packs") : "See packs") + "</button></div>" +
-      '<div class="wh-packrow">' + (thumbs ? '<span class="pthumbs">' + thumbs + "</span>" : "") + '<div class="packline">' + esc(line) + "</div></div>" +
-      '<div class="packnote' + (isHost && (short || !on.length) ? " bad" : "") + '">' + (isHost && (short || !on.length) ? ico("info", "wh-i--sm") : "") + "<span>" + esc(note) + "</span></div></div>";
+      '<button class="wh-btn wh-btn--secondary wh-btn--sm" id="openPacks">' + btn + "</button></div>" + mode +
+      (room ? rankingHtml(s, 3) : '<div class="wh-packrow">' + (thumbs ? '<span class="pthumbs">' + thumbs + "</span>" : "") + '<div class="packline">' + esc(line) + "</div></div>") +
+      '<div class="packnote' + (bad ? " bad" : "") + '">' + (bad ? ico("info", "wh-i--sm") : "") + "<span>" + esc(note) + "</span></div></div>";
   }
 
   function pickerHtml(s, isHost) {
+    var room = s.packMode === "room", votes = s.packVotes || {};
     var all = s.packs.length === s.selectedPacks.length;
-    var cards = s.packs.map(function (p) { return packCard(p, s.selectedPacks.indexOf(p.id) !== -1, !isHost); }).join("");
+    var mine = s.myPackVotes || [];
+    var cards = s.packs.map(function (p) {
+      var voters = (votes[p.id] || []).map(function (id) { var pl = player(s, id); return pl ? avatarHtml(s, pl, "wh-avatar--xs") : ""; });
+      return packCard(p, room ? mine.indexOf(p.id) !== -1 : s.selectedPacks.indexOf(p.id) !== -1, !room && !isHost, voters);
+    }).join("");
+    var intro = room ? "Vote for up to 3 packs. The top 3 play, and ties all play."
+      : isHost ? "These decide which songs come up in the game. Tick one pack or as many as you like." : "These decide which songs come up in the game. The host picks them.";
     return '<div class="picker" id="picker"><div class="pwrap">' +
-      '<div class="phead"><div class="wh-title ptitle">Choose your song packs</div>' +
-      '<p class="wh-sub pintro">' + (isHost ? "These decide which songs come up in the game. Tick one pack or as many as you like." : "These decide which songs come up in the game. The host picks them.") + "</p>" +
-      (isHost ? '<div class="pactions"><button class="wh-chip" id="packAll">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") + "</div>" +
+      '<div class="phead"><div class="wh-title ptitle">' + (room ? "Vote for song packs" : "Choose your song packs") + "</div>" +
+      '<p class="wh-sub pintro">' + intro + "</p>" +
+      (room ? '<div class="pranking"><div class="wh-over">Most popular</div>' + rankingHtml(s, 5) + "</div>" : "") +
+      (isHost && !room ? '<div class="pactions"><button class="wh-chip" id="packAll">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") + "</div>" +
       '<div class="pbody"><div class="packs">' + cards + "</div>" +
-        (isHost ? "" : '<p class="wh-note center">The host picks the packs</p>') + "</div>" +
-      '<div class="pfoot"><div class="pcount"><b>' + s.selectedPacks.length + "</b> of " + s.packs.length + " packs picked</div>" +
+        (!isHost && !room ? '<p class="wh-note center">The host picks the packs</p>' : "") + "</div>" +
+      '<div class="pfoot"><div class="pcount">' + (room ? "<b>" + mine.length + "</b> of 3 votes used" : "<b>" + s.selectedPacks.length + "</b> of " + s.packs.length + " packs picked") + "</div>" +
         '<button class="wh-btn wh-btn--block" id="pkDone">Done</button></div>' +
     "</div></div>";
   }
 
   function startNote(s, turns) {
     if (s.players.length < s.minPlayers) { return "Waiting for at least " + s.minPlayers + " players"; }
-    if (!s.selectedPacks.length) { return "Pick at least one song pack to start"; }
+    if (!s.selectedPacks.length) { return s.packMode === "room" ? "Waiting for votes on the song packs" : "Pick at least one song pack to start"; }
     if (s.songsInPlay < turns + 5) { return "Not enough songs for this many turns. Pick more packs or lower the rounds."; }
     var off = s.players.filter(function (p) { return p.mic === "off"; }).map(function (p) { return p.name; });
     if (off.length) { return off.join(" and ").replace(/^(.*), /, "$1, ") + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses."; }
@@ -464,10 +496,20 @@
         $("#openPacks").onclick = function () { pickerOpen = true; keepPickerScroll = false; render(); };
         if (pickerOpen) {
           $("#pkDone").onclick = function () { pickerOpen = false; render(); };
-          if (isHost) {
+          var cardsEl = document.querySelectorAll(".pack");
+          if (s.packMode === "room") {
+            var mine = (s.myPackVotes || []).slice();
+            for (var c2 = 0; c2 < cardsEl.length; c2++) {
+              cardsEl[c2].onclick = function () {
+                var id = this.getAttribute("data-id"), at = mine.indexOf(id);
+                if (at === -1) { if (mine.length >= 3) { toast("You can vote for up to 3 packs."); return; } mine.push(id); }
+                else { mine.splice(at, 1); }
+                send({ t: "votePacks", packs: mine.slice() });
+              };
+            }
+          } else if (isHost) {
             var sel = s.selectedPacks.slice(), allIds = s.packs.map(function (p) { return p.id; });
             var sendPacks = function () { send({ t: "setPacks", packs: sel }); };
-            var cardsEl = document.querySelectorAll(".pack");
             for (var c = 0; c < cardsEl.length; c++) {
               cardsEl[c].onclick = function () {
                 var id = this.getAttribute("data-id"), at = sel.indexOf(id);
@@ -486,6 +528,8 @@
             };
           }
         }
+        var pm = document.querySelectorAll(".pmode");
+        for (var q = 0; q < pm.length; q++) { pm[q].onclick = function () { send({ t: "setPackMode", mode: this.getAttribute("data-m") }); }; }
         if (isHost) {
           var want = s.rounds;
           $("#minus").onclick = function () { want = Math.max(1, want - 1); send({ t: "setRounds", rounds: want }); };
@@ -515,12 +559,21 @@
     if (!st || !st.turn) { return; }
     var l = $("#topLabel"); if (l) { l.textContent = topLabel(st); }
     var b = $("#lastRound"); if (!b) { return; }
-    var show = st.hostId === st.me && !st.turn.sd && !st.suddenDeath && st.turn.round === st.rounds;
-    var has = !!$("#addRound");
-    if (show && !has) {
-      b.innerHTML = '<button id="addRound" class="wh-banner wh-banner--accent lastbanner">' + ico("add") + '<span class="wh-banner__text">Last round<small>Tap to add an extra round</small></span></button>';
-      $("#addRound").onclick = function () { send({ t: "addRound" }); };
-    } else if (!show && has) { b.innerHTML = ""; }
+    var T = st.turn, isHost = st.hostId === st.me;
+    var show = !T.sd && !st.suddenDeath && T.round === st.rounds;
+    var html = "";
+    if (show && isHost) {
+      var n = T.roundVotes || 0;
+      html = '<button id="addRound" class="wh-banner wh-banner--accent lastbanner">' + ico("add") + '<span class="wh-banner__text">Last round<small>' +
+        (n ? n + (n === 1 ? " person wants" : " people want") + " an extra round. Tap to add one" : "Tap to add an extra round") + "</small></span></button>";
+    } else if (show) {
+      html = '<button id="voteRound" class="wh-banner wh-banner--accent lastbanner' + (T.iVotedRound ? " voted" : "") + '">' + ico(T.iVotedRound ? "tick" : "add") + '<span class="wh-banner__text">Last round<small>' +
+        (T.iVotedRound ? "You asked for an extra round. Tap to undo" : "Tap to ask the host for an extra round") + "</small></span></button>";
+    }
+    if (b.getAttribute("data-h") === html) { return; }
+    b.setAttribute("data-h", html); b.innerHTML = html;
+    var ar = $("#addRound"); if (ar) { ar.onclick = function () { send({ t: "addRound" }); }; }
+    var vr = $("#voteRound"); if (vr) { vr.onclick = function () { send({ t: "voteRound" }); }; }
   }
 
   function skipHtml(s) {
@@ -564,16 +617,32 @@
     if (b) { b.onclick = openHostMenu; }
   }
 
-  function lockHtml(note) {
-    return '<div class="lockov wh-field wh-field--ink" id="lock" hidden><div class="lk1">Shuffle!</div><div class="lk2">Shuffle costs 100 points</div>' +
-      '<div class="lknum" id="lknum">5</div><div class="lk3">' + note + "</div></div>";
-  }
+  function lockHtml() { return ""; }
 
   function songCardHtml(T) {
     var d = T.difficulty;
     return '<div class="wh-card songcard"><span class="wh-chip wh-chip--static"><i style="--c:var(--' + (d || "easy") + ')"></i>' + esc(cap(d)) + ", x" + T.multiplier + "</span>" +
       '<div class="t wh-title" id="songTitle">' + esc(T.song ? T.song.title : "") + "</div>" +
       '<div class="a wh-sub" id="songArtist">' + esc(T.song ? T.song.artist : "") + "</div></div>";
+  }
+
+  function syncAskBtn(t) {
+    var b = $("#askHintBtn"); if (!b) { return; }
+    var done = t.hints >= 3;
+    b.hidden = done;
+    b.disabled = !!t.iAsked || t.stage === "confirming";
+    var sp = b.querySelector("span"), txt = t.iAsked ? "Hint requested" : "Request a hint";
+    if (sp && sp.textContent !== txt) { sp.textContent = txt; }
+  }
+
+  // Whistler's phone: one card per person asking for a hint, stacked.
+  function asksHtml(s, t) {
+    var ids = t.hintAsks || [];
+    return ids.map(function (id) { return '<div class="askcard">' + ico("info", "wh-i--sm") + "<span>" + esc(pname(s, id)) + " wants a hint!</span></div>"; }).join("");
+  }
+  function syncAsks(s, t) {
+    var el = $("#hintAsks"); if (!el) { return; }
+    var h = asksHtml(s, t); if (el.innerHTML !== h) { el.innerHTML = h; }
   }
 
   function hintCostText(t) { return t.nextHintCost === null ? "No hints left" : "-" + t.nextHintCost + " points"; }
@@ -694,7 +763,7 @@
         key: "w-" + T.id, field: dfield,
         html: '<div class="screen">' + topBar(s) +
           '<div class="timerbox"><div class="wh-over" id="tlabel">Time</div><div class="wh-timer" id="bigtime">0.0</div>' +
-          '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' + songCardHtml(T) + '<div class="wh-card hintcard" id="hintBox" hidden></div>' +
+          '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' + songCardHtml(T) + '<div class="asks" id="hintAsks">' + asksHtml(s, T) + '</div><div class="wh-card hintcard" id="hintBox" hidden></div>' +
           '<div class="spacer"></div>' +
           '<button id="gotBtn" class="wh-btn wh-btn--block gotbtn">Someone got it</button>' +
           '<div class="lifelines"><button id="shuffleBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("shuffle") + "<span>Shuffle<small>" + "-" + T.penalty + " points</small></span></button>" +
@@ -718,6 +787,7 @@
           $("#confirm").hidden = !conf;
           if (conf) { buildWho(t); } else { whoState.built = null; }
           showHints(t);
+          syncAsks(st, t);
           $("#hintCost").textContent = hintCostText(t);
           $("#hintBtn").disabled = t.stage === "confirming" || t.nextHintCost === null;
           $("#shuffleBtn").disabled = t.stage === "confirming";
@@ -742,10 +812,10 @@
             : '<div class="wh-stack midc"><div class="wh-orb wh-orb--off off" id="orb"><span class="wh-orb__core">' + ico("mic-off") + '</span></div>' +
               '<h2 class="wh-title" id="listenHead">Listening</h2>' +
               '<p class="wh-sub">Shout your guesses. Get it right and you earn points too.</p>' +
-              '<div class="wh-stack" data-mic="quiet"></div><div class="heard wh-note" id="heard"></div></div>' +
+              '<div class="wh-stack" data-mic="quiet"></div></div>' +
               '<button id="toType" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("keyboard") + 'Mic not working? Type your answer</button>') +
-          '<div class="spacer"></div>' + skipHtml(s) +
-          lockHtml("Song changing. Guessing is paused.") +
+          '<div class="spacer"></div>' +
+          '<button id="askHintBtn" class="wh-btn wh-btn--secondary wh-btn--block askhint">' + ico("info") + "<span>Request a hint</span></button>" + skipHtml(s) +
           '<div class="wh-overlay wh-field wh-field--sky fixedov" id="checking" hidden><div class="wh-spin"></div><h2 class="wh-title">Checking...</h2>' +
           '<p class="wh-sub">Someone may have got it.<br>Waiting for the whistler to confirm.</p></div></div>',
         bind: function () {
@@ -760,6 +830,8 @@
               return false;
             };
           }
+          var ah = $("#askHintBtn"); if (ah) { ah.onclick = function () { send({ t: "askHint" }); }; }
+          syncAskBtn(st.turn);
           var tt = $("#toType"); if (tt) { tt.onclick = function () { mic.typeMode = true; render(); }; }
           var tm = $("#toMic"); if (tm) { tm.onclick = function () { mic.typeMode = false; render(); }; }
           bindSkip();
@@ -768,7 +840,7 @@
           $("#checking").hidden = st.turn.stage !== "confirming";
           showHints(st.turn);
           if (mic.turnSeen !== st.turn.id) { mic.turnSeen = st.turn.id; mic.base = mic.total || 0; mic.heard = ""; }
-          var h = $("#heard"); if (h) { h.textContent = mic.heard ? "Heard: " + mic.heard : ""; }
+          syncAskBtn(st.turn);
         }
       };
     }

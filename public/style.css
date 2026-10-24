@@ -469,3 +469,47 @@ p,.wh-sub,.wh-note,.wh-help,.wh-pack__desc,.wh-setting__sub,.packnote,.packline,
 .deltaTag{background:var(--tomato);transform:rotate(3deg)}
 .multBadge[hidden],.deltaTag[hidden]{display:none}
 @media (prefers-reduced-motion:reduce){.scoreNum,.multBadge,.deltaTag,.wh-pack{transition:none;animation:none}}
+
+/* ---------- breathing room inside curved boxes ---------- */
+.wh-card{padding:24px 28px}
+.songcard.wh-card,.scorecard.wh-card{padding:26px 30px}
+.wh-setting{padding:20px 28px}
+.wh-setting--col{padding:22px 28px 26px}
+.wh-prow{padding:12px 28px}
+.wh-game{padding:14px 18px 14px 28px;min-height:72px}
+.wh-banner{padding:12px 24px;border-radius:32px;border:var(--outline)}
+.wh-modal{padding:30px 28px}
+.wh-empty{padding:32px 30px}
+.wh-card .wh-title,.wh-modal .wh-title{font-size:19px;line-height:24px}
+.codecard{padding:4px 6px}
+.hintcard{padding:22px 28px}
+.askhint{margin-top:2px}
+.wh-seg{padding:5px}
+
+/* pack voting */
+.wh-avatar--xs{--s:22px;font-size:11px;border-width:1.5px}
+.pico{position:relative;display:block}
+.voters{position:absolute;left:8px;bottom:8px;display:flex;align-items:center}
+.voters .wh-avatar{margin-left:-6px;box-shadow:0 0 0 1.5px var(--paper)}
+.voters .wh-avatar:first-child{margin-left:0}
+.vmore{margin-left:4px;font:700 11px/1 var(--font-sans);background:var(--ink);color:var(--paper);border-radius:999px;padding:4px 6px}
+.packmode{width:100%}
+.ranking{display:flex;flex-direction:column;gap:8px}
+.rkrow{display:flex;align-items:center;gap:12px;min-height:44px;font:600 15px/20px var(--font-sans)}
+.rkart{width:36px;height:36px;border-radius:30%;border:var(--outline);flex:none;overflow:hidden}
+.rkname{flex:1;min-width:0}
+.rkn{font:700 14px/1 var(--font-display);white-space:nowrap}
+.rkrow.in .rkn{background:var(--lime);border:var(--outline);border-radius:999px;padding:6px 10px}
+.pranking{display:flex;flex-direction:column;gap:8px;background:var(--paper);border:var(--outline);border-radius:32px;padding:18px 24px;margin-top:10px}
+
+/* hint requests: cards stack on the whistler's phone */
+.asks{display:flex;flex-direction:column;padding:0 4px}
+.asks:empty{display:none}
+.askcard{display:flex;align-items:center;gap:10px;background:var(--hot);color:var(--ink);border:var(--outline);border-radius:28px;padding:12px 20px 22px;font:700 15px/20px var(--font-display);box-shadow:var(--shadow-sm);transform:rotate(-1.6deg);animation:wh-pop .28s cubic-bezier(.2,.9,.3,1.3)}
+.askcard+.askcard{margin-top:-14px;transform:rotate(1.4deg);background:var(--lime)}
+.askcard+.askcard+.askcard{transform:rotate(-1deg);background:var(--sky)}
+.askcard:last-child{padding-bottom:12px}
+.askhint[hidden]{display:none}
+
+.lastbanner.voted{background:var(--ink);color:var(--paper)}
+#adminBar .aact.aon{background:var(--lime);color:var(--ink)}

@@ -29,7 +29,6 @@ var DEFAULTS = {
   countdownMs: 3000,     // 3, 2, 1 before the clock starts
   confirmMs: 10000,      // whistler has this long to confirm a detected guess
   cooldownMs: 4000,      // ignore guesses this long after the whistler says "no"
-  shuffleLockS: 5,       // the whistler's screen is locked this long after a shuffle (the clock does not count it)
   shufflePoints: 100,    // each shuffle costs this many points, taken off after the multiplier
   hintPoints: [50, 100, 150], // the 1st, 2nd and 3rd hint on a song cost this many points
   multipliers: { easy: 1, medium: 1.1, hard: 1.2 },
@@ -115,10 +114,19 @@ RoomManager.prototype.viewFor = function (room, pid) {
       multiplier: t.multiplier, shuffles: t.shuffles, sd: t.sd, round: t.round,
       countdownEndsAt: t.countdownEndsAt, accumulatedMs: t.accumulatedMs,
       runningSince: t.runningSince, limitMs: room.limitMs,
-      penalty: this.opts.shufflePoints, lockS: this.opts.shuffleLockS, nextAt: t.nextAt || null,
+      penalty: this.opts.shufflePoints, nextAt: t.nextAt || null,
       hints: t.hints || 0, hintCost: t.hintCost || 0,
       nextHintCost: (t.hints || 0) < 3 ? this.opts.hintPoints[t.hints || 0] : null
     };
+    if (t.stage === "whistling" || t.stage === "confirming") {
+      if (isW) { tv.hintAsks = (t.hintAsks || []).slice(); }
+      else { tv.iAsked = (t.hintAsks || []).indexOf(pid) !== -1; }
+    }
+    if (room.phase === "turn" && !t.sd && !room.sd && t.round === room.rounds) {
+      var rv = Object.keys(room.roundVotes || {});
+      tv.roundVotes = rv.length; tv.iVotedRound = !!(room.roundVotes || {})[pid];
+      tv.roundVoters = room.hostId === pid ? rv : undefined;
+    }
     var locked = t.lockUntil && t.lockUntil > this.now();
     if (locked) { tv.lockUntil = t.lockUntil; }
     if (isW && t.options && t.stage === "choose" && !t.difficulty) {
@@ -146,6 +154,9 @@ RoomManager.prototype.viewFor = function (room, pid) {
       return { id: p.id, group: p.group, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
     }),
     selectedPacks: room.packs.slice(),
+    packMode: room.packMode,
+    packVotes: this.packVoteMap(room),
+    myPackVotes: (room.packVotes[pid] || []).slice(),
     songsInPlay: this.poolFor(room).length,
     turn: tv,
     winners: room.winners || null,
@@ -167,6 +178,7 @@ RoomManager.prototype.broadcast = function (room) {
       v.hostId = as;
       v.admin = {
         as: as,
+        autoplay: !!room.admin.autoplay,
         canAdd: room.phase === "lobby" && room.players.length < this.opts.maxPlayers,
         players: room.players.filter(function (q) { return !q.sitOut; }).map(function (q) { return { id: q.id, name: q.name }; })
       };
@@ -233,6 +245,7 @@ RoomManager.prototype.handle = function (conn, msg) {
       if (findPlayer(room, msg.id)) { room.admin.as = msg.id; this.broadcast(room); }
       return;
     }
+    if (msg.t === "adminAutoplay") { return this.setAutoplay(room, !!msg.on); }
     if (msg.t === "adminAddBot") {
       if (room.phase === "lobby") { this.addBot(room); this.broadcast(room); }
       return;
@@ -251,6 +264,10 @@ RoomManager.prototype.handle = function (conn, msg) {
     case "playAgain":  return isHost ? this.playAgain(room) : err(conn, "not_host", "Only the host can do that.");
     case "setLimit":   return isHost ? this.setLimit(room, msg) : err(conn, "not_host", "Only the host can do that.");
     case "setPacks":   return isHost ? this.setPacks(room, msg) : err(conn, "not_host", "Only the host can do that.");
+    case "setPackMode": return isHost ? this.setPackMode(room, msg) : err(conn, "not_host", "Only the host can do that.");
+    case "votePacks":  return this.votePacks(room, me, msg);
+    case "voteRound":  return this.voteRound(room, me);
+    case "askHint":    return this.askHint(room, me);
     case "addRound":   return isHost ? this.addRound(room, conn) : err(conn, "not_host", "Only the host can do that.");
     case "cancelGame": return isHost ? this.cancelGame(room) : err(conn, "not_host", "Only the host can do that.");
     case "refreshOptions": return this.refreshOptions(room, me);
@@ -287,6 +304,7 @@ RoomManager.prototype.create = function (conn, msg) {
     code: this.makeCode(), hostId: null, players: [], phase: "lobby",
     rounds: this.opts.defaultRounds, limitMs: this.opts.limitMs, turns: [], turnPos: -1, turn: null, turnCounter: 0,
     packs: (this.opts.defaultPacks || []).slice(), used: {}, sd: null, winners: null, tieBreakWon: false,
+    packMode: "host", packVotes: {}, roundVotes: {},
     createdAt: this.now(), lastActive: this.now()
   };
   var p = this.addPlayer(room, name);
@@ -346,6 +364,7 @@ RoomManager.prototype.closeAdmin = function (room, conn) {
   conn.roomCode = null; conn.playerId = null;
   room.players.forEach(function (p) { if (p.conn) { p.conn.roomCode = null; p.conn.playerId = null; p.conn = null; } });
   if (room.turn) { this.clearTimers(room.turn); }
+  if (room.autoTimer) { clearInterval(room.autoTimer); }
   delete this.rooms[room.code];
 };
 
@@ -374,6 +393,8 @@ RoomManager.prototype.leave = function (room, me, conn) {
   me.conn = null; me.connected = false;
   if (room.phase === "lobby") {
     room.players = room.players.filter(function (p) { return p.id !== me.id; });
+    delete room.packVotes[me.id];
+    this.recomputePacks(room);
   }
   this.promoteHost(room);
   if (room.phase === "turn" && wasWhistler) { return this.finishTurn(room, "skipped"); }
@@ -413,7 +434,7 @@ RoomManager.prototype.unusedCount = function (room) {
 
 // Host ticks packs in the lobby. None are ticked to begin with.
 RoomManager.prototype.setPacks = function (room, msg) {
-  if (room.phase !== "lobby" || !Array.isArray(msg.packs)) { return; }
+  if (room.phase !== "lobby" || room.packMode === "room" || !Array.isArray(msg.packs)) { return; }
   var chosen = PACK_IDS.filter(function (id) { return msg.packs.indexOf(id) !== -1; });
   room.packs = chosen;
   this.broadcast(room);
@@ -428,10 +449,62 @@ RoomManager.prototype.addRound = function (room, conn) {
     return err(conn, "too_few_songs", "Not enough unplayed songs left in the chosen packs for another round.");
   }
   room.rounds++;
+  room.roundVotes = {};
   for (var i = 0; i < room.players.length; i++) {
     if (!room.players[i].sitOut) { room.turns.push({ playerId: room.players[i].id, round: room.rounds, sd: false }); }
   }
   this.broadcast(room);
+};
+
+// Non-hosts ask for an extra round on the last round; the host sees how many want one.
+RoomManager.prototype.voteRound = function (room, me) {
+  var t = room.turn;
+  if (room.phase !== "turn" || room.sd || !t || t.sd || t.round !== room.rounds || room.hostId === me.id) { return; }
+  if (room.roundVotes[me.id]) { delete room.roundVotes[me.id]; } else { room.roundVotes[me.id] = true; }
+  this.broadcast(room);
+};
+
+// ---- pack voting: the host either picks the packs or hands the choice to the room.
+RoomManager.prototype.setPackMode = function (room, msg) {
+  if (room.phase !== "lobby" || (msg.mode !== "host" && msg.mode !== "room")) { return; }
+  room.packMode = msg.mode;
+  if (room.packMode === "room") { this.recomputePacks(room); }
+  this.broadcast(room);
+};
+
+RoomManager.prototype.votePacks = function (room, me, msg) {
+  if (room.phase !== "lobby" || room.packMode !== "room" || !Array.isArray(msg.packs)) { return; }
+  room.packVotes[me.id] = msg.packs.filter(function (id, i) { return PACK_IDS.indexOf(id) !== -1 && msg.packs.indexOf(id) === i; }).slice(0, 3);
+  this.recomputePacks(room);
+  this.broadcast(room);
+};
+
+RoomManager.prototype.packTally = function (room) {
+  var tally = {};
+  room.players.forEach(function (p) {
+    (room.packVotes[p.id] || []).forEach(function (id) { tally[id] = (tally[id] || 0) + 1; });
+  });
+  return PACK_IDS.filter(function (id) { return tally[id]; }).map(function (id) { return { id: id, votes: tally[id] }; })
+    .sort(function (a, b) { return b.votes - a.votes || PACK_IDS.indexOf(a.id) - PACK_IDS.indexOf(b.id); });
+};
+
+RoomManager.prototype.packVoteMap = function (room) {
+  var map = {};
+  room.players.forEach(function (p) {
+    (room.packVotes[p.id] || []).forEach(function (id) { (map[id] = map[id] || []).push(p.id); });
+  });
+  return map;
+};
+
+// Top three packs win. Anything level with third place comes in too.
+RoomManager.prototype.recomputePacks = function (room) {
+  if (room.packMode !== "room") { return; }
+  var ranked = this.packTally(room);
+  if (!ranked.length) { room.packs = []; return; }
+  var cutoff = ranked[Math.min(2, ranked.length - 1)].votes;
+  room.packs = PACK_IDS.filter(function (id) {
+    return ranked.some(function (r) { return r.id === id && r.votes >= cutoff; });
+  });
 };
 
 RoomManager.prototype.start = function (room, conn) {
@@ -451,7 +524,7 @@ RoomManager.prototype.start = function (room, conn) {
       room.turns.push({ playerId: room.players[i].id, round: r, sd: false });
     }
   }
-  room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {};
+  room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
   room.phase = "turn";
   this.advance(room);
 };
@@ -476,7 +549,7 @@ RoomManager.prototype.beginTurn = function (room, t) {
     id: room.turnCounter, playerId: t.playerId, round: t.round, sd: !!t.sd,
     stage: "choose", difficulty: null, multiplier: null, song: null, shuffles: 0,
     accumulatedMs: 0, runningSince: null, countdownEndsAt: null, pending: null, hints: 0, hintCost: 0, hintsUsed: 0,
-    cooldownUntil: 0, lockUntil: 0, options: null, result: null, timers: {}
+    cooldownUntil: 0, lockUntil: 0, hintAsks: [], options: null, result: null, timers: {}
   };
   room.turn = turn;
   if (t.sd) {
@@ -570,28 +643,33 @@ RoomManager.prototype.pickDifficulty = function (room, me, msg) {
   this.broadcast(room);
 };
 
-// Shuffle during the round: new song of the same difficulty, and the whistler's
-// screen locks for the penalty time. The clock keeps running through the lock.
+// Shuffle during the round: a new song of the same difficulty. The clock keeps
+// running and nothing is locked; the shuffle just costs points.
 RoomManager.prototype.shuffle = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling"]);
-  if (!t || !t.difficulty || (t.lockUntil && t.lockUntil > this.now())) { return; }
-  var self = this, id = t.id, ms = this.opts.shuffleLockS * 1000;
+  if (!t || !t.difficulty) { return; }
   if (!this.drawSong(room, t)) { return; } // no unplayed songs left: nothing to shuffle to
   t.shuffles++;
   t.hints = 0;
-  t.lockUntil = this.now() + ms;
-  if (t.timers.lock) { clearTimeout(t.timers.lock); }
-  t.timers.lock = setTimeout(function () {
-    if (room.turn && room.turn.id === id) { self.broadcast(room); }
-  }, ms + 20);
+  t.hintAsks = [];
+  this.broadcast(room);
+};
+
+// A guesser asks the whistler for a hint. The whistler decides whether to give one.
+RoomManager.prototype.askHint = function (room, me) {
+  var t = room.turn;
+  if (room.phase !== "turn" || !t || t.stage !== "whistling" || t.playerId === me.id || !t.song || t.hints >= 3) { return; }
+  if (t.hintAsks.indexOf(me.id) !== -1) { return; }
+  t.hintAsks.push(me.id);
   this.broadcast(room);
 };
 
 // The lifeline: up to three hints per song, each costing more points than the last.
 RoomManager.prototype.hint = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling"]);
-  if (!t || !t.song || t.hints >= 3 || (t.lockUntil && t.lockUntil > this.now())) { return; }
+  if (!t || !t.song || t.hints >= 3) { return; }
   t.hintCost += this.opts.hintPoints[t.hints];
+  t.hintAsks = [];
   t.hints++;
   t.hintsUsed++;
   this.broadcast(room);
@@ -638,7 +716,7 @@ RoomManager.prototype.pause = function (t) {
 RoomManager.prototype.guess = function (room, me, conn, msg) {
   var t = room.turn;
   if (room.phase !== "turn" || !t || t.stage !== "whistling" || t.playerId === me.id) { return; }
-  if (this.now() < t.cooldownUntil || this.now() < t.lockUntil) { return; }
+  if (this.now() < t.cooldownUntil) { return; }
   var typed = !!msg.typed;
   var alts = (Array.isArray(msg.alts) ? msg.alts : []).slice(0, 5)
     .map(function (a) { return String(a == null ? "" : a).slice(0, 120); })
@@ -678,7 +756,7 @@ RoomManager.prototype.confirmGuess = function (room, me, ok, byTimeout, who) {
 
 RoomManager.prototype.gotIt = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling", "confirming"]);
-  if (!t || this.now() < t.lockUntil || t.stage !== "whistling") { return; }
+  if (!t || t.stage !== "whistling") { return; }
   // Pause the clock and ask the whistler who got it. No timeout: they take their time.
   this.pause(t);
   t.stage = "confirming";
@@ -700,12 +778,11 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
   var limitS = room.limitMs / 1000;
   var timeMs = outcome === "correct" ? Math.min(t.accumulatedMs, room.limitMs) : room.limitMs;
   var mult = t.multiplier || 1;
-  var lockedS = this.opts.shuffleLockS * t.shuffles;
+  var lockedS = 0;
   var shufflePts = this.opts.shufflePoints * t.shuffles;
   var hintPts = t.hintCost || 0;
   var base = 0, afterMult = 0, score = 0;
   if (outcome === "correct") {
-    // Time spent locked out after a shuffle does not count against the guess.
     var rawS = Math.max(0, timeMs / 1000 - lockedS);
     base = Math.max(0, Math.round(this.opts.maxPoints * (1 - rawS / limitS)));
     afterMult = Math.round(base * mult);
@@ -810,6 +887,62 @@ RoomManager.prototype.cancelGame = function (room) {
   this.resetToLobby(room);
 };
 
+// ------------------------------------------------------- admin: bots play on their own
+RoomManager.prototype.setAutoplay = function (room, on) {
+  var self = this;
+  room.admin.autoplay = on;
+  if (room.autoTimer) { clearInterval(room.autoTimer); room.autoTimer = null; }
+  if (on) {
+    room.autoTimer = setInterval(function () { self.autoTick(room); }, 1500);
+    if (room.autoTimer.unref) { room.autoTimer.unref(); }
+  }
+  this.broadcast(room);
+};
+
+RoomManager.prototype.autoTick = function (room) {
+  var self = this;
+  if (!this.rooms[room.code] || !room.admin || !room.admin.autoplay) {
+    if (room.autoTimer) { clearInterval(room.autoTimer); room.autoTimer = null; }
+    return;
+  }
+  var bots = room.players.filter(function (p) { return p.bot && !p.sitOut; });
+  var pick = function (arr) { return arr[Math.floor(self.random() * arr.length)]; };
+  if (room.phase === "lobby") {
+    if (room.packMode === "room") {
+      bots.forEach(function (b) {
+        if (room.packVotes[b.id] && room.packVotes[b.id].length) { return; }
+        var ids = PACK_IDS.slice(), mine = [];
+        while (mine.length < 3) { mine.push(ids.splice(Math.floor(self.random() * ids.length), 1)[0]); }
+        self.votePacks(room, b, { packs: mine });
+      });
+    }
+    return;
+  }
+  var t = room.turn;
+  if (room.phase !== "turn" || !t) { return; }
+  var w = findPlayer(room, t.playerId), now = this.now();
+  if (!w) { return; }
+  var dummy = { send: function () {} };
+  if (t.stage === "choose") {
+    if (!w.bot) { return; }
+    if (!t.difficulty) { return this.pickDifficulty(room, w, { i: Math.floor(this.random() * (t.options || []).length) }); }
+    return this.ready(room, w);
+  }
+  if (t.stage === "confirming" && w.bot) {
+    var others = room.players.filter(function (p) { return !p.sitOut && p.id !== w.id; });
+    var who = [pick(others)];
+    if (others.length > 2 && this.random() < 0.4) { var second = pick(others); if (second !== who[0]) { who.push(second); } }
+    return this.confirmGuess(room, w, true, false, who.map(function (p) { return p.id; }));
+  }
+  if (t.stage === "whistling") {
+    if (!t.botAt) { t.botAt = now + 6000 + Math.floor(this.random() * 22000); return; }
+    if (now < t.botAt) { return; }
+    if (w.bot) { return this.gotIt(room, w); }
+    var guessers = bots.filter(function (b) { return b.id !== w.id; });
+    if (guessers.length) { t.botAt = now + 8000 + Math.floor(this.random() * 15000); return this.guess(room, pick(guessers), dummy, { alts: [t.song.title], typed: true }); }
+  }
+};
+
 // ------------------------------------------------------------------- cleanup
 RoomManager.prototype.sweep = function () {
   var now = this.now();
@@ -818,6 +951,7 @@ RoomManager.prototype.sweep = function () {
     var anyone = room.players.some(function (p) { return p.connected && !p.bot; });
     if ((!anyone && now - room.lastActive > this.opts.roomIdleMs) || now - room.createdAt > this.opts.roomMaxAgeMs) {
       this.clearTimers(room.turn);
+      if (room.autoTimer) { clearInterval(room.autoTimer); }
       delete this.rooms[code];
     }
   }

@@ -3,7 +3,7 @@
 var WebSocket = require("ws");
 var createServer = require("./server.js").createServer;
 var failed = 0;
-function check(n, c) { if (c) { console.log("ok   " + n); } else { failed++; console.log("FAIL " + n); } }
+function check(n, c, d) { if (c) { console.log("ok   " + n); } else { failed++; console.log("FAIL " + n + (d ? "  [" + d + "]" : "")); } }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 function client(port) {
   var c = { state: null, errors: [], ws: new WebSocket("ws://localhost:" + port + "/ws") };
@@ -94,7 +94,62 @@ function client(port) {
   X.send({ t: "ping" });
   check("exiting admin closes the room", true);
 
+  // pack voting, hint requests, round votes
+  var E = client(port), F = client(port), G = client(port), H = client(port); await Promise.all([E.ready, F.ready, G.ready, H.ready]);
+  E.send({ t: "create", name: "Eve" }); await sleep(100);
+  F.send({ t: "join", code: E.code, name: "Finn" }); G.send({ t: "join", code: E.code, name: "Gus" }); H.send({ t: "join", code: E.code, name: "Hal" }); await sleep(150);
+  F.send({ t: "setPackMode", mode: "room" }); await sleep(60);
+  check("only the host can switch to room picks", E.state.packMode === "host");
+  E.send({ t: "setPackMode", mode: "room" }); await sleep(80);
+  check("host can hand pack choice to the room", F.state.packMode === "room");
+  E.send({ t: "setPacks", packs: ["bangers"] }); await sleep(60);
+  check("host ticking is ignored in room mode", E.state.selectedPacks.length === 0);
+  E.send({ t: "votePacks", packs: ["bangers", "gaga", "rock", "xmas"] }); await sleep(80);
+  check("a player votes for at most 3 packs", E.state.myPackVotes.length === 3);
+  F.send({ t: "votePacks", packs: ["bangers", "gaga"] });
+  G.send({ t: "votePacks", packs: ["bangers", "beatles"] }); await sleep(100);
+  check("votes show on each pack with who voted", E.state.packVotes.bangers.length === 3 && E.state.packVotes.gaga.length === 2);
+  check("a tie for third place brings every tied pack in", ["bangers", "gaga", "rock", "beatles"].every(function (id) { return E.state.selectedPacks.indexOf(id) !== -1; }) && E.state.selectedPacks.indexOf("xmas") === -1 && E.state.selectedPacks.length === 4);
+  H.send({ t: "votePacks", packs: ["rock"] }); await sleep(100);
+  check("top 3 win when there is no tie", E.state.selectedPacks.length === 3 && E.state.selectedPacks.indexOf("bangers") !== -1 && E.state.selectedPacks.indexOf("gaga") !== -1 && E.state.selectedPacks.indexOf("rock") !== -1, E.state.selectedPacks.join());
+  G.send({ t: "leave" }); await sleep(100);
+  check("leaving takes your votes away", !E.state.packVotes.beatles);
+  E.send({ t: "setPackMode", mode: "host" }); await sleep(60);
+  E.send({ t: "setPacks", packs: ["bangers"] }); E.send({ t: "setRounds", rounds: 1 }); await sleep(60);
+  E.send({ t: "start" }); await sleep(150);
+  check("game starts after voting", E.state.phase === "turn");
+  var wid = E.state.turn.playerId, byId = { }; [E, F, H].forEach(function (c) { byId[c.id] = c; });
+  var W = byId[wid], others = [E, F, H].filter(function (c) { return c !== W; });
+  W.send({ t: "pickDifficulty", i: 0 }); await sleep(60); W.send({ t: "ready" }); await sleep(400);
+  others[0].send({ t: "askHint" }); others[1].send({ t: "askHint" }); others[1].send({ t: "askHint" }); await sleep(100);
+  check("the whistler sees who asked for a hint, once each", W.state.turn.hintAsks.length === 2);
+  check("a guesser sees that they asked", others[0].state.turn.iAsked === true && !others[0].state.turn.hintAsks);
+  W.send({ t: "hint" }); await sleep(80);
+  check("giving a hint clears the requests", W.state.turn.hintAsks.length === 0 && others[0].state.turn.iAsked === false);
+  W.send({ t: "askHint" }); await sleep(60);
+  check("the whistler cannot ask themselves", W.state.turn.hintAsks.length === 0);
+  var host = E;
+  var notHost = [F, H].filter(function (c) { return c !== host; })[0];
+  notHost.send({ t: "voteRound" }); await sleep(100);
+  check("others can vote for an extra round and the host sees the count", host.state.turn.roundVotes === 1 && notHost.state.turn.iVotedRound === true);
+  host.send({ t: "voteRound" }); await sleep(60);
+  check("the host does not vote, they decide", host.state.turn.roundVotes === 1);
+  host.send({ t: "addRound" }); await sleep(100);
+  check("adding a round clears the votes", host.state.rounds === 2 && !host.state.turn.roundVotes, host.state.rounds + " " + host.state.turn.roundVotes + " " + host.errors.join());
+
+  // admin bots play on their own
+  var Z = client(port); await Z.ready;
+  Z.send({ t: "createAdmin", password: "Bean" }); await sleep(150);
+  Z.send({ t: "adminAutoplay", on: true }); await sleep(100);
+  check("admin can switch the bots on", Z.state.admin.autoplay === true);
+  Z.send({ t: "setPacks", packs: ["bangers"] }); Z.send({ t: "setRounds", rounds: 1 }); Z.send({ t: "start" }); await sleep(200);
+  var moved = false, adminId = Z.state.me;
+  if (Z.state.turn.playerId === adminId) { Z.send({ t: "skip" }); await sleep(100); Z.send({ t: "next" }); await sleep(150); }
+  for (var k = 0; k < 40 && !moved; k++) { await sleep(250); moved = Z.state.turn && (Z.state.turn.stage !== "choose" || Z.state.turnNumber > 1); }
+  check("a bot whistler picks a song and starts on its own", moved, JSON.stringify(Z.state.turn && Z.state.turn.stage) + Z.errors.join());
+  Z.send({ t: "leave" }); await sleep(80);
+
   console.log(failed ? failed + " FAILED" : "ALL PASSED");
-  [A, B, C, D, L, X, Y].forEach(function (c) { c.ws.close(); });
+  [A, B, C, D, L, X, Y, E, F, G, H, Z].forEach(function (c) { c.ws.close(); });
   s.server.close(); setTimeout(function () { process.exit(failed ? 1 : 0); }, 100);
 })();

@@ -78,7 +78,7 @@ async function mainScenario() {
   console.log("\n--- Scenario 1: full game, three players ---");
   // Short timers so the test runs fast. In the real game the limit is 60s and
   // a shuffle costs 5s; the maths is the same.
-  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shuffleLockS: 0.5 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
 
@@ -136,14 +136,10 @@ async function mainScenario() {
 
   A.send({ t: "shuffle" });
   await A.waitFor(function (s) { return s.turn.shuffles === 1; }, "shuffle");
-  check("shuffle locks the screen and hides the song", !!A.state.turn.lockUntil && !A.state.turn.song);
-  await B.waitFor(function (s) { return !!s.turn.lockUntil; }, "lock seen by B");
-  B.send({ t: "guess", alts: [song], typed: true }); await sleep(100);
-  check("guesses are ignored during the shuffle lock", A.stage() === "whistling");
-  await A.waitFor(function (s) { return !!s.turn.song; }, "song returns after the lock");
+  check("shuffle does not lock the screen: a new song is there at once", !A.state.turn.lockUntil && !!A.state.turn.song);
   check("shuffle gives a different song", A.state.turn.song.title !== song);
   check("shuffle keeps the same difficulty", A.state.turn.difficulty === "easy");
-  check("the clock kept running through the lock", A.state.turn.runningSince !== null);
+  check("the clock keeps running through a shuffle", A.state.turn.runningSince !== null);
   song = A.state.turn.song.title;
 
   B.send({ t: "guess", alts: ["definitely not the song"], typed: true });
@@ -181,8 +177,8 @@ async function mainScenario() {
   var res = B.state.turn.result;
   check("result is a correct guess", res.outcome === "correct");
   check("everyone sees the song at the reveal", res.song.title === song && C.state.turn.result.song.title === song);
-  var expected = Math.max(0, Math.round(1000 * (1 - (res.timeMs / 1000 - 0.5) / 3)) - 100);
-  check("score is 1000 x (1 - time / limit), minus 100 for the shuffle; lock time is free", res.score === expected && res.score > 0 && res.score <= 1000, res.score + " vs " + expected);
+  var expected = Math.max(0, Math.round(1000 * (1 - res.timeMs / 1000 / 3)) - 100);
+  check("score is 1000 x (1 - time / limit), minus 100 for the shuffle", res.score === expected && res.score > 0 && res.score <= 1000, res.score + " vs " + expected);
   check("a shuffle costs 100 points off the multiplied score", res.shuffles === 1 && res.shufflePts === 100 && res.score === res.afterMult - 100, res.afterMult + " / " + res.score);
   var tot = function (c) { return A.state.players.filter(function (p) { return p.id === c.playerId; })[0].total; };
   check("the whistler's points are added to their total", tot(A) === res.score);
