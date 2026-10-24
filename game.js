@@ -923,12 +923,14 @@ RoomManager.prototype.autoTick = function (room) {
   var w = findPlayer(room, t.playerId), now = this.now();
   if (!w) { return; }
   var dummy = { send: function () {} };
+  // If the admin is viewing as the whistler, they are playing that turn themselves.
+  var adminDrives = room.admin.as === w.id;
   if (t.stage === "choose") {
-    if (!w.bot) { return; }
+    if (!w.bot || adminDrives) { return; }
     if (!t.difficulty) { return this.pickDifficulty(room, w, { i: Math.floor(this.random() * (t.options || []).length) }); }
     return this.ready(room, w);
   }
-  if (t.stage === "confirming" && w.bot) {
+  if (t.stage === "confirming" && w.bot && !adminDrives) {
     var others = room.players.filter(function (p) { return !p.sitOut && p.id !== w.id; });
     var who = [pick(others)];
     if (others.length > 2 && this.random() < 0.4) { var second = pick(others); if (second !== who[0]) { who.push(second); } }
@@ -937,7 +939,7 @@ RoomManager.prototype.autoTick = function (room) {
   if (t.stage === "whistling") {
     if (!t.botAt) { t.botAt = now + 6000 + Math.floor(this.random() * 22000); return; }
     if (now < t.botAt) { return; }
-    if (w.bot) { return this.gotIt(room, w); }
+    if (w.bot) { return adminDrives ? undefined : this.gotIt(room, w); }
     var guessers = bots.filter(function (b) { return b.id !== w.id; });
     if (guessers.length) { t.botAt = now + 8000 + Math.floor(this.random() * 15000); return this.guess(room, pick(guessers), dummy, { alts: [t.song.title], typed: true }); }
   }
