@@ -51,9 +51,9 @@ function phone(port, name) {
   check("host has start button", !!A.q("#startBtn") && !A.q("#startBtn").disabled);
   check("guest has no start button", !B.q("#startBtn"));
   A.click("#minus"); A.click("#minus"); A.click("#minus"); A.click("#minus");
-  await until(function () { return A.q("#roundsVal").textContent === "1" && B.q("#roundsVal").textContent === "1"; }, 2000, "rounds stepper synced");
+  await until(function () { return A.q("#roundsVal").textContent === "1" && /^1 round,/.test(B.q("#guestSettings").textContent); }, 2000, "rounds stepper synced");
   check("host sees round length choices", A.w.document.querySelectorAll(".segb").length === 4);
-  check("guest sees round length as text", !!B.q("#limitVal"));
+  check("guest has no round controls", !B.q("#plus") && !B.q("#startBtn") && !B.q(".segb") && !!B.q("#guestSettings"));
   var A_ = A.w.document, ticked = function (d) { return d.querySelectorAll(".pack.on").length; };
   check("lobby summary shows the chosen pack", /All Time Bangers/.test(A.q(".packline").textContent) && !A_.querySelector(".pack"));
   A.click("#openPacks"); B.click("#openPacks");
@@ -72,7 +72,7 @@ function phone(port, name) {
   A.click("#pkDone"); B.click("#pkDone");
   check("picker closes", !A_.querySelector("#picker"));
   A.w.document.querySelector('.segb[data-ms="30000"]').click();
-  await until(function () { return /30 s/.test(B.q("#limitVal").textContent); }, 2000, "length synced to guest");
+  await until(function () { return /30 s/.test(B.q("#guestSettings").textContent); }, 2000, "length synced to guest");
   A.click("#startBtn");
 
   var all = [A, B, C];

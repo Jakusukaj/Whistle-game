@@ -447,6 +447,16 @@
       '<button class="btn btn--outline" id="openPacks">' + btn + "</button></div>";
   }
 
+  // Guests see one quiet line about the songs and, in room mode, a way to vote.
+  function guestSongsHtml(s) {
+    var room = s.packMode === "room";
+    var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
+    var line = room ? (rankingList(s).length ? "Leading: " + rankingList(s).slice(0, 3).map(function (x) { return x.p.name; }).join(", ") : "No votes yet") : packSummaryLine(on);
+    return '<div class="stack"><div class="label">Songs</div><p class="title">' + esc(line) + "</p>" +
+      (room ? '<button class="btn btn--outline" id="openPacks">' + (s.myPackVotes.length ? "Change votes" : "Vote for song packs") + "</button>"
+            : '<div><button class="txt" id="openPacks">See packs</button></div>') + "</div>";
+  }
+
   function pickerHtml(s, isHost) {
     var room = s.packMode === "room", votes = s.packVotes || {};
     var all = s.packs.length === s.selectedPacks.length;
@@ -507,13 +517,14 @@
           '<div class="head"><h1 class="headline">' + esc(pname(s, s.hostId)) + "'s game</h1>" +
             '<p class="small">' + s.players.length + " of " + s.maxPlayers + " players are in</p></div>" +
           '<div class="pgrid">' + cells + "</div>" +
-          packsSummaryHtml(s, isHost) +
-          '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all, one whistle each per round</p></div>" +
+          (isHost ? packsSummaryHtml(s, isHost) : guestSongsHtml(s)) +
+          (!isHost ? '<p class="small" id="guestSettings">' + s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each. The host sets these.</p>" : "") +
+          (!isHost ? "" : '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all, one whistle each per round</p></div>" +
             (isHost
               ? '<div class="stepper"><button id="minus" class="txt" aria-label="Fewer rounds">Less</button><span class="title val" id="roundsVal">' + s.rounds + '</span><button id="plus" class="txt" aria-label="More rounds">More</button></div>'
               : '<span class="title" id="roundsVal">' + s.rounds + "</span>") +
-          "</div>" +
-          lengthHtml(s, isHost) +
+          "</div>") +
+          (isHost ? lengthHtml(s, isHost) : "") +
           '<div class="micline" data-mic></div>' +
           '<div class="spacer"></div>' +
           (isHost
