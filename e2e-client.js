@@ -96,7 +96,7 @@ function phone(port, name) {
     await until(function () { return W.q("#bigtime") && others.every(function (p) { return p.q("#toType") || p.q("#ginput"); }); }, 3000, "whistling started");
     if (turn === 1) {
       check("guesser sees orb and shout copy", !!others[0].q("#orb") && /Shout your guesses/.test(others[0].text()));
-      check("mic off until switched on", /Mic is off/.test(others[0].text()));
+      check("mic off until switched on", /turn on your mic/.test(others[0].text()));
       others[0].click("#micBtn");
       await until(function () { return /Listening/.test(others[0].text()); }, 2000, "listening headline after mic on");
       check("mic orb no longer greyed", !others[0].q("#orb").classList.contains("off"));
@@ -128,7 +128,7 @@ function phone(port, name) {
     }
     if (turn === 3) {
       // let the host skip
-      A.q("#skipBtn") ? A.click("#skipBtn") : null;
+      A.click("#hostMenuBtn"); A.click("#skipBtn"); A.click("#cdOk");
     } else {
       var g = others[0];
       g.type("#ginput", turn === 1 ? title.toLowerCase() : title);

@@ -30,6 +30,7 @@ var DEFAULTS = {
   confirmMs: 10000,      // whistler has this long to confirm a detected guess
   cooldownMs: 4000,      // ignore guesses this long after the whistler says "no"
   shufflePenaltyS: 5,
+  hintPenaltyS: 10,      // a hint counts as this many extra seconds
   multipliers: { easy: 1, medium: 1.1, hard: 1.2 },
   maxPoints: 1000,       // a guess at 0s is worth this before the multiplier
   guesserShare: 0.5,     // each named guesser earns this share of the whistler's points
@@ -45,6 +46,19 @@ var DEFAULTS = {
   roomIdleMs: 15 * 60 * 1000,
   roomMaxAgeMs: 12 * 60 * 60 * 1000
 };
+
+// Clues for the hint lifeline. Built from what we know about the song, never from its lyrics.
+var HINT_ERAS = { sixties: "the 1960s", seventies: "the 1970s", eighties: "the 1980s", nineties: "the 1990s", noughties: "the 2000s", tens: "the 2010s" };
+var HINT_KINDS = { disney: "A Disney song", film: "A song from a film", tv: "A TV theme tune", xmas: "A Christmas song", halloween: "A spooky season song" };
+function hintFor(song) {
+  var lines = [], packs = song.packs || [], i;
+  for (i = 0; i < packs.length; i++) { if (HINT_KINDS[packs[i]]) { lines.push(HINT_KINDS[packs[i]]); break; } }
+  for (i = 0; i < packs.length; i++) { if (HINT_ERAS[packs[i]]) { lines.push("From " + HINT_ERAS[packs[i]]); break; } }
+  if (song.clue) { lines.unshift(song.clue); }
+  var words = String(song.title).replace(/\(.*?\)/g, "").split(/\s+/).filter(Boolean);
+  lines.push("The title has " + words.length + (words.length === 1 ? " word" : " words") + " and starts with " + String(song.title).charAt(0).toUpperCase());
+  return lines;
+}
 
 function round1(x) { return Math.round(x * 10) / 10; }
 function newId() { return crypto.randomBytes(8).toString("hex"); }
@@ -95,7 +109,8 @@ RoomManager.prototype.viewFor = function (room, pid) {
       multiplier: t.multiplier, shuffles: t.shuffles, sd: t.sd, round: t.round,
       countdownEndsAt: t.countdownEndsAt, accumulatedMs: t.accumulatedMs,
       runningSince: t.runningSince, limitMs: room.limitMs,
-      penalty: this.opts.shufflePenaltyS, nextAt: t.nextAt || null
+      penalty: this.opts.shufflePenaltyS, nextAt: t.nextAt || null,
+      hints: t.hints || 0, hintPenalty: this.opts.hintPenaltyS
     };
     var locked = t.lockUntil && t.lockUntil > this.now();
     if (locked) { tv.lockUntil = t.lockUntil; }
@@ -106,6 +121,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
       });
     }
     if (isW && t.song && t.stage !== "reveal" && !locked) { tv.song = { title: t.song.title, artist: t.song.artist }; }
+    if (isW && t.song && t.hintOn && t.stage !== "reveal" && !locked) { tv.hint = hintFor(t.song); }
     if (isW && t.stage === "confirming" && t.pending) { tv.pending = { heard: t.pending.heard, from: t.pending.from || null, manual: !!t.pending.manual }; }
     if (t.stage === "reveal") { tv.result = t.result; }
   }
@@ -116,7 +132,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
     players: room.players.filter(function (p) { return !p.sitOut; }).map(function (p) {
-      return { id: p.id, name: p.name, connected: p.connected, total: p.total, last: p.last, turns: p.turns };
+      return { id: p.id, name: p.name, connected: p.connected, total: p.total, last: p.last, turns: p.turns, mic: p.mic || null };
     }),
     packs: PACKS.map(function (p) {
       return { id: p.id, group: p.group, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
@@ -232,6 +248,8 @@ RoomManager.prototype.handle = function (conn, msg) {
     case "refreshOptions": return this.refreshOptions(room, me);
     case "pickDifficulty": return this.pickDifficulty(room, me, msg);
     case "shuffle":    return this.shuffle(room, me);
+    case "hint":       return this.hint(room, me);
+    case "mic":        me.mic = ["on", "off", "typing"].indexOf(msg.state) !== -1 ? msg.state : null; return this.broadcast(room);
     case "ready":      return this.ready(room, me);
     case "gotIt":      return this.gotIt(room, me);
     case "confirm":    return this.confirmGuess(room, me, !!msg.ok, false, msg.who);
@@ -449,7 +467,7 @@ RoomManager.prototype.beginTurn = function (room, t) {
   var turn = {
     id: room.turnCounter, playerId: t.playerId, round: t.round, sd: !!t.sd,
     stage: "choose", difficulty: null, multiplier: null, song: null, shuffles: 0,
-    accumulatedMs: 0, runningSince: null, countdownEndsAt: null, pending: null,
+    accumulatedMs: 0, runningSince: null, countdownEndsAt: null, pending: null, hints: 0, hintOn: false,
     cooldownUntil: 0, lockUntil: 0, options: null, result: null, timers: {}
   };
   room.turn = turn;
@@ -552,11 +570,21 @@ RoomManager.prototype.shuffle = function (room, me) {
   var self = this, id = t.id, ms = this.opts.shufflePenaltyS * 1000;
   if (!this.drawSong(room, t)) { return; } // no unplayed songs left: nothing to shuffle to
   t.shuffles++;
+  t.hintOn = false;
   t.lockUntil = this.now() + ms;
   if (t.timers.lock) { clearTimeout(t.timers.lock); }
   t.timers.lock = setTimeout(function () {
     if (room.turn && room.turn.id === id) { self.broadcast(room); }
   }, ms + 20);
+  this.broadcast(room);
+};
+
+// The lifeline: a clue about the song, at the cost of extra seconds. One per song.
+RoomManager.prototype.hint = function (room, me) {
+  var t = this.currentTurnFor(room, me, ["whistling"]);
+  if (!t || !t.song || t.hintOn || (t.lockUntil && t.lockUntil > this.now())) { return; }
+  t.hintOn = true;
+  t.hints++;
   this.broadcast(room);
 };
 
@@ -664,13 +692,15 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
   var timeMs = outcome === "correct" ? Math.min(t.accumulatedMs, room.limitMs) : room.limitMs;
   var mult = t.multiplier || 1;
   var lockedS = this.opts.shufflePenaltyS * t.shuffles;
-  var base = 0, afterShuffle = 0, score = 0;
+  var hintS = this.opts.hintPenaltyS * (t.hints || 0);
+  var base = 0, afterShuffle = 0, afterHint = 0, score = 0;
   if (outcome === "correct") {
     // Shuffle lock time is part of the clock, so it already counts against the guess time.
     var rawS = Math.max(0, timeMs / 1000 - lockedS);
     base = Math.max(0, Math.round(this.opts.maxPoints * (1 - rawS / limitS)));
     afterShuffle = Math.max(0, Math.round(this.opts.maxPoints * (1 - timeMs / 1000 / limitS)));
-    score = Math.round(afterShuffle * mult);
+    afterHint = Math.max(0, Math.round(this.opts.maxPoints * (1 - (timeMs / 1000 + hintS) / limitS)));
+    score = Math.round(afterHint * mult);
   }
   // Who gets points: the whistler, plus each person they named (never themselves).
   var awards = [{ id: t.playerId, points: score, role: "whistler" }];
@@ -687,7 +717,7 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
   t.pending = null;
   t.result = {
     outcome: outcome, timeMs: timeMs, limitMs: room.limitMs, multiplier: t.multiplier, difficulty: t.difficulty,
-    shuffles: t.shuffles, penaltyS: lockedS, base: base, afterShuffle: afterShuffle, score: score, awards: awards,
+    shuffles: t.shuffles, penaltyS: lockedS, hints: t.hints || 0, hintS: hintS, base: base, afterShuffle: afterShuffle, afterHint: afterHint, score: score, awards: awards,
     revealAt: this.now(),
     song: t.song ? { title: t.song.title, artist: t.song.artist } : null
   };

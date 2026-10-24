@@ -6,6 +6,7 @@
 
   var ws = null, connected = false, session = null, rejoining = false, pendingName = "";
   var gameList = [], adminLogin = false, pickerOpen = false, pickerTab = "All", keepPickerScroll = true;
+  var lastMicSent = "";
   var st = null, offset = 0, lastKey = null, wakeLock = null, prevStage = null, prevTurnId = null;
 
   try { session = JSON.parse(localStorage.getItem("whistle.session") || "null"); } catch (e) { session = null; }
@@ -47,7 +48,7 @@
     var proto = location.protocol === "https:" ? "wss" : "ws";
     ws = new WebSocket(proto + "://" + location.host + "/ws");
     ws.onopen = function () {
-      connected = true; setBanner("");
+      connected = true; setBanner(""); lastMicSent = "";
       send({ t: "listRooms" });
       if (session) {
         rejoining = true;
@@ -79,7 +80,7 @@
       if (!st && !adminLogin && lastKey === "home") { var v = viewHome(); if (v.update) { v.update(); } }
     } else if (m.t === "joined") {
       session = { code: m.code, playerId: m.playerId, name: pendingName || (session && session.name) || "" };
-      saveSession(); rejoining = false; keepAwake(); adminLogin = false;
+      saveSession(); rejoining = false; keepAwake(); adminLogin = false; lastMicSent = "";
     } else if (m.t === "error") {
       if (rejoining && (m.code === "room_not_found" || m.code === "game_started")) {
         session = null; saveSession(); st = null; rejoining = false; lastKey = null;
@@ -197,8 +198,11 @@
       var b = $("#micBtn", boxes[i]);
       if (b) { b.onclick = micStart; }
     }
+    var ms = mic.typeMode || mic.state === "unsupported" ? "typing" : (mic.state === "on" ? "on" : "off");
+    if (st && !st.admin && ms !== lastMicSent) { lastMicSent = ms; send({ t: "mic", state: ms }); }
     var orb = $("#orb");
     if (orb) {
+      orb.onclick = function () { if (SR && mic.state !== "on" && mic.state !== "starting") { micStart(); } };
       var off = mic.state !== "on";
       orb.classList.toggle("off", off);
       orb.classList.toggle("wh-orb--off", off);
@@ -206,7 +210,7 @@
       orb.innerHTML = '<span class="wh-orb__core">' + ico(off ? "mic-off" : "mic") + "</span>";
     }
     var hd = $("#listenHead");
-    if (hd) { hd.textContent = mic.state === "on" ? "Listening" : mic.state === "blocked" ? "Mic blocked" : "Mic is off"; }
+    if (hd) { hd.textContent = mic.state === "on" ? "Listening" : mic.state === "blocked" ? "Mic blocked" : mic.state === "starting" ? "Starting mic..." : "Tap the circle to turn on your mic"; }
   }
 
   // ----------------------------------------------------------------- views
@@ -282,10 +286,11 @@
           blob("width:170px;height:170px;right:-70px;top:-60px;background:var(--tomato)") +
           blob("width:130px;height:130px;left:-60px;bottom:70px;background:var(--cobalt)") +
           '<div class="brand"><h1 class="wh-title">Whistle</h1>' +
-          '<p class="wh-sub">Keep a straight face. Keep whistling.</p></div>' +
+          '<p class="wh-sub">Keep a straight face. Keep whistling.</p>' +
+          '<p class="wh-sub intro">One person whistles a song and everyone else guesses it. The quicker the guess, the more points.</p></div>' +
           '<div class="wh-card wh-stack">' +
             '<div class="wh-fieldgroup"><label class="wh-label" for="name">Your name</label>' +
-            '<input id="name" class="wh-input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Name" value="' + esc(name) + '"></div>' +
+            '<input id="name" class="wh-input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Name" value="' + esc(name) + '"><p class="wh-help">Up to 14 characters</p></div>' +
             '<button id="hostBtn" class="wh-btn wh-btn--block">Host a game</button>' +
           "</div>" +
           '<h2 class="wh-over">Join a game</h2><div class="wh-stack" id="games">' + gamesHtml() + "</div>" +
@@ -405,13 +410,23 @@
     "</div></div>";
   }
 
+  function startNote(s, turns) {
+    if (s.players.length < s.minPlayers) { return "Waiting for at least " + s.minPlayers + " players"; }
+    if (!s.selectedPacks.length) { return "Pick at least one song pack to start"; }
+    if (s.songsInPlay < turns + 5) { return "Not enough songs for this many turns. Pick more packs or lower the rounds."; }
+    var off = s.players.filter(function (p) { return p.mic === "off"; }).map(function (p) { return p.name; });
+    if (off.length) { return off.join(" and ").replace(/^(.*), /, "$1, ") + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses."; }
+    return "";
+  }
+
   function viewLobby(s) {
     var isHost = s.hostId === s.me;
     var turns = s.rounds * s.players.length;
     var list = s.players.map(function (p) {
       return '<div class="wh-prow pl">' + avatarHtml(s, p) + '<span class="wh-prow__name nm">' + esc(p.name) +
         (p.id === s.hostId ? '<span class="wh-tag wh-tag--host">Host</span>' : "") +
-        (p.id === s.me ? '<span class="wh-tag wh-tag--you">You</span>' : "") + "</span>" +
+        (p.id === s.me ? '<span class="wh-tag wh-tag--you">You</span>' : "") +
+        (p.mic === "off" ? '<span class="wh-tag micoff">' + ico("mic-off") + "Mic off</span>" : "") + "</span>" +
         '<span class="wh-prow__meta"><i class="pdot' + (p.connected ? " on" : "") + '"></i>' + (p.connected ? "Online" : "Away") + "</span></div>";
     }).join("");
     return {
@@ -436,7 +451,7 @@
           '<div class="spacer"></div>' +
           (isHost
             ? '<button id="startBtn" class="wh-btn wh-btn--block"' + (s.players.length < s.minPlayers || !s.selectedPacks.length || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
-              (s.players.length < s.minPlayers ? '<p class="wh-note center">Waiting for at least ' + s.minPlayers + " players</p>" : "")
+              (startNote(s, turns) ? '<p class="wh-note center startnote">' + esc(startNote(s, turns)) + "</p>" : "")
             : '<p class="wh-sub center">Waiting for ' + esc(pname(s, s.hostId)) + " to start...</p>") +
           '<div class="wh-row rowc"><button id="helpBtn" class="wh-btn wh-btn--ghost">How to play</button>' +
           '<button id="leaveBtn" class="wh-btn wh-btn--ghost">Leave game</button></div>' +
@@ -508,16 +523,43 @@
 
   function skipHtml(s) {
     if (s.hostId !== s.me) { return ""; }
-    return '<div class="wh-row rowc">' +
-      (s.turn.stage !== "reveal" ? '<button id="skipBtn" class="wh-btn wh-btn--ghost wh-btn--sm">' + ico("skip", "wh-i--sm") + "Skip this turn</button>" : "") +
-      '<button id="endBtn" class="wh-btn wh-btn--ghost wh-btn--sm">End game</button></div>';
+    return '<div class="wh-row rowc"><button id="hostMenuBtn" class="wh-btn wh-btn--ghost wh-btn--sm">' + ico("settings", "wh-i--sm") + "Host controls</button></div>";
+  }
+
+  function confirmDialog(title, text, okLabel, danger, fn) {
+    var o = document.createElement("div");
+    o.className = "overlay modal";
+    o.innerHTML = '<div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">' + esc(title) + '</h2><p class="wh-sub">' + esc(text) + '</p>' +
+      '<div class="wh-modal__actions"><button class="wh-btn wh-btn--block' + (danger ? " wh-btn--danger" : "") + '" id="cdOk">' + esc(okLabel) + '</button>' +
+      '<button class="wh-btn wh-btn--secondary wh-btn--block" id="cdNo">Cancel</button></div></div>';
+    document.body.appendChild(o);
+    var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
+    $("#cdNo", o).onclick = close;
+    $("#cdOk", o).onclick = function () { close(); fn(); };
+  }
+
+  function openHostMenu() {
+    var o = document.createElement("div");
+    o.className = "ovl sheetwrap";
+    var canSkip = st && st.turn && st.turn.stage !== "reveal";
+    o.innerHTML = '<div class="wh-scrim" id="hmScrim"></div><div class="wh-sheet"><div class="wh-sheet__grab"></div>' +
+      '<div class="wh-sheet__head"><h2 class="wh-title">Host controls</h2><button class="wh-iconbtn" id="hmClose" aria-label="Close">' + ico("close") + "</button></div>" +
+      (canSkip ? '<button id="skipBtn" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("skip", "wh-i--sm") + "Skip this turn</button>" : "") +
+      '<button id="endBtn" class="wh-btn wh-btn--danger wh-btn--block">End game</button></div>';
+    document.body.appendChild(o);
+    var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
+    $("#hmClose", o).onclick = close; $("#hmScrim", o).onclick = close;
+    var sk = $("#skipBtn", o);
+    if (sk) { sk.onclick = function () { close(); confirmDialog("Skip this turn?", "Nobody scores for it.", "Skip turn", false, function () { send({ t: "skip" }); }); }; }
+    $("#endBtn", o).onclick = function () {
+      close();
+      confirmDialog("End this game?", "Everyone goes back to the lobby and scores are cleared.", "End game", true, function () { send({ t: "cancelGame" }); });
+    };
   }
 
   function bindSkip() {
-    var b = $("#skipBtn");
-    if (b) { b.onclick = function () { if (window.confirm("Skip this turn? It scores the full 60 seconds.")) { send({ t: "skip" }); } }; }
-    var e = $("#endBtn");
-    if (e) { e.onclick = function () { if (window.confirm("End this game? Everyone goes back to the lobby and scores are cleared.")) { send({ t: "cancelGame" }); } }; }
+    var b = $("#hostMenuBtn");
+    if (b) { b.onclick = openHostMenu; }
   }
 
   function lockHtml(note) {
@@ -639,16 +681,18 @@
         key: "w-" + T.id, field: dfield,
         html: '<div class="screen">' + topBar(s) +
           '<div class="timerbox"><div class="wh-over" id="tlabel">Time</div><div class="wh-timer" id="bigtime">0.0</div>' +
-          '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' + songCardHtml(T) +
+          '<div class="wh-progress"><i id="bar"></i></div><div class="wh-sub worth" id="worth"></div></div>' + songCardHtml(T) + '<div class="wh-card hintcard" id="hintBox" hidden></div>' +
           '<div class="spacer"></div>' +
           '<button id="gotBtn" class="wh-btn wh-btn--block gotbtn">Someone got it</button>' +
-          '<button id="shuffleBtn" class="wh-btn wh-btn--secondary wh-btn--block">' + ico("shuffle") + "Shuffle, " + T.penalty + "s penalty</button>" + skipHtml(s) +
+          '<div class="lifelines"><button id="shuffleBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("shuffle") + "<span>Shuffle<small>" + T.penalty + "s penalty</small></span></button>" +
+          '<button id="hintBtn" class="wh-btn wh-btn--secondary lifeline">' + ico("info") + "<span>Hint<small>" + T.hintPenalty + "s penalty</small></span></button></div>" + skipHtml(s) +
           lockHtml("New song coming up.") +
           '<div class="ovl" id="confirm" hidden><div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">Who got it?</h2>' +
           '<p class="wh-sub" id="confSub"></p><div class="whogrid" id="whoGrid"></div><div class="wh-modal__actions">' +
           '<button id="yesBtn" class="wh-btn wh-btn--block" disabled>Confirm</button><button id="noBtn" class="wh-btn wh-btn--secondary wh-btn--block">Not yet, keep going</button></div></div></div></div>',
         bind: function () {
           $("#shuffleBtn").onclick = function () { send({ t: "shuffle" }); };
+          $("#hintBtn").onclick = function () { send({ t: "hint" }); };
           $("#gotBtn").onclick = function () { send({ t: "gotIt" }); };
           $("#yesBtn").onclick = function () { if (whoState.picks.length) { send({ t: "confirm", ok: true, who: whoState.picks.slice() }); } };
           $("#noBtn").onclick = function () { send({ t: "confirm", ok: false }); };
@@ -660,6 +704,10 @@
           $("#songArtist").textContent = t.song ? t.song.artist : "";
           $("#confirm").hidden = !conf;
           if (conf) { buildWho(t); } else { whoState.built = null; }
+          var hbx = $("#hintBox");
+          if (t.hint) { hbx.hidden = false; hbx.innerHTML = '<div class="wh-over">Hint</div>' + t.hint.map(function (l) { return '<div class="wh-sub">' + esc(l) + "</div>"; }).join(""); }
+          else { hbx.hidden = true; }
+          $("#hintBtn").disabled = t.stage === "confirming" || !!t.hint;
           $("#shuffleBtn").disabled = t.stage === "confirming";
           $("#gotBtn").disabled = t.stage === "confirming";
         }
@@ -751,7 +799,7 @@
   function revealFrame(R, el) {
     if (R.outcome !== "correct") {
       var fin0 = 1200;
-      return { num: 0, cap: el >= fin0 ? (R.outcome === "timeout" ? "Time's up" : "Skipped") : "Counting up", final: el >= fin0, finalAt: fin0 };
+      return { num: 0, cap: el >= fin0 ? "No points" : "Counting up", final: el >= fin0, finalAt: fin0 };
     }
     var rawS = Math.max(0, R.timeMs / 1000 - R.penaltyS), cur = 2200;
     var segs = [{ from: 0, to: R.base, at: 0, len: 1600, cap: "Guessed in " + rawS.toFixed(1) + "s" }];
@@ -759,8 +807,14 @@
       segs.push({ from: R.base, to: R.afterShuffle, at: cur, len: 1000, cap: R.shuffles === 1 ? "Shuffle penalty, " + R.penaltyS + "s" : R.shuffles + " shuffles, " + R.penaltyS + "s penalty" });
       cur += 1600;
     }
+    var preMult = R.afterShuffle;
+    if (R.hints) {
+      var ah = R.afterHint === undefined ? R.afterShuffle : R.afterHint;
+      segs.push({ from: R.afterShuffle, to: ah, at: cur, len: 1000, cap: (R.hints === 1 ? "Hint penalty, " : R.hints + " hints, ") + R.hintS + "s" + (R.hints === 1 ? "" : " penalty") });
+      cur += 1600; preMult = ah;
+    }
     if (R.multiplier && R.multiplier !== 1) {
-      segs.push({ from: R.afterShuffle, to: R.score, at: cur, len: 1400, cap: cap(R.difficulty || "") + " song, x" + R.multiplier });
+      segs.push({ from: preMult, to: R.score, at: cur, len: 1400, cap: cap(R.difficulty || "") + " song, x" + R.multiplier });
       cur += 2000;
     }
     var finalAt = Math.max(cur + 1200, 4500);
@@ -802,16 +856,16 @@
     var o = document.createElement("div");
     o.className = "overlay modal";
     var steps = [
-      "On your turn, pick one of three songs: easy, medium or hard. Harder songs earn bonus points.",
-      "Whistle the song on your phone. Only you can see it, so keep your screen to yourself.",
-      "Everyone else shouts or types guesses. The quicker they get it, the more points it is worth.",
-      "When someone gets it, say who. You and everyone you name earn points.",
-      "Stuck? Shuffle for a new song, but your screen locks for 5 seconds and it costs you points. Nobody guesses in time, no points.",
-      "After the last round, the highest total wins."
+      "Pick a song: easy, medium or hard. Harder songs earn bonus points, so scores can go above 1000.",
+      "Whistle it. Only you can see the song.",
+      "Everyone else shouts or types guesses. The quicker they get it, the more it is worth.",
+      "Say who got it. You and everyone you name earn points.",
+      "Stuck? Shuffle for a new song or ask for a hint. Both cost time. The highest total wins."
     ];
 
+
     o.innerHTML = '<div class="wh-scrim"></div><div class="wh-modal"><h2 class="wh-title">How to play</h2>' +
-      '<p class="wh-sub">Get everyone to guess your song as quickly as you can. A guess at the start is worth 1000 points and the value falls as the clock runs, so the highest total wins.</p>' +
+      '<p class="wh-sub">Whistle a song and get the room to guess it. A guess at the start is worth 1000 points, and the value falls as the clock runs.</p>' +
       '<ol class="wh-steps">' + steps.map(function (t, i) { return "<li><b>" + (i + 1) + "</b><span>" + t + "</span></li>"; }).join("") + "</ol>" +
       '<div class="wh-modal__actions"><button class="wh-btn wh-btn--block" id="helpClose">Got it</button></div></div>';
     document.body.appendChild(o);
@@ -881,7 +935,8 @@
         if (ln && ln.textContent !== String(n)) { ln.textContent = n; }
         var lp = lk.querySelector(".lk2"); if (lp) { lp.textContent = T.penalty + "s penalty"; }
       }
-      var sb = document.getElementById("shuffleBtn"), gb = document.getElementById("gotBtn");
+      var sb = document.getElementById("shuffleBtn"), gb = document.getElementById("gotBtn"), hbn = document.getElementById("hintBtn");
+      if (hbn) { hbn.disabled = on || T.stage === "confirming" || !!T.hint; }
       if (sb) { sb.disabled = on || T.stage === "confirming"; }
       if (gb) { gb.disabled = on || T.stage === "confirming"; }
     }
@@ -925,7 +980,7 @@
       if (bar) { bar.style.width = Math.min(100, (el / T.limitMs) * 100) + "%"; }
       var wv = $("#worth");
       if (wv) {
-        var worth = Math.round(1000 * (1 - el / T.limitMs) * (T.multiplier || 1)), wt = "Worth " + pts(worth) + " points";
+        var worth = Math.max(0, Math.round(1000 * (1 - (el / 1000 + (T.hints || 0) * (T.hintPenalty || 0)) / (T.limitMs / 1000)) * (T.multiplier || 1))), wt = "Worth " + pts(worth) + " points";
         if (wv.textContent !== wt) { wv.textContent = wt; }
       }
       if (danger && T.stage === "whistling") {

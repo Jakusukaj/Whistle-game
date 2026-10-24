@@ -397,3 +397,22 @@ body.danger #app .wh-progress>i{background:var(--ink)}
 #awards,#board{transition:opacity .4s ease-out,transform .4s ease-out}
 .worth{margin-top:2px;color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){.scoreNum.drum,.scoreNum.slam{animation:none}#awards,#board{transition:none}}
+
+/* no widows: balance short headings, tidy the last line of paragraphs */
+h1,h2,h3,.wh-title,.wh-topbar__title,.wh-empty h3,.lk1{text-wrap:balance}
+p,.wh-sub,.wh-note,.wh-help,.wh-pack__desc,.wh-setting__sub,.packnote,.packline,.wh-game__s,.wh-banner__text{text-wrap:pretty}
+.wh-note.center,.wh-sub.center,.midc p{text-wrap:balance}
+
+/* lifelines, hints, host menu */
+.lifelines{display:flex;gap:var(--space-3)}
+.lifeline{flex:1;min-height:60px;padding:0 12px;gap:10px;text-align:left}
+.lifeline span{display:flex;flex-direction:column;align-items:flex-start}
+.lifeline small{font:500 11px/14px var(--font-sans);opacity:.85}
+.hintcard{gap:6px}
+.hintcard .wh-sub{color:var(--on-surface)}
+.sheetwrap{align-items:flex-end;padding:0}
+.sheetwrap .wh-sheet{position:relative;width:100%;max-width:480px;margin:0 auto;padding-bottom:max(var(--space-6),env(safe-area-inset-bottom))}
+.micoff{background:var(--danger);color:var(--on-danger)}
+.startnote{margin-top:-4px}
+#orb{cursor:pointer}
+.intro{margin-top:var(--space-2)}

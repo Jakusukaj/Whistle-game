@@ -78,7 +78,7 @@ async function mainScenario() {
   console.log("\n--- Scenario 1: full game, three players ---");
   // Short timers so the test runs fast. In the real game the limit is 60s and
   // a shuffle costs 5s; the maths is the same.
-  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 3000, countdownMs: 100, confirmMs: 600, cooldownMs: 300, shufflePenaltyS: 0.5, hintPenaltyS: 0.5 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
 
@@ -204,6 +204,16 @@ async function mainScenario() {
   A.send({ t: "next" });
   await C.waitFor(turnId(C.playerId), "turn 3 is Cat's");
   await startTurnAs(cs, C, "medium");
+  B.send({ t: "hint" }); await sleep(80);
+  check("only the whistler can take a hint", !C.state.turn.hint && B.state.turn.hints === 0);
+  C.send({ t: "hint" });
+  await C.waitFor(function (st) { return !!st.turn.hint; }, "hint shown");
+  check("the hint has clues and never the answer", C.state.turn.hint.length >= 1 && C.state.turn.hint.join(" ").toLowerCase().indexOf(C.state.turn.song.title.toLowerCase()) === -1, C.state.turn.hint.join(" | "));
+  check("guessers cannot see the hint", !B.state.turn.hint && B.state.turn.hints === 1);
+  C.send({ t: "hint" }); await sleep(80);
+  check("only one hint per song", C.state.turn.hints === 1);
+  A.send({ t: "mic", state: "off" }); await sleep(80);
+  check("a phone can report its mic is off", C.state.players.filter(function (p) { return p.id === A.playerId; })[0].mic === "off");
   C.send({ t: "gotIt" });
   await C.waitFor(stageIs("confirming"), "gotIt asks who");
   check("Someone got it pauses the clock and asks who", C.state.turn.runningSince === null && C.state.turn.pending.manual === true);
@@ -214,7 +224,8 @@ async function mainScenario() {
   check("whistler names who got it", r3.outcome === "correct" && r3.multiplier === 1.1);
   check("each named guesser is awarded separately, never the whistler twice or a stranger", r3.awards.length === 3 && r3.awards.filter(function (a) { return a.role === "guesser"; }).length === 2, JSON.stringify(r3.awards));
   check("each guesser earns half the whistler's points", r3.awards.filter(function (a) { return a.role === "guesser"; }).every(function (a) { return a.points === Math.round(r3.score / 2); }));
-  check("medium is worth 10% more than the same speed on easy", r3.score === Math.round(r3.afterShuffle * 1.1));
+  check("medium is worth 10% more than the same speed on easy", r3.score === Math.round(r3.afterHint * 1.1));
+  check("a hint costs seconds, so it costs points", r3.hints === 1 && r3.hintS === 0.5 && r3.afterHint < r3.afterShuffle, r3.afterHint + " < " + r3.afterShuffle);
 
   A.send({ t: "next" });
   await A.waitFor(function (s) { return s.phase === "gameover"; }, "game over");
