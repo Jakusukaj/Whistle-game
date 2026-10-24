@@ -5,7 +5,7 @@
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   var ws = null, connected = false, session = null, rejoining = false, pendingName = "";
-  var gameList = [], adminLogin = false, pickerOpen = false, pickerTab = "All", keepPickerScroll = true;
+  var gameList = [], adminLogin = false, pickerOpen = false, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
   var lastMicSent = "";
   var st = null, offset = 0, lastKey = null, wakeLock = null, prevStage = null, prevTurnId = null;
 
@@ -489,6 +489,7 @@
       '<div class="phead"><div class="toprow"><span class="label">Song packs</span><button class="txt" id="pkDone">Done</button></div>' +
       '<h1 class="headline">' + (room ? "Vote for the packs you want" : isHost ? "Choose the packs to play" : "The packs in play") + "</h1>" +
       '<div class="stack" style="gap:2px"><p class="small">' + intro + '</p><p class="small">' + count + "</p></div>" +
+      (isHost ? '<div class="seg packmode"><button class="pmode" data-m="host" aria-pressed="' + !room + '">Host picks</button><button class="pmode" data-m="room" aria-pressed="' + room + '">Room picks</button></div>' : "") +
       (isHost && !room ? '<div><button class="txt" id="packAll" style="padding-left:0">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") + "</div>" +
       '<div class="pbody"><div>' + html + "</div></div>" +
     "</div></div>";
@@ -501,6 +502,35 @@
     var off = s.players.filter(function (p) { return p.mic === "off"; }).map(function (p) { return p.name; });
     if (off.length) { return off.join(" and ").replace(/^(.*), /, "$1, ") + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses."; }
     return "";
+  }
+
+  function songsLine(s) {
+    var room = s.packMode === "room";
+    var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
+    if (room) { var r = rankingList(s); return r.length ? "Leading: " + r.slice(0, 3).map(function (x) { return x.p.name; }).join(", ") : "No votes yet"; }
+    return packSummaryLine(on);
+  }
+  function songsRowHtml(s, isHost) {
+    var room = s.packMode === "room";
+    var cue = room ? (s.myPackVotes.length ? "Change votes" : "Vote") : isHost ? "Choose" : "See";
+    return '<button class="lrow" id="openPacks"><span class="lrow__t"><span class="label">Songs' + (room ? ", room picks" : "") + '</span><span class="title">' + esc(songsLine(s)) + '</span></span><span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
+  }
+  function settingsText(s) {
+    return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
+  }
+  function settingsRowHtml(s, isHost) {
+    if (!isHost) { return '<div class="lrow lrow--static" id="guestSettings"><span class="lrow__t"><span class="label">Game</span><span class="title">' + settingsText(s) + "</span></span></div>"; }
+    return '<button class="lrow" id="openSettings"><span class="lrow__t"><span class="label">Game settings</span><span class="title" id="settingsLine">' + settingsText(s) + '</span></span><span class="lrow__c label">Change</span>' + ico("chevron", "chev") + "</button>";
+  }
+  function settingsSheetHtml(s, turns) {
+    var opts = s.limitOptions || [30000, 60000, 90000, 120000];
+    return '<div class="sheetwrap"><div class="scrim" id="setScrim"></div><div class="sheet"><span class="label">Game settings</span>' +
+      '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all</p></div>" +
+      '<div class="stepper"><button id="minus" class="txt" aria-label="Fewer rounds">Less</button><span class="title val" id="roundsVal">' + s.rounds + '</span><button id="plus" class="txt" aria-label="More rounds">More</button></div></div>' +
+      '<div class="stack"><div class="label">Round length</div><div class="seg">' + opts.map(function (ms) {
+        return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" aria-pressed="' + (ms === s.limitMs) + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
+      }).join("") + "</div></div>" +
+      '<button class="btn" id="setDone">Done</button></div></div>';
   }
 
   function viewLobby(s) {
@@ -517,14 +547,7 @@
           '<div class="head"><h1 class="headline">' + esc(pname(s, s.hostId)) + "'s game</h1>" +
             '<p class="small">' + s.players.length + " of " + s.maxPlayers + " players are in</p></div>" +
           '<div class="pgrid">' + cells + "</div>" +
-          (isHost ? packsSummaryHtml(s, isHost) : guestSongsHtml(s)) +
-          (!isHost ? '<p class="small" id="guestSettings">' + s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each. The host sets these.</p>" : "") +
-          (!isHost ? "" : '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all, one whistle each per round</p></div>" +
-            (isHost
-              ? '<div class="stepper"><button id="minus" class="txt" aria-label="Fewer rounds">Less</button><span class="title val" id="roundsVal">' + s.rounds + '</span><button id="plus" class="txt" aria-label="More rounds">More</button></div>'
-              : '<span class="title" id="roundsVal">' + s.rounds + "</span>") +
-          "</div>") +
-          (isHost ? lengthHtml(s, isHost) : "") +
+          '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + "</div>" +
           '<div class="micline" data-mic></div>' +
           '<div class="spacer"></div>' +
           (isHost
@@ -534,9 +557,16 @@
           '<div class="rowc"><button id="helpBtn" class="txt">How to play</button>' +
           '<button id="leaveBtn" class="txt">Leave game</button></div>' +
           (pickerOpen ? pickerHtml(s, isHost) : "") +
+          (settingsOpen && isHost ? settingsSheetHtml(s, turns) : "") +
         "</div>",
       bind: function () {
         $("#helpBtn").onclick = showHelp;
+        var sr = $("#openSettings");
+        if (sr) { sr.onclick = function () { settingsOpen = true; render(); }; }
+        if (settingsOpen && isHost) {
+          $("#setDone").onclick = function () { settingsOpen = false; render(); };
+          $("#setScrim").onclick = function () { settingsOpen = false; render(); };
+        }
         $("#openPacks").onclick = function () { pickerOpen = true; keepPickerScroll = false; render(); };
         if (pickerOpen) {
           $("#pkDone").onclick = function () { pickerOpen = false; render(); };
@@ -579,8 +609,10 @@
         for (var q = 0; q < pm.length; q++) { pm[q].onclick = function () { send({ t: "setPackMode", mode: this.getAttribute("data-m") }); }; }
         if (isHost) {
           var want = s.rounds;
-          $("#minus").onclick = function () { want = Math.max(1, want - 1); send({ t: "setRounds", rounds: want }); };
-          $("#plus").onclick = function () { want = Math.min(10, want + 1); send({ t: "setRounds", rounds: want }); };
+          if ($("#minus")) {
+            $("#minus").onclick = function () { want = Math.max(1, want - 1); send({ t: "setRounds", rounds: want }); };
+            $("#plus").onclick = function () { want = Math.min(10, want + 1); send({ t: "setRounds", rounds: want }); };
+          }
           $("#startBtn").onclick = function () { send({ t: "start" }); };
           var segs = document.querySelectorAll(".segb");
           for (var i = 0; i < segs.length; i++) {

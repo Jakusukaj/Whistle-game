@@ -50,12 +50,14 @@ function phone(port, name) {
   await until(function () { return /Cat/.test(A.text()) && /Bob/.test(A.text()); }, 3000, "host sees players");
   check("host has start button", !!A.q("#startBtn") && !A.q("#startBtn").disabled);
   check("guest has no start button", !B.q("#startBtn"));
+  A.click("#openSettings");
   A.click("#minus"); A.click("#minus"); A.click("#minus"); A.click("#minus");
-  await until(function () { return A.q("#roundsVal").textContent === "1" && /^1 round,/.test(B.q("#guestSettings").textContent); }, 2000, "rounds stepper synced");
+  await until(function () { return A.q("#roundsVal").textContent === "1" && /1 round,/.test(B.q("#guestSettings").textContent); }, 2000, "rounds stepper synced");
   check("host sees round length choices", A.w.document.querySelectorAll(".segb").length === 4);
+  A.click("#setDone");
   check("guest has no round controls", !B.q("#plus") && !B.q("#startBtn") && !B.q(".segb") && !!B.q("#guestSettings"));
   var A_ = A.w.document, ticked = function (d) { return d.querySelectorAll(".pack.on").length; };
-  check("lobby summary shows the chosen pack", /All Time Bangers/.test(A.q(".packline").textContent) && !A_.querySelector(".pack"));
+  check("lobby summary shows the chosen pack", /All Time Bangers/.test(A.q("#openPacks").textContent) && !A_.querySelector(".pack"));
   A.click("#openPacks"); B.click("#openPacks");
   check("picker shows 20 pack cards", A_.querySelectorAll(".pack").length === 20 && B.w.document.querySelectorAll(".pack").length === 20);
   check("pack cards are grouped under four collapsible rows", A_.querySelectorAll(".pgroup__row").length === 4);
@@ -71,8 +73,10 @@ function phone(port, name) {
   check("guests cannot tap packs", B.w.document.querySelectorAll(".pack.ro").length === 20);
   A.click("#pkDone"); B.click("#pkDone");
   check("picker closes", !A_.querySelector("#picker"));
+  A.click("#openSettings");
   A.w.document.querySelector('.segb[data-ms="30000"]').click();
   await until(function () { return /30 s/.test(B.q("#guestSettings").textContent); }, 2000, "length synced to guest");
+  A.click("#setDone");
   A.click("#startBtn");
 
   var all = [A, B, C];
@@ -145,8 +149,10 @@ function phone(port, name) {
   await until(function () { return B.q(".pgrid"); }, 3000, "back to lobby");
 
   // extra round banner
+  A.click("#openSettings");
   for (var q = 0; q < 4; q++) { A.click("#minus"); }
   await until(function () { return A.q("#roundsVal").textContent === "1"; }, 2000, "rounds back to 1");
+  A.click("#setDone");
   A.click("#startBtn");
   await until(function () { return A.q("#addRound"); }, 3000, "host sees last-round banner");
   check("only the host sees the banner", !B.q("#addRound") && !C.q("#addRound"));

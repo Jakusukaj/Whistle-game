@@ -276,3 +276,12 @@ body.admin .scrim { top: 44px; }
 .timer.grow { justify-content: center; }
 .action__top .label { white-space: nowrap; }
 .songband .tag { margin: 4px 0; }
+
+/* Lobby rows: one tappable line each for songs and game settings. */
+.lrows { border-top: 1.5px solid var(--ink); }
+.lrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 0; border-bottom: 1.5px solid var(--ink); text-align: left; color: inherit; }
+.lrow__t { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.lrow__t .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .chev { flex: none; }
+.lrow__c { flex: none; }
+.lrow--static { cursor: default; }
