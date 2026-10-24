@@ -1277,30 +1277,32 @@
   var newbie = null, tipSeen = {}, askedPlayed = false;
   try { var np = localStorage.getItem("ttt_played"); newbie = np === "yes" ? false : np === "no" ? true : null; } catch (e) {}
   var TIPS = {
-    lobby: "Everyone joins from the link. The host picks the songs and taps Start when all of you are in.",
-    ready: "Only you can see the song. Do not whistle until the countdown ends.",
-    wait: "The whistler is picking a song. Get ready to say the title out loud.",
-    cd: "Whistle only when the countdown ends.",
-    w: "Whistle the tune. When someone gets it, tap Someone got it and say who.",
-    g: "Say the song title out loud, or type it. Your phone mic should pick it up by itself.",
-    reveal: "Points go to the whistler and to everyone who named the song."
+    lobbyHost: "Start when everyone is in. Keep your mic on so we can hear guesses.",
+    lobby: "The host starts the game when everyone is in. Keep your mic on so we can hear guesses.",
+    ready: "Whistle the tune with no words. Tap Ready when you are set.",
+    wait: "Say the song title out loud when you think you know it. You can type it instead.",
+    cd: "Get ready to say the title out loud when the whistling starts.",
+    cdw: "Take a breath, then whistle the tune clearly. Shuffles and hints cost points.",
+    w: "Tap Someone got it when a guess is right. Shuffles and hints cost points.",
+    g: "Shout your guess, or tap Type instead. The faster you guess, the more you score.",
+    reveal: "The whistler earns the full score. Each guesser earns half."
   };
   function tipFor(key) {
     if (/^ready-/.test(key)) { return "ready"; }
     if (/^wait-/.test(key)) { return "wait"; }
-    if (/^cd-/.test(key)) { return "cd"; }
+    if (/^cd-/.test(key)) { return st && st.turn && st.turn.playerId === st.me ? "cdw" : "cd"; }
     if (/^w-/.test(key)) { return "w"; }
     if (/^g-/.test(key)) { return "g"; }
     if (/^reveal-/.test(key)) { return "reveal"; }
-    if (key === "lobby") { return "lobby"; }
+    if (key === "lobby") { return st && st.hostId === st.me ? "lobbyHost" : "lobby"; }
     return null;
   }
   function askPlayed() {
     askedPlayed = true;
     var o = document.createElement("div");
     o.className = "sheetwrap";
-    o.innerHTML = '<div class="scrim"></div><div class="sheet"><span class="label">Welcome</span><p class="title">Have you played before?</p>' +
-      '<p class="small">If not, short tips appear on each screen.</p><button class="btn" id="pYes">Yes</button><button class="btn btn--outline" id="pNo">No</button></div>';
+    o.innerHTML = '<div class="scrim"></div><div class="sheet"><p class="headline">Have you played before?</p>' +
+      '<p class="small">Say no and we will show a few short tips as you play.</p><div class="rowc" style="gap:12px"><button class="btn btn--outline" id="pYes" style="flex:1">Yes</button><button class="btn" id="pNo" style="flex:1">No</button></div></div>';
     document.body.appendChild(o);
     var done = function (v) { newbie = !v; try { localStorage.setItem("ttt_played", v ? "yes" : "no"); } catch (e) {} if (o.parentNode) { o.parentNode.removeChild(o); } render(); };
     $("#pYes", o).onclick = function () { done(true); };
@@ -1314,10 +1316,19 @@
     if (!newbie) { return; }
     var id = tipFor(lastKey || ""); if (!id || tipSeen[id]) { return; }
     var b = document.createElement("button");
-    b.id = "tipbubble"; b.className = "tipbubble"; b.setAttribute("aria-label", "Dismiss tip");
-    b.innerHTML = '<span class="label">Tip</span><span class="small">' + esc(TIPS[id]) + "</span>";
-    b.onclick = function () { tipSeen[id] = true; document.body.classList.remove("hastip"); if (b.parentNode) { b.parentNode.removeChild(b); } };
+    b.id = "tipbubble"; b.className = "tipbubble"; b.setAttribute("aria-label", "Tip, tap to close");
+    b.innerHTML = '<span class="th"><span class="tg">Tip</span><span class="tc">Tap to close</span></span><span class="tt">' + esc(TIPS[id]) + "</span>";
+    var close = function () {
+      tipSeen[id] = true; document.body.classList.remove("hastip");
+      b.classList.add("out"); setTimeout(function () { if (b.parentNode) { b.parentNode.removeChild(b); } }, 120);
+    };
+    b.onclick = close;
     document.body.appendChild(b);
+    // Sit 12px above the main button when there is one, else on the bottom safe area.
+    var btns = app.querySelectorAll(".btn, #gotBtn"), tgt = null, i;
+    for (i = btns.length - 1; i >= 0; i--) { if (btns[i].offsetParent !== null && btns[i].getBoundingClientRect().height > 0) { tgt = btns[i]; break; } }
+    var vh = window.innerHeight, bot = tgt ? vh - tgt.getBoundingClientRect().top + 12 : 36;
+    b.style.bottom = Math.max(16, Math.min(bot, vh - 140)) + "px";
     document.body.classList.add("hastip");
   }
 
