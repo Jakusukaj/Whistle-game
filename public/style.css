@@ -272,8 +272,9 @@ body{min-height:100dvh;overflow-x:hidden}
 .gamebtn{appearance:none;border:0;width:100%;text-align:left;cursor:pointer;justify-content:space-between}
 .gamebtn .gtxt{min-width:0;flex:1}
 .gamebtn:active{transform:scale(.98)}
-.admindot{position:fixed;right:6px;bottom:6px;width:44px;height:44px;border:0;background:transparent;cursor:pointer;z-index:5}
-.admindot::after{content:"";position:absolute;right:16px;bottom:16px;width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.25}
+.homefoot{display:flex;align-items:center;justify-content:center;position:relative;min-height:44px}
+.admindot{position:absolute;right:-8px;top:0;width:44px;height:44px;border:0;background:transparent;cursor:pointer}
+.admindot::after{content:"";position:absolute;left:17px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--ink);opacity:.3}
 
 /* lobby */
 .codecard .wh-sub{margin-top:4px}
@@ -357,3 +358,13 @@ body.danger #app{--bg:var(--tomato);--text:var(--ink);--text-muted:var(--ink);--
 body.danger #app .wh-progress{background:rgba(21,19,28,.18)}
 body.danger #app .wh-progress>i{background:var(--ink)}
 @media (prefers-reduced-motion:reduce){#app{transition:none}}
+
+/* spacing fixes: big corner radii need more inner padding */
+.wh-setting{padding:var(--space-4) var(--space-6)}
+.wh-setting--col{gap:var(--space-3);padding:var(--space-5) var(--space-6)}
+.wh-card{padding:var(--space-5) var(--space-6)}
+.wh-card.wh-stack{gap:var(--space-3)}
+.packhead{align-items:center}
+.wh-packrow{min-height:44px}
+.packnote{margin-top:0;line-height:16px;align-items:center}
+.wh-prow{padding:8px var(--space-5)}

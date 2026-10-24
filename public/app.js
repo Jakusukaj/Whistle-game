@@ -286,8 +286,8 @@
           "</div>" +
           '<h2 class="wh-over">Join a game</h2><div class="wh-stack" id="games">' + gamesHtml() + "</div>" +
           '<div class="spacer"></div>' +
-          '<button id="helpBtn" class="wh-btn wh-btn--ghost">' + ico("info") + 'How to play</button>' +
-          '<button id="adminDot" class="admindot" aria-label="Admin"></button>' +
+          '<div class="homefoot"><button id="helpBtn" class="wh-btn wh-btn--ghost">' + ico("info") + 'How to play</button>' +
+          '<button id="adminDot" class="admindot" aria-label="Admin"></button></div>' +
         "</div>",
       update: function () {
         var g = $("#games"); if (!g) { return; }
