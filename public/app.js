@@ -1259,24 +1259,83 @@
     };
   }
 
+  // How to play: a short animated walkthrough that fills the screen. Tap right to skip ahead, left to go back.
   function showHelp() {
-    var o = document.createElement("div");
-    o.className = "sheetwrap";
-    var steps = [
-      "Whistle it only once the countdown ends. Only you can see the song.",
-      "Everyone else says the title out loud. Your phone microphone should pick it up by itself. If it does not, tap Type instead and type the guess, or the whistler can tap Someone got it.",
-      "Say who got it. You and everyone you name earn points."
+    var AV = function (n, c) { return '<span class="avatar pc pc' + c + ' avatar--md">' + n.charAt(0) + "</span>"; };
+    var scenes = [
+      { ms: 4200, bg: FIELD_BG.orange, fg: "#111", html:
+        '<div class="hv-c"><p class="label hv-in">How to play</p><h1 class="display hv-in hv-d1">One person whistles.</h1><h1 class="display hv-in hv-d2">Everyone else guesses.</h1><p class="title hv-in hv-d3">Take turns. The quicker the guess, the more points.</p></div>' },
+      { ms: 5200, bg: FIELD_BG.ground, fg: "#111", html:
+        '<div class="hv-c"><p class="label hv-in">The whistler</p><h1 class="headline hv-in hv-d1">Pick a song</h1><div class="hv-cards">' +
+        '<div class="hv-card hv-in hv-d2"><span class="label">Easy</span><b>Dancing Queen</b><i>ABBA</i></div>' +
+        '<div class="hv-card hv-pick hv-in hv-d3"><span class="label">Medium</span><b>Wonderwall</b><i>Oasis</i></div>' +
+        '<div class="hv-card hv-in hv-d4"><span class="label">Hard</span><b>Rolling in the Deep</b><i>Adele</i></div></div>' +
+        '<p class="title hv-in hv-d5">Only you can see the song. Harder songs earn bonus points.</p></div>' },
+      { ms: 5200, bg: FIELD_BG.green, fg: "#111", html:
+        '<div class="hv-c hv-mid"><div class="hv-disc"><div class="hv-num" data-seq="3,2,1,Go" data-step="900">3</div></div>' +
+        '<h1 class="headline hv-in hv-d1">Wait for the countdown</h1><p class="title hv-in hv-d3">Then whistle the tune. No words.</p></div>' },
+      { ms: 6200, bg: FIELD_BG.green, fg: "#111", html:
+        '<div class="hv-c hv-mid"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
+        '<div class="hv-say hv-in hv-d2"><span class="label">Theo says</span><b>Dancing Queen</b></div>' +
+        '<h1 class="headline hv-in hv-d3">Say the title out loud</h1><p class="title hv-in hv-d4">Your phone mic should pick it up by itself. If it does not, tap Type instead.</p></div>' },
+      { ms: 5200, bg: FIELD_BG.ground, fg: "#111", html:
+        '<div class="hv-c"><p class="label hv-in">The whistler</p><h1 class="headline hv-in hv-d1">Who got it</h1><div class="hv-who">' +
+        '<div class="hv-row hv-on hv-in hv-d2">' + AV("Theo", 1) + '<b>Theo</b><span class="tag">Got it</span></div>' +
+        '<div class="hv-row hv-in hv-d3">' + AV("Priya", 2) + '<b>Priya</b></div>' +
+        '<div class="hv-row hv-in hv-d4">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="hv-btn hv-in hv-d4">Confirm</div>' +
+        '<p class="title hv-in hv-d5">Tap everyone who named the song, then confirm.</p></div>' },
+      { ms: 5600, bg: FIELD_BG.blue, fg: "#ECEAE4", html:
+        '<div class="hv-c"><p class="label hv-in">The score</p><div class="hv-big" data-count="917" data-ms="1600">0</div><p class="label">Guessed in 12.4s</p>' +
+        '<h1 class="headline hv-in hv-d2">Faster guesses score more</h1><p class="title hv-in hv-d3">The whistler earns the full score. Each guesser earns half.</p></div>' },
+      { ms: 5600, bg: FIELD_BG.pink, fg: "#111", html:
+        '<div class="hv-c"><p class="label hv-in">After the last round</p><h1 class="headline hv-in hv-d1">Most points wins</h1><div class="hv-board">' +
+        '<div class="hv-row hv-in hv-d2"><b>1</b>' + AV("Maya", 0) + '<b>Maya</b><span>2,140</span></div>' +
+        '<div class="hv-row hv-in hv-d3"><b>2</b>' + AV("Theo", 1) + '<b>Theo</b><span>1,820</span></div>' +
+        '<div class="hv-row hv-in hv-d4"><b>3</b>' + AV("Priya", 2) + '<b>Priya</b><span>1,310</span></div></div>' +
+        '<p class="title hv-in hv-d5">Awards add bonus points at the end. Shuffles and hints cost points, so use them wisely.</p></div>' }
     ];
-    o.innerHTML = '<div class="scrim" id="helpScrim"></div><div class="sheet"><span class="label">How to play</span>' +
-      '<p class="title">A guess at the start is worth 1000 points, and the value falls as the clock runs.</p>' +
-      '<ol class="steps">' + steps.map(function (t, i) { return "<li><b>" + (i + 1) + '</b><span class="small">' + t + "</span></li>"; }).join("") + "</ol>" +
-      '<p class="small">Harder songs earn bonus points. A shuffle costs 100 points and hints cost 50, 100 and 150. After the last round, awards give bonus points.</p>' +
-      '<button class="btn" id="helpClose">Done</button></div>';
+    var o = document.createElement("div");
+    o.className = "hv"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "How to play");
+    o.innerHTML = '<div class="hv-bars">' + scenes.map(function () { return '<span><i></i></span>'; }).join("") + '</div>' +
+      '<button class="hv-x" aria-label="Close">Close</button><div class="hv-stage" id="hvStage"></div>' +
+      '<button class="hv-prev" aria-label="Back"></button><button class="hv-next" aria-label="Next"></button>';
     document.body.appendChild(o);
-    var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
-    $("#helpClose", o).onclick = close; $("#helpScrim", o).onclick = close;
+    document.body.classList.add("noscroll");
+    var idx = -1, timer = null, ints = [];
+    var bars = o.querySelectorAll(".hv-bars i");
+    var stage = $("#hvStage", o);
+    var clearAll = function () { clearTimeout(timer); ints.forEach(clearInterval); ints = []; };
+    var close = function () { clearAll(); document.body.classList.remove("noscroll"); if (o.parentNode) { o.parentNode.removeChild(o); } syncBg(); };
+    var go = function (n) {
+      clearAll();
+      if (n >= scenes.length) { close(); return; }
+      idx = Math.max(0, n);
+      var sc = scenes[idx];
+      o.style.background = sc.bg; o.style.color = sc.fg;
+      try { document.querySelector('meta[name="theme-color"]').setAttribute("content", sc.bg); document.documentElement.style.background = sc.bg; } catch (e) {}
+      stage.innerHTML = sc.html;
+      for (var b = 0; b < bars.length; b++) {
+        bars[b].style.transition = "none"; bars[b].style.width = b < idx ? "100%" : "0%";
+      }
+      void o.offsetWidth;
+      bars[idx].style.transition = "width " + sc.ms + "ms linear"; bars[idx].style.width = "100%";
+      var seq = stage.querySelector("[data-seq]");
+      if (seq) {
+        var items = seq.getAttribute("data-seq").split(","), k = 0;
+        ints.push(setInterval(function () { k = Math.min(k + 1, items.length - 1); seq.textContent = items[k]; seq.className = "hv-num hv-pop"; }, parseInt(seq.getAttribute("data-step"), 10)));
+      }
+      var cnt = stage.querySelector("[data-count]");
+      if (cnt) {
+        var to = parseInt(cnt.getAttribute("data-count"), 10), dur = parseInt(cnt.getAttribute("data-ms"), 10), t0 = Date.now();
+        ints.push(setInterval(function () { var f = Math.min(1, (Date.now() - t0) / dur); cnt.textContent = String(Math.round(to * (1 - Math.pow(1 - f, 3)))); }, 40));
+      }
+      timer = setTimeout(function () { go(idx + 1); }, sc.ms);
+    };
+    $(".hv-x", o).onclick = close;
+    $(".hv-next", o).onclick = function () { go(idx + 1); };
+    $(".hv-prev", o).onclick = function () { go(idx - 1); };
+    go(0);
   }
-
 
   // ------------------------------------------------------- first-time tips
   var newbie = null, tipSeen = {}, askedPlayed = false;
