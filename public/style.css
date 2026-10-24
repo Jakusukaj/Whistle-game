@@ -358,3 +358,7 @@ body.admin .scrim { top: 44px; }
 #deltaTag.tag.stamp { background: var(--red); color: var(--light); }
 
 .pcell .pn { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+
+/* The colour fills the whole screen, including behind the browser bars. */
+html, body { min-height: 100%; }
+#bgfill { position: fixed; top: -100px; left: 0; right: 0; bottom: -100px; z-index: -1; background: var(--ground); transition: background-color 220ms var(--ease); pointer-events: none; }

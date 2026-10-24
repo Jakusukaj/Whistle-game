@@ -1280,13 +1280,16 @@
 
   // Keep the page behind the app (overscroll, notch) the same colour as the current field.
   var lastBg = "";
+  var FIELD_BG = { ground: "#E4E2DD", pink: "#FF4FA3", green: "#00B86B", yellow: "#FFD21F", orange: "#FF4B14", blue: "#2640EC" };
   function syncBg() {
     try {
-      var c = getComputedStyle(app).backgroundColor;
-      if (c && c !== lastBg) {
-        lastBg = c; document.documentElement.style.background = c;
-        var m = document.querySelector('meta[name="theme-color"]'); if (m) { m.setAttribute("content", c); }
-      }
+      var m0 = /field--(\w+)/.exec(app.className), c = FIELD_BG[m0 ? m0[1] : "ground"] || FIELD_BG.ground;
+      if (c === lastBg) { return; }
+      lastBg = c;
+      document.documentElement.style.background = c;
+      document.body.style.background = c;
+      var bg = document.getElementById("bgfill"); if (bg) { bg.style.background = c; }
+      var m = document.querySelector('meta[name="theme-color"]'); if (m) { m.setAttribute("content", c); }
     } catch (e) {}
   }
 
