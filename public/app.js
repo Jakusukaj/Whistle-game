@@ -1105,7 +1105,7 @@
     var correct = R.outcome === "correct";
     if (correct) {
       head = esc(who) + " scores";
-      sub = guessers.length ? guessers.map(esc).join(", ").replace(/, ([^,]*)$/, " and $1") + " named it and earn " + pts(gAwards[0].points) + " each" : "";
+      sub = guessers.length ? guessers.map(esc).join(", ").replace(/, ([^,]*)$/, " and $1") + (guessers.length > 1 ? " named it and earn " + pts(gAwards[0].points) + " each" : " named it and earns " + pts(gAwards[0].points)) : "";
     } else if (R.outcome === "timeout") {
       head = "Time's up";
       sub = "Nobody guessed " + esc(who) + "'s song, so it scores nothing.";
@@ -1324,11 +1324,26 @@
     };
     b.onclick = close;
     document.body.appendChild(b);
-    // Sit 12px above the main button when there is one, else on the bottom safe area.
-    var btns = app.querySelectorAll(".btn, #gotBtn"), tgt = null, i;
-    for (i = btns.length - 1; i >= 0; i--) { if (btns[i].offsetParent !== null && btns[i].getBoundingClientRect().height > 0) { tgt = btns[i]; break; } }
-    var vh = window.innerHeight, bot = tgt ? vh - tgt.getBoundingClientRect().top + 12 : 36;
-    b.style.bottom = Math.max(16, Math.min(bot, vh - 140)) + "px";
+    // Sit 12px above the main button. With no main button, sit above the lowest link so it is never covered.
+    // The countdown tips go at the top, because the headline sits at the bottom there.
+    var vh = window.innerHeight;
+    if (id === "cd" || id === "cdw") { b.style.top = "56px"; b.style.bottom = "auto"; }
+    else {
+      var tgt = app.querySelector("#toType"), i, cand = app.querySelectorAll(".btn, #gotBtn");
+      if (tgt && !(tgt.offsetParent !== null && tgt.getBoundingClientRect().height > 0)) { tgt = null; }
+      if (!tgt) {
+      for (i = cand.length - 1; i >= 0; i--) { if (cand[i].offsetParent !== null && cand[i].getBoundingClientRect().height > 0) { tgt = cand[i]; break; } }
+      }
+      if (!tgt) {
+        cand = app.querySelectorAll(".txt, .tbtn, a");
+        for (i = 0; i < cand.length; i++) {
+          var r = cand[i].getBoundingClientRect();
+          if (cand[i].offsetParent !== null && r.height > 0 && (!tgt || r.top > tgt.getBoundingClientRect().top)) { tgt = cand[i]; }
+        }
+      }
+      var bot = tgt ? vh - tgt.getBoundingClientRect().top + 12 : 36;
+      b.style.bottom = Math.max(16, Math.min(bot, vh - 140)) + "px";
+    }
     document.body.classList.add("hastip");
   }
 

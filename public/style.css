@@ -385,3 +385,7 @@ html, body { min-height: 100%; }
 @keyframes tipFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes tipFadeOut { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .tipbubble { animation: tipFade 200ms linear both; } .tipbubble.out { animation: tipFadeOut 120ms linear both; } }
+
+.pgrid > .pcell { min-width: 0; }
+.pcell .pn { min-width: 0; overflow: hidden; }
+.pcell .pn .title { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
