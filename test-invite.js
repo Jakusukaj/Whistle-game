@@ -27,7 +27,7 @@ function phone(port, search) {
   H.type("#name", "Ann"); H.q("#hostBtn").click();
   await until(function () { return H.q(".pgrid"); }, 3000, "host lobby");
   var code = Object.keys(s.manager.rooms)[0];
-  check("host lobby shows the invite link with a Copy link cue", /\?join=/.test(H.q("#copyLink").textContent) && /Copy link/.test(H.q("#copyLink").textContent));
+  check("host lobby has a Copy link button and does not show the link", /Copy link/.test(H.q("#copyLink").textContent) && !/join=/.test(H.q("#copyLink").textContent));
   var G = phone(port, "?join=" + code); await sleep(400);
   await until(function () { return G.q("#joinBtn"); }, 3000, "join screen");
   check("the link shows the host's game, a name field and Join lobby", /Ann's game/.test(G.text()) && !!G.q("#name") && /Join lobby/.test(G.q("#joinBtn").textContent) && !G.q("#hostBtn") && !G.q("#games"));

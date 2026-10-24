@@ -632,8 +632,7 @@
       (d ? '<span class="small lrow__list">' + esc(d) + "</span>" : "") + '</span><span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
   }
   function inviteRowHtml(s) {
-    return '<button class="lrow" id="copyLink"><span class="lrow__t"><span class="label">Invite link</span><span class="title">' + esc(location.host + "/?join=" + s.code) +
-      '</span></span><span class="lrow__c label">Copy link</span></button>';
+    return '<button class="lrow" id="copyLink" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Invite friends</span></span><span class="lrow__c label">Copy link</span></button>';
   }
   function settingsText(s) {
     return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
