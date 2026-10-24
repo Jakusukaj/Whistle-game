@@ -388,7 +388,7 @@
     var votes = s.packVotes || {};
     return s.packs.map(function (p, i) { return { p: p, n: (votes[p.id] || []).length, i: i }; })
       .filter(function (r) { return r.n > 0; })
-      .sort(function (a, b) { return b.n - a.n || a.i - b.i; });
+      .sort(function (a, b) { return b.n - a.n || (s.selectedPacks.indexOf(b.p.id) !== -1) - (s.selectedPacks.indexOf(a.p.id) !== -1) || a.i - b.i; });
   }
   function rankingHtml(s, limit) {
     var r = rankingList(s);
@@ -396,7 +396,7 @@
     var shown = limit ? r.slice(0, limit) : r;
     return '<div class="ranking">' + shown.map(function (x) {
       var inn = s.selectedPacks.indexOf(x.p.id) !== -1;
-      return '<div class="rkrow' + (inn ? " in" : "") + '">' + packArt(x.p.id, "rkart") + '<span class="rkname">' + esc(x.p.name) + '</span><span class="rkn">' + x.n + (x.n === 1 ? " vote" : " votes") + "</span></div>";
+      return '<div class="rkrow' + (inn ? " in" : "") + '">' + packArt(x.p.id, "rkart") + '<span class="rkname">' + esc(x.p.name) + '</span><span class="rkn">' + (inn ? ico("tick", "wh-i--sm") : "") + x.n + (x.n === 1 ? " vote" : " votes") + "</span></div>";
     }).join("") + (limit && r.length > limit ? '<p class="wh-note">+' + (r.length - limit) + " more with votes</p>" : "") + "</div>";
   }
 
@@ -409,7 +409,7 @@
       : on.slice(0, 2).map(function (p) { return p.name; }).join(", ") + (on.length > 2 ? " +" + (on.length - 2) + " more" : "");
     var note = !on.length ? (room ? "Everyone votes for up to 3 packs" : isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
       : short ? "Not enough songs for this many turns: pick more packs or lower the rounds"
-      : room ? "The top 3 packs play. Ties all play." : "No song is played twice in a game.";
+      : room ? "The top 3 packs play. Small ties all play." : "No song is played twice in a game.";
     var bad = (isHost || room) && (short || !on.length) && !(room && !on.length);
     var thumbs = on.slice(0, 3).map(function (p) { return packArt(p.id, "pthumb"); }).join("");
     var mode = isHost
@@ -430,7 +430,7 @@
       var voters = (votes[p.id] || []).map(function (id) { var pl = player(s, id); return pl ? avatarHtml(s, pl, "wh-avatar--xs") : ""; });
       return packCard(p, room ? mine.indexOf(p.id) !== -1 : s.selectedPacks.indexOf(p.id) !== -1, !room && !isHost, voters);
     }).join("");
-    var intro = room ? "Vote for up to 3 packs. The top 3 play, and ties all play."
+    var intro = room ? "Vote for up to 3 packs. The top 3 play. A small tie for third plays too."
       : isHost ? "These decide which songs come up in the game. Tick one pack or as many as you like." : "These decide which songs come up in the game. The host picks them.";
     return '<div class="picker" id="picker"><div class="pwrap">' +
       '<div class="phead"><div class="wh-title ptitle">' + (room ? "Vote for song packs" : "Choose your song packs") + "</div>" +

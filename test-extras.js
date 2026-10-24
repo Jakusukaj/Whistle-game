@@ -114,6 +114,8 @@ function client(port) {
   check("top 3 win when there is no tie", E.state.selectedPacks.length === 3 && E.state.selectedPacks.indexOf("bangers") !== -1 && E.state.selectedPacks.indexOf("gaga") !== -1 && E.state.selectedPacks.indexOf("rock") !== -1, E.state.selectedPacks.join());
   G.send({ t: "leave" }); await sleep(100);
   check("leaving takes your votes away", !E.state.packVotes.beatles);
+  E.send({ t: "votePacks", packs: ["bangers", "rock", "party"] }); F.send({ t: "votePacks", packs: ["soul", "tv", "film"] }); H.send({ t: "votePacks", packs: ["xmas", "beatles", "bowie"] }); await sleep(120);
+  check("a nine-way tie on one vote still gives just three packs", E.state.selectedPacks.length === 3, E.state.selectedPacks.join());
   E.send({ t: "setPackMode", mode: "host" }); await sleep(60);
   E.send({ t: "setPacks", packs: ["bangers"] }); E.send({ t: "setRounds", rounds: 1 }); await sleep(60);
   E.send({ t: "start" }); await sleep(150);

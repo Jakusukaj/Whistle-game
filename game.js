@@ -496,15 +496,24 @@ RoomManager.prototype.packVoteMap = function (room) {
   return map;
 };
 
-// Top three packs win. Anything level with third place comes in too.
+// Top three packs win. Packs level with third place all come in if that keeps
+// the total at five or fewer; with a bigger pile-up (say, everything on one
+// vote) the earliest-voted packs fill the three places, so a result is always
+// useful and never changes just because someone refreshed.
 RoomManager.prototype.recomputePacks = function (room) {
   if (room.packMode !== "room") { return; }
+  room.voteSeq = room.voteSeq || { n: 0, at: {} };
+  var seq = room.voteSeq;
   var ranked = this.packTally(room);
+  ranked.forEach(function (r) { if (seq.at[r.id] === undefined) { seq.at[r.id] = seq.n++; } });
+  ranked.sort(function (a, b) { return b.votes - a.votes || seq.at[a.id] - seq.at[b.id]; });
   if (!ranked.length) { room.packs = []; return; }
   var cutoff = ranked[Math.min(2, ranked.length - 1)].votes;
-  room.packs = PACK_IDS.filter(function (id) {
-    return ranked.some(function (r) { return r.id === id && r.votes >= cutoff; });
-  });
+  var above = ranked.filter(function (r) { return r.votes > cutoff; });
+  var level = ranked.filter(function (r) { return r.votes === cutoff; });
+  var chosen = above.concat(level);
+  if (chosen.length > 5) { chosen = chosen.slice(0, Math.max(3, above.length)); }
+  room.packs = PACK_IDS.filter(function (id) { return chosen.some(function (r) { return r.id === id; }); });
 };
 
 RoomManager.prototype.start = function (room, conn) {
