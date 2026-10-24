@@ -112,6 +112,13 @@ RoomManager.prototype.elapsed = function (turn) {
   return turn.accumulatedMs + (turn.runningSince !== null ? this.now() - turn.runningSince : 0);
 };
 
+// True when the turn in play is the last of its round (or of the whole game), so the leaderboard is shown.
+function isRoundEnd(room) {
+  var cur = room.turns[room.turnPos], nxt = room.turns[room.turnPos + 1];
+  if (!cur || !nxt) { return true; }
+  return !!(cur.sd || nxt.sd) || nxt.round !== cur.round;
+}
+
 // ------------------------------------------------------------------- views
 RoomManager.prototype.viewFor = function (room, pid) {
   var self = this, t = room.turn, tv = null;
@@ -119,7 +126,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     var isW = t.playerId === pid;
     tv = {
       id: t.id, playerId: t.playerId, stage: t.stage, difficulty: t.difficulty,
-      multiplier: t.multiplier, shuffles: t.shuffles, sd: t.sd, round: t.round,
+      multiplier: t.multiplier, shuffles: t.shuffles, sd: t.sd, round: t.round, roundEnd: isRoundEnd(room), nextId: room.turns[room.turnPos + 1] ? room.turns[room.turnPos + 1].playerId : null,
       countdownEndsAt: t.countdownEndsAt, accumulatedMs: t.accumulatedMs,
       runningSince: t.runningSince, limitMs: room.limitMs,
       penalty: this.opts.shufflePoints, nextAt: t.nextAt || null,
@@ -156,7 +163,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
     players: room.players.filter(function (p) { return !p.sitOut; }).map(function (p) {
-      return { id: p.id, name: p.name, connected: p.connected, total: p.total, last: p.last, turns: p.turns, mic: p.mic || null, bonus: p.bonus || 0 };
+      return { id: p.id, name: p.name, ci: (p.ci || 0) % 8, connected: p.connected, total: p.total, prev: p.prev || 0, last: p.last, turns: p.turns, mic: p.mic || null, bonus: p.bonus || 0 };
     }),
     packs: PACKS.map(function (p) {
       return { id: p.id, group: p.group, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
@@ -242,6 +249,7 @@ RoomManager.prototype.handle = function (conn, msg) {
   if (msg.t === "createAdmin") { return this.createAdmin(conn, msg); }
   if (msg.t === "listRooms") { return conn.send({ t: "rooms", rooms: this.listRooms() }); }
   if (msg.t === "join") { return this.join(conn, msg); }
+  if (msg.t === "peek") { return this.peek(conn, msg); }
 
   var room = conn.roomCode ? this.rooms[conn.roomCode] : null;
   if (!room) { return err(conn, "room_not_found", "You are not in a room."); }
@@ -309,7 +317,7 @@ RoomManager.prototype.attach = function (room, player, conn) {
 };
 
 RoomManager.prototype.addPlayer = function (room, name) {
-  var p = { id: newId(), name: name, conn: null, connected: false, total: 0, last: null, turns: 0 };
+  var p = { id: newId(), name: name, conn: null, connected: false, total: 0, prev: 0, last: null, turns: 0, ci: (room.colourSeq = (room.colourSeq || 0) + 1) - 1 };
   room.players.push(p);
   return p;
 };
@@ -330,6 +338,17 @@ RoomManager.prototype.create = function (conn, msg) {
   this.attach(room, p, conn);
   conn.send({ t: "joined", code: room.code, playerId: p.id });
   this.broadcast(room);
+};
+
+// What a shared join link needs to know before the guest has typed a name.
+RoomManager.prototype.peek = function (conn, msg) {
+  var code = String(msg.code || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  var room = this.rooms[code], host = room ? findPlayer(room, room.hostId) : null;
+  if (!room || !host) { return conn.send({ t: "roomInfo", code: code, found: false }); }
+  var count = room.players.filter(function (p) { return !p.sitOut; }).length;
+  var state = room.phase === "lobby" ? "open" : (room.phase === "gameover" ? "over" : "started");
+  if (state === "open" && count >= this.opts.maxPlayers) { state = "full"; }
+  conn.send({ t: "roomInfo", code: room.code, found: true, host: host.name, players: count, max: this.opts.maxPlayers, state: state });
 };
 
 RoomManager.prototype.join = function (conn, msg) {
@@ -543,7 +562,7 @@ RoomManager.prototype.start = function (room, conn) {
   if (this.poolFor(room).length < need) {
     return err(conn, "too_few_songs", "These packs only have " + this.poolFor(room).length + " songs, and this game needs about " + need + ". Tick more packs or lower the rounds.");
   }
-  room.players.forEach(function (p) { p.total = 0; p.last = null; p.turns = 0; });
+  room.players.forEach(function (p) { p.total = 0; p.prev = 0; p.last = null; p.turns = 0; });
   room.turns = [];
   for (var r = 1; r <= room.rounds; r++) {
     for (var i = 0; i < room.players.length; i++) {
@@ -566,6 +585,9 @@ RoomManager.prototype.clearTimers = function (turn) {
 
 RoomManager.prototype.advance = function (room) {
   this.clearTimers(room.turn);
+  // The leaderboard is shown once a round, after everyone has had a turn. Once it has been seen,
+  // those totals become the baseline for the next leaderboard's rank changes.
+  if (room.turn && isRoundEnd(room)) { room.players.forEach(function (p) { p.prev = p.total; }); }
   room.turnPos++;
   if (room.turnPos < room.turns.length) { return this.beginTurn(room, room.turns[room.turnPos]); }
   this.afterTurns(room);
@@ -977,7 +999,7 @@ RoomManager.prototype.gameOver = function (room, winnerIds, viaTieBreak) {
 RoomManager.prototype.resetToLobby = function (room) {
   this.clearTimers(room.turn);
   room.players = room.players.filter(function (p) { return p.connected; });
-  room.players.forEach(function (p) { p.total = 0; p.last = null; p.turns = 0; p.bonus = 0; p.sitOut = false; });
+  room.players.forEach(function (p) { p.total = 0; p.prev = 0; p.last = null; p.turns = 0; p.bonus = 0; p.sitOut = false; });
   room.stats = {}; room.endAwards = null; room.bonusCapped = false;
   room.phase = "lobby"; room.turn = null; room.turns = []; room.turnPos = -1;
   room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {};

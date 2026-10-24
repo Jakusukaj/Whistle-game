@@ -7,9 +7,18 @@
   var ws = null, connected = false, session = null, rejoining = false, pendingName = "";
   var gameList = [], adminLogin = false, pickerOpen = false, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
   var lastMicSent = "";
+  var invite = null, copyOnJoin = false, linkResolve = null;
   var st = null, offset = 0, lastKey = null, wakeLock = null, prevStage = null, prevTurnId = null;
 
   try { session = JSON.parse(localStorage.getItem("whistle.session") || "null"); } catch (e) { session = null; }
+  (function () {
+    var m = /[?&]join=([A-Za-z]{4})/.exec(location.search);
+    if (m) {
+      var code = m[1].toUpperCase();
+      if (session && session.code !== code) { session = null; saveSession(); }
+      if (!session) { invite = { code: code, info: null, loading: true }; }
+    }
+  })();
 
   function $(sel, root) { return (root || document).querySelector(sel); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -50,6 +59,7 @@
     ws.onopen = function () {
       connected = true; setBanner(""); lastMicSent = "";
       send({ t: "listRooms" });
+      if (invite && !session) { invite.loading = true; send({ t: "peek", code: invite.code }); }
       if (session) {
         rejoining = true;
         send({ t: "join", code: session.code, playerId: session.playerId, name: session.name });
@@ -78,9 +88,13 @@
     } else if (m.t === "rooms") {
       gameList = m.rooms || [];
       if (!st && !adminLogin && lastKey === "home") { var v = viewHome(); if (v.update) { v.update(); } }
+    } else if (m.t === "roomInfo") {
+      if (invite && invite.code === m.code) { invite.info = m; invite.loading = false; if (!st) { lastKey = null; render(); } }
     } else if (m.t === "joined") {
       session = { code: m.code, playerId: m.playerId, name: pendingName || (session && session.name) || "" };
       saveSession(); rejoining = false; keepAwake(); adminLogin = false; lastMicSent = "";
+      if (invite) { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} }
+      if (copyOnJoin) { copyOnJoin = false; deliverLink(m.code); }
     } else if (m.t === "error") {
       if (rejoining && (m.code === "room_not_found" || m.code === "game_started")) {
         session = null; saveSession(); st = null; rejoining = false; lastKey = null;
@@ -106,6 +120,35 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible" && session) { keepAwake(); }
   });
+
+  function linkFor(code) { return location.origin + "/?join=" + code; }
+  // Copy the join link. The host's tap on Start lobby starts the copy; the link is filled in once the room exists.
+  function primeCopy() {
+    linkResolve = null;
+    try {
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        var pr = new Promise(function (res) { linkResolve = res; });
+        navigator.clipboard.write([new ClipboardItem({ "text/plain": pr.then(function (t) { return new Blob([t], { type: "text/plain" }); }) })])
+          .then(function () { toast("Link copied. Paste it into your group chat."); })
+          .catch(function () { linkResolve = null; });
+      }
+    } catch (e) { linkResolve = null; }
+  }
+  function deliverLink(code) {
+    var url = linkFor(code);
+    if (linkResolve) { var r = linkResolve; linkResolve = null; r(url); return; }
+    copyText(url, true);
+  }
+  function copyText(text, quiet) {
+    var done = function () { toast("Link copied. Paste it into your group chat."); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () { if (!quiet) { toast(text); } });
+        return;
+      }
+    } catch (e) {}
+    if (!quiet) { toast(text); }
+  }
 
   function leaveRoom() {
     send({ t: "leave" });
@@ -200,12 +243,30 @@
     }
   }
 
+  function micRowHtml() {
+    switch (mic.state) {
+      case "unsupported": return '<span class="dot off"></span><span class="t-title title">Typing only on this phone</span>';
+      case "starting": return '<span class="dot off"></span><span class="t-title title">Starting mic</span>';
+      case "on": return '<span class="dot"></span><span class="t-title title">Mic connected</span><button id="micOffBtn" class="txt">Turn off</button>';
+      case "blocked": return '<span class="dot off"></span><span class="t-title title">Mic not connected</span><button id="micBtn" class="btn sm line">Connect now</button>' +
+        '<p class="small" style="flex-basis:100%">Allow the microphone for this site in your browser settings, then reload. You can still type guesses.</p>';
+      default: return '<span class="dot off"></span><span class="t-title title">Mic not connected</span><button id="micBtn" class="btn sm line">Connect now</button>';
+    }
+  }
+  function micStop() {
+    mic.want = false;
+    try { if (mic.rec) { mic.rec.onend = null; mic.rec.stop(); } } catch (e) {}
+    mic.rec = null; mic.state = "off"; refreshMic();
+  }
+
   function refreshMic() {
     var boxes = document.querySelectorAll("[data-mic]");
     for (var i = 0; i < boxes.length; i++) {
-      boxes[i].innerHTML = micHtml();
+      boxes[i].innerHTML = boxes[i].getAttribute("data-mic") === "row" ? micRowHtml() : micHtml();
       var b = $("#micBtn", boxes[i]);
       if (b) { b.onclick = micStart; }
+      var o = $("#micOffBtn", boxes[i]);
+      if (o) { o.onclick = micStop; }
     }
     var ms = mic.typeMode || mic.state === "unsupported" ? "typing" : (mic.state === "on" ? "on" : "off");
     if (st && !st.admin && ms !== lastMicSent) { lastMicSent = ms; send({ t: "mic", state: ms }); }
@@ -231,21 +292,21 @@
   ];
   // Pack colour tokens from the design system. "l" means light text, "i" ink text.
   var PACK_COL = {
-    bangers: ["#225A31", "l"], diva: ["#FF4FA3", "i"], party: ["#41AE61", "i"], soul: ["#FE973B", "i"], tv: ["#115E5E", "l"], film: ["#95330F", "l"], disney: ["#E4DC71", "i"],
-    sixties: ["#43B2AC", "i"], seventies: ["#F68675", "i"], eighties: ["#6EBB5D", "i"], nineties: ["#972622", "l"], noughties: ["#575A13", "l"], tens: ["#F77036", "i"], today: ["#C1CF51", "i"],
-    beatles: ["#2640EC", "l"], bowie: ["#D1AD41", "i"], gaga: ["#4DBC92", "i"], talkingheads: ["#FFAE34", "i"],
-    halloween: ["#F85452", "i"], xmas: ["#8CAD40", "i"]
+    bangers: ["#00B86B", "i"], diva: ["#FF3D81", "i"], party: ["#3DDC84", "i"], soul: ["#FF9A1F", "i"], tv: ["#0FB5C8", "i"], film: ["#A66BFF", "i"], disney: ["#FFD21F", "i"],
+    sixties: ["#2EE6D6", "i"], seventies: ["#F68675", "i"], eighties: ["#9BE23A", "i"], nineties: ["#FF4FA3", "i"], noughties: ["#4D7CFF", "i"], tens: ["#FF6A3D", "i"], today: ["#C77DFF", "i"],
+    beatles: ["#6F8DFF", "i"], bowie: ["#00D1FF", "i"], gaga: ["#E040FB", "i"], talkingheads: ["#B09CFF", "i"],
+    halloween: ["#FF5252", "i"], xmas: ["#FFC9A3", "i"]
   };
   var openGroups = { Vibe: true };
 
   function avatarHtml(s, p, cls) {
     var ch = (String(p.name).trim().charAt(0) || "?").toUpperCase();
-    return '<span class="avatar' + (cls ? " " + cls : "") + '">' + esc(ch) + "</span>";
+    return '<span class="avatar pc pc' + ((p.ci || 0) % 8) + (cls ? " " + cls : "") + '">' + esc(ch) + "</span>";
   }
 
   function pts(n) { return Math.round(n).toLocaleString("en-GB"); }
 
-  // Standings: rank, name, text rank change, points. Your own row is underlined heavier.
+  // Standings: rank, player, points and the rank change since the last leaderboard. Your own row is inverted.
   function standingsHtml(s, awards, winners, opt) {
     opt = opt || {};
     var gained = {};
@@ -258,62 +319,102 @@
       rows.push({ p: p, rank: rank });
     });
     if (opt.change) {
-      var before = s.players.slice().sort(function (a, b) { return (b.total - (gained[b.id] || 0)) - (a.total - (gained[a.id] || 0)); });
+      var before = s.players.slice().sort(function (a, b) { return (b.prev || 0) - (a.prev || 0); });
       var pr = {}, r2 = 0, pv = null;
       before.forEach(function (p, i) {
-        var t = p.total - (gained[p.id] || 0);
+        var t = p.prev || 0;
         if (pv === null || t !== pv) { r2 = i + 1; }
         pv = t; pr[p.id] = r2;
       });
-      var tied = before.every(function (p) { return p.total - (gained[p.id] || 0) === before[0].total - (gained[before[0].id] || 0); });
-      if (!tied) { rows.forEach(function (r) { r.chg = pr[r.p.id] - r.rank; }); }
+      var tied = before.every(function (p) { return (p.prev || 0) === (before[0].prev || 0); });
+      rows.forEach(function (r) { r.chg = tied ? undefined : pr[r.p.id] - r.rank; });
     }
     if (opt.limit && rows.length > opt.limit) {
       var top = rows.slice(0, opt.limit), me = rows.filter(function (r) { return r.p.id === s.me; })[0];
       if (me && top.indexOf(me) === -1) { top[top.length - 1] = me; }
       rows = top;
     }
+    var final = !!opt.bonus;
     var html = rows.map(function (r) {
       var p = r.p, me = p.id === s.me, win = winners && winners.indexOf(p.id) !== -1;
-      var g = gained[p.id] !== undefined && gained[p.id] > 0 && opt.bonus ? "<small>+" + pts(gained[p.id]) + "</small>" : "";
       var chg = r.chg === undefined ? "" : (r.chg > 0 ? "+" + r.chg : String(r.chg));
-      return '<div class="srow' + (me ? " srow--you" : "") + '"><span class="srow__rank title">' + r.rank + "</span>" +
-        '<span class="srow__name title">' + esc(p.name) + (win ? '<span class="tag">Winner</span>' : "") + "</span>" +
-        (chg !== "" ? '<span class="srow__chg small">' + chg + "</span>" : "") +
-        '<span class="srow__pts title">' + pts(p.total) + g + "</span></div>";
+      var g = gained[p.id] !== undefined && gained[p.id] > 0 && final ? "+" + pts(gained[p.id]) : "";
+      return '<div class="' + (final ? "finalrow" : "stand" + (me ? " me" : "")) + '"><span class="label">' + r.rank + "</span>" +
+        '<span class="title pn">' + avatarHtml(s, p) + '<span class="nmtx">' + esc(p.name) + "</span>" + (win ? '<span class="tag">Winner</span>' : "") + "</span>" +
+        '<span class="title">' + pts(p.total) + "</span>" +
+        (final ? '<span class="bn">' + g + "</span>" : '<span class="ch">' + chg + "</span>") + "</div>";
     }).join("");
-    return '<div class="board" style="border-top:1.5px solid currentColor">' + html + "</div>";
+    return '<div class="board" style="border-bottom:1.5px solid currentColor">' + html + "</div>";
   }
 
   function gamesHtml() {
     if (!gameList.length) {
-      return '<div class="stack" style="padding:12px 0"><p class="title">Nobody is hosting yet</p><p class="small">Ask someone to host a game, then it will show up here.</p></div>';
+      return '<div class="gamerow"><span class="gtxt"><span class="title">Nobody is hosting yet</span></span></div>';
     }
     return gameList.map(function (g) {
-      return '<button class="gamebtn" data-code="' + esc(g.code) + '"><span class="gtxt"><span class="title">' + esc(g.host) + "'s game</span>" +
-        '<span class="small">' + g.players + (g.players === 1 ? " player" : " players") + (g.inProgress ? ", in progress" : ", waiting to start") + "</span></span>" +
-        '<span class="tag">Join</span></button>';
+      var closed = g.inProgress;
+      return (closed ? '<div class="gamerow dead">' : '<button class="gamebtn" data-code="' + esc(g.code) + '">') +
+        '<span class="gtxt"><span class="title">' + esc(g.host) + "'s game</span>" +
+        '<span class="small">' + (closed ? g.players + (g.players === 1 ? " player" : " players") + ", in progress" : g.players + " of 8 players") + "</span></span>" +
+        '<span class="label">' + (closed ? "In progress" : "Join") + "</span>" + (closed ? "</div>" : "</button>");
     }).join("");
   }
 
-  function viewHome() {
+  function readName() {
+    var el = $("#name"), n = el.value.replace(/\s+/g, " ").trim();
+    if (!n) { el.classList.add("flag"); var h = $("#nameHint"); if (h) { h.textContent = "Enter your name first"; h.className = "title"; } el.focus(); return ""; }
+    try { localStorage.setItem("whistle.name", n); } catch (e) {}
+    pendingName = n;
+    return n;
+  }
+  function nameField(val) {
+    return '<div><label class="label flab" for="name">Your name</label><input id="name" class="input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Type a name" value="' + esc(val) + '">' +
+      '<p class="small" id="nameHint" style="margin-top:8px">Up to 14 characters</p></div>';
+  }
+
+  // A shared link opens straight on a name field and a Join lobby button.
+  function viewInvite() {
     var name = ""; try { name = localStorage.getItem("whistle.name") || ""; } catch (e) {}
-    function nameVal() {
-      var n = $("#name").value.replace(/\s+/g, " ").trim();
-      if (!n) { toast("Enter your name first."); $("#name").focus(); return ""; }
-      try { localStorage.setItem("whistle.name", n); } catch (e) {}
-      pendingName = n;
-      return n;
+    var info = invite.info;
+    var goHome = '<div class="homefoot"><button id="inviteHome" class="txt">Back to home</button><span></span></div>';
+    if (!info || invite.loading) {
+      return { key: "invite-load", field: "orange", html: '<div class="screen"><div class="brand"><h1 class="headline">Joining the game</h1><p class="title">Finding the lobby</p></div><div class="bar"><i></i></div><div class="spacer"></div>' + goHome + "</div>",
+        bind: function () { $("#inviteHome").onclick = function () { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} lastKey = null; render(); }; } };
+    }
+    var closed = !info.found ? ["Game not found", "That link is no longer working. Ask the host for a new one."]
+      : info.state === "started" ? [esc(info.host) + "'s game has started", "You can join once it is back in the lobby."]
+      : info.state === "over" ? [esc(info.host) + "'s game has finished", "Ask the host for a new link."]
+      : info.state === "full" ? [esc(info.host) + "'s game is full", "All " + info.max + " places are taken."] : null;
+    if (closed) {
+      return { key: "invite-closed", field: "orange", html: '<div class="screen"><div class="brand"><h1 class="headline">' + closed[0] + '</h1><p class="title">' + closed[1] + '</p></div><div class="spacer"></div><button id="inviteHome" class="btn">Back to home</button></div>',
+        bind: function () { $("#inviteHome").onclick = function () { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} lastKey = null; render(); }; } };
     }
     return {
-      key: "home", field: "yellow",
+      key: "invite", field: "orange",
+      html: '<div class="screen"><div class="brand"><h1 class="headline">' + esc(info.host) + "'s game</h1>" +
+        '<p class="title">' + info.players + " of " + info.max + " players are in</p></div>" +
+        '<div class="field-group">' + nameField(name) + '<button id="joinBtn" class="btn" style="margin-top:12px">Join lobby</button></div>' +
+        '<div class="spacer"></div>' + goHome + "</div>",
+      bind: function () {
+        var go = function () { var n = readName(); if (n) { send({ t: "join", code: invite.code, name: n }); } };
+        $("#joinBtn").onclick = go;
+        $("#name").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
+        $("#inviteHome").onclick = function () { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} lastKey = null; render(); };
+      }
+    };
+  }
+
+  function viewHome() {
+    if (invite) { return viewInvite(); }
+    var name = ""; try { name = localStorage.getItem("whistle.name") || ""; } catch (e) {}
+    return {
+      key: "home", field: "orange",
       html:
         '<div class="screen">' +
-          '<div class="brand"><h1 class="display">Tip of My Tongue</h1>' +
-          '<p class="small">One person whistles a song and everyone else guesses it. The quicker the guess, the more points.</p></div>' +
-          '<div class="field-group"><label class="label" for="name">Your name</label>' +
-          '<input id="name" class="input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Name" value="' + esc(name) + '"><p class="small">Up to 14 characters</p></div>' +
-          '<button id="hostBtn" class="btn">Host a game</button>' +
+          '<div class="brand"><h1 class="headline">Tip of My Tongue</h1>' +
+          '<p class="title">One person whistles a song and everyone else guesses it. The quicker the guess, the more points.</p></div>' +
+          '<div class="field-group">' + nameField(name) + '<button id="hostBtn" class="btn" style="margin-top:12px">Start lobby</button>' +
+          '<p class="small">Starting a lobby copies a link you can send to your friends.</p></div>' +
           '<div class="stack"><h2 class="label">Join a game</h2><div class="line-list" id="games">' + gamesHtml() + "</div></div>" +
           '<div class="spacer"></div>' +
           '<div class="homefoot"><button id="helpBtn" class="txt">How to play</button>' +
@@ -324,11 +425,13 @@
         g.innerHTML = gamesHtml();
         var bs = g.querySelectorAll(".gamebtn");
         for (var i = 0; i < bs.length; i++) {
-          bs[i].onclick = function () { var n = nameVal(); if (n) { send({ t: "join", code: this.getAttribute("data-code"), name: n }); } };
+          bs[i].onclick = function () { var n = readName(); if (n) { send({ t: "join", code: this.getAttribute("data-code"), name: n }); } };
         }
       },
       bind: function () {
-        $("#hostBtn").onclick = function () { var n = nameVal(); if (n) { send({ t: "create", name: n }); } };
+        var go = function () { var n = readName(); if (n) { copyOnJoin = true; primeCopy(); send({ t: "create", name: n }); } };
+        $("#hostBtn").onclick = go;
+        $("#name").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
         $("#helpBtn").onclick = showHelp;
         $("#adminDot").onclick = function () { adminLogin = true; render(); };
       }
@@ -500,7 +603,7 @@
     if (!s.selectedPacks.length) { return s.packMode === "room" ? "Waiting for votes on the song packs" : "Pick at least one song pack to start"; }
     if (s.songsInPlay < turns + 5) { return "Not enough songs for this many turns. Pick more packs or lower the rounds."; }
     var off = s.players.filter(function (p) { return p.mic === "off"; }).map(function (p) { return p.name; });
-    if (off.length) { return off.join(" and ").replace(/^(.*), /, "$1, ") + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses."; }
+    if (off.length) { return (off.length > 1 ? off.slice(0, -1).join(", ") + " and " + off[off.length - 1] : off[0]) + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses."; }
     return "";
   }
 
@@ -527,6 +630,10 @@
     var d = songsDetail(s);
     return '<button class="lrow lrow--top" id="openPacks"><span class="lrow__t"><span class="label">Songs' + (room ? ", room picks" : "") + '</span><span class="title">' + esc(songsTitle(s)) + "</span>" +
       (d ? '<span class="small lrow__list">' + esc(d) + "</span>" : "") + '</span><span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
+  }
+  function inviteRowHtml(s) {
+    return '<button class="lrow" id="copyLink"><span class="lrow__t"><span class="label">Invite link</span><span class="title">' + esc(location.host + "/?join=" + s.code) +
+      '</span></span><span class="lrow__c label">Copy link</span></button>';
   }
   function settingsText(s) {
     return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
@@ -560,13 +667,14 @@
           '<div class="head"><h1 class="headline">' + esc(pname(s, s.hostId)) + "'s game</h1>" +
             '<p class="small">' + s.players.length + " of " + s.maxPlayers + " players are in</p></div>" +
           '<div class="pgrid">' + cells + "</div>" +
-          '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + "</div>" +
-          '<div class="micline" data-mic></div>' +
+          '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + inviteRowHtml(s) + "</div>" +
           '<div class="spacer"></div>' +
+          (isHost ? "" : '<p class="headline waiting">Waiting for ' + esc(pname(s, s.hostId)) + " to start</p><div class=\"spacer\"></div>") +
+          '<div class="micline micst" data-mic="row"></div>' +
           (isHost
             ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers || !s.selectedPacks.length || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
               (startNote(s, turns) ? '<p class="small center startnote">' + esc(startNote(s, turns)) + "</p>" : "")
-            : '<p class="title center">Waiting for ' + esc(pname(s, s.hostId)) + " to start</p>") +
+            : "") +
           '<div class="rowc"><button id="helpBtn" class="txt">How to play</button>' +
           '<button id="leaveBtn" class="txt">Leave game</button></div>' +
           (pickerOpen ? pickerHtml(s, isHost) : "") +
@@ -574,6 +682,7 @@
         "</div>",
       bind: function () {
         $("#helpBtn").onclick = showHelp;
+        $("#copyLink").onclick = function () { copyText(linkFor(s.code), false); };
         var sr = $("#openSettings");
         if (sr) { sr.onclick = function () { settingsOpen = true; render(); }; }
         if (settingsOpen && isHost) {
@@ -989,11 +1098,13 @@
         '<div class="scorebox"><div class="scorerow"><div class="numeral scoreNum' + (big ? " numeral--120" : "") + '" id="scoreNum">0</div></div>' +
           '<div class="rowc" style="justify-content:flex-start;gap:8px"><span class="label" id="scoreCap">Guessed in</span><span class="tag stamp" id="multBadge" hidden></span><span class="tag stamp" id="deltaTag" hidden></span></div>' +
           '<div class="stack" style="gap:2px"><h2 class="title">' + head + "</h2>" + (sub ? '<p class="small">' + sub + "</p>" : "") + "</div></div>" +
-        '<div class="board rvhide" id="board">' + standingsHtml(s, R.awards, null, { change: true, limit: lim }) + "</div>" +
+        (T.roundEnd
+          ? '<div class="board rvhide" id="board">' + standingsHtml(s, R.awards, null, { change: true, limit: lim }) + "</div>"
+          : (T.nextId ? '<div class="stack rvhide" id="board"><span class="label">Up next</span><p class="title pn">' + avatarHtml(s, player(s, T.nextId) || { name: "?" }) + esc(T.nextId === s.me ? "You" : pname(s, T.nextId)) + "</p></div>" : "")) +
         '<div class="spacer"></div>' +
-        '<p class="small center" id="nextIn"></p>' +
+        '<p class="label" id="nextIn"></p>' +
         (s.hostId === s.me
-          ? '<button id="nextBtn" class="btn">' + (last ? "Skip to final scores" : "Next round") + "</button>"
+          ? '<button id="nextBtn" class="btn">' + (last ? "Skip to final scores" : T.roundEnd ? "Next round" : "Next turn") + "</button>"
           : "") + skipHtml(s) + "</div>",
       bind: function () { var b = $("#nextBtn"); if (b) { b.onclick = function () { send({ t: "next" }); }; } bindSkip(); },
       update: function () {}
@@ -1093,7 +1204,7 @@
     var names = (s.winners || []).map(function (id) { return pname(s, id); });
     var head = names.length > 1 ? "It's a draw: " + names.map(esc).join(" and ") : esc(names[0] || "Nobody") + " wins";
     return {
-      key: "over", field: "yellow",
+      key: "over", field: "blue",
       html: '<div class="screen">' +
         '<div class="label">Game over</div>' +
         '<div class="head"><h1 class="display">' + head + "</h1>" +
@@ -1214,7 +1325,7 @@
       var ni = $("#nextIn");
       if (ni) {
         var rem = T.nextAt ? T.nextAt - nowS() : null, last = st.turnNumber >= st.totalTurns;
-        var nt = rem !== null && rem <= 5000 ? (last ? "Final scores in " : "Next round in ") + Math.max(1, Math.ceil(rem / 1000)) : "";
+        var nt = rem !== null && rem <= 5000 ? (last ? "Final scores in " : T.roundEnd ? "Next round in " : "Next turn in ") + Math.max(1, Math.ceil(rem / 1000)) : "";
         if (ni.textContent !== nt) { ni.textContent = nt; }
       }
     }
