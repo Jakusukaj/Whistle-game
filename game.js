@@ -180,10 +180,10 @@ RoomManager.prototype.broadcast = function (room) {
     if (!p.conn) { continue; }
     if (room.admin && p.id === room.admin.pid) {
       // The admin sees the game as whichever test player they are "viewing as",
-      // with host controls, so one person can walk through every screen.
+      // as a host only when that player really is the host, so guest screens are true guest screens.
       var as = findPlayer(room, room.admin.as) ? room.admin.as : p.id;
       var v = this.viewFor(room, as);
-      v.hostId = as;
+      v.hostId = room.hostId;
       v.admin = {
         as: as,
         autoplay: !!room.admin.autoplay,
