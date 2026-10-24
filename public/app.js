@@ -1330,9 +1330,11 @@
     var close = function () { clearAll(); document.body.classList.remove("noscroll"); window.removeEventListener("resize", fit); if (o.parentNode) { o.parentNode.removeChild(o); } lastBg = ""; syncBg(); };
     var fit = function () {
       var wrap = stage.querySelector(".hv-phone"), scr = stage.querySelector(".hv-screen"); if (!wrap || !scr) { return; }
-      var r = wrap.getBoundingClientRect(), k = Math.min((r.width - 12) / 390, (r.height - 12) / 700);
-      scr.style.transform = "scale(" + k + ")";
-      scr.style.left = ((r.width - 390 * k) / 2) + "px"; scr.style.top = ((r.height - 700 * k) / 2) + "px";
+      // The screen fills the whole frame: fixed 390 logical width, and as much logical height as the frame has.
+      var w = wrap.clientWidth, h = wrap.clientHeight, k = w / 390, lh = h / k;
+      if (lh < 600) { lh = 600; k = h / lh; }
+      scr.style.width = "390px"; scr.style.height = lh + "px";
+      scr.style.transform = "scale(" + k + ")"; scr.style.left = ((w - 390 * k) / 2) + "px"; scr.style.top = "0px";
     };
     window.addEventListener("resize", fit);
     try { document.querySelector('meta[name="theme-color"]').setAttribute("content", DARK); document.documentElement.style.background = DARK; document.body.style.background = DARK; var bf = document.getElementById("bgfill"); if (bf) { bf.style.background = DARK; } } catch (e) {}
@@ -1354,7 +1356,7 @@
         ints.push(setInterval(function () { k = Math.min(k + 1, items.length - 1); seq.textContent = items[k]; seq.className = "m-num hv-pop"; }, parseInt(seq.getAttribute("data-step"), 10)));
       }
       var tm = stage.querySelector("[data-timer]");
-      if (tm) { var v = parseInt(tm.getAttribute("data-timer"), 10); ints.push(setInterval(function () { v = Math.max(0, v - 1); tm.textContent = (v < 10 ? "0" : "") + v; }, 450)); }
+      if (tm) { var v = parseInt(tm.getAttribute("data-timer"), 10); ints.push(setInterval(function () { v = Math.max(0, v - 1); tm.textContent = (v < 10 ? "0" : "") + v; }, 1000)); }
       var cnt = stage.querySelector("[data-count]");
       if (cnt) {
         var to = parseInt(cnt.getAttribute("data-count"), 10), dur = parseInt(cnt.getAttribute("data-ms"), 10), t0 = Date.now();

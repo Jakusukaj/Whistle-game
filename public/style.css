@@ -405,9 +405,8 @@ html, body { min-height: 100%; }
 @keyframes hvIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .hv-prev, .hv-next { position: absolute; top: 90px; bottom: 0; z-index: 2; background: transparent; }
 .hv-prev { left: 0; width: 30%; } .hv-next { right: 0; width: 70%; }
-.hv-phone { flex: 1; min-height: 0; position: relative; border-radius: 34px; background: #2B2B2B; box-shadow: inset 0 0 0 2px #4a4a4a; overflow: hidden; animation: hvIn 600ms 200ms both cubic-bezier(.2,.8,.2,1); }
-.hv-phone::before { content: ""; position: absolute; top: 7px; left: 50%; width: 54px; height: 5px; margin-left: -27px; border-radius: 3px; background: #111; z-index: 2; }
-.hv-screen { position: absolute; width: 390px; height: 700px; transform-origin: 0 0; border-radius: 22px; padding: 34px 22px 26px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; color: #111; overflow: hidden; }
+.hv-phone { flex: 1; min-height: 0; position: relative; border-radius: 28px; background: transparent; box-shadow: 0 0 0 2px #4a4a4a; overflow: hidden; animation: hvIn 600ms 200ms both cubic-bezier(.2,.8,.2,1); }
+.hv-screen { position: absolute; width: 390px; height: 700px; transform-origin: 0 0; border-radius: 0; padding: 26px 22px 26px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; color: #111; overflow: hidden; }
 .hv-screen.m-lt { color: #ECEAE4; }
 .hv-screen .m-spacer { flex: 1; }
 .m-top { font-size: 40px; line-height: 1; font-weight: 800; letter-spacing: -.03em; }
