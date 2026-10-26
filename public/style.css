@@ -466,3 +466,7 @@ html, body { min-height: 100%; }
 .hv-ftext { font-size: 22px; line-height: 28px; font-weight: 600; margin: 0; animation: hvIn 600ms 450ms both cubic-bezier(.2,.8,.2,1); }
 .hv-fullslide .hv-role { background: #111; color: #ECEAE4; }
 .hv-screen .m-art { margin-top: 6px; } .hv-screen .m-song { margin-top: 6px; }
+
+.mpill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; margin: 2px 0 0 -2px; border: 1.5px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; }
+.mpill .label { font-size: 11px; letter-spacing: .1em; line-height: 14px; }
+.mpill:active { background: var(--ink); color: var(--raised); }

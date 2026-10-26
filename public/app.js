@@ -277,7 +277,10 @@
     mic.rec = null; mic.state = "off"; refreshMic();
   }
 
+  var lobbyMicSig = "";
   function refreshMic() {
+    var sig = mic.state + "|" + mic.typeMode;
+    if (st && $(".pgrid") && sig !== lobbyMicSig) { lobbyMicSig = sig; try { render(); } catch (e) {} }
     var boxes = document.querySelectorAll("[data-mic]");
     for (var i = 0; i < boxes.length; i++) {
       boxes[i].innerHTML = boxes[i].getAttribute("data-mic") === "note" ? micRowHtml() : micHtml();
@@ -675,13 +678,17 @@
     var turns = s.rounds * s.players.length;
     var cells = s.players.map(function (p) {
       var mine = p.id === s.me, away = !p.connected;
-      var lab = away ? "Away" : mine ? (mic.state === "on" ? "Mic on" : mic.typeMode || mic.state === "unsupported" ? "Keyboard" : "Mic off") : micLabel(p);
+      var lab = away ? "Away" : mine ? (mic.state === "on" ? "Mic on" : mic.state === "starting" ? "Starting" : mic.state === "blocked" || mic.state === "unsupported" ? "Keyboard" : "Mic off") : micLabel(p);
       var on = lab === "Mic on", kb = lab === "Keyboard";
-      var act = "", showLab = true;
-      if (mine && !s.admin && SR && mic.state !== "on" && mic.state !== "starting" && mic.state !== "blocked") { act = '<button class="mon" data-act="mic">Turn on mic</button>'; showLab = false; }
-      else if (isHost && away) { act = '<button class="mon" data-act="rm" data-id="' + esc(p.id) + '">Remove</button>'; }
+      var dot = '<i class="mdot' + (on ? " on" : kb ? " kb" : "") + '"></i>';
+      var stat;
+      if (mine && !s.admin && SR && !away && mic.state !== "blocked" && mic.state !== "starting") {
+        stat = '<button class="mpill" data-act="mictoggle" aria-label="' + (on ? "Turn mic off" : "Turn mic on") + '">' + dot + '<span class="label">' + lab + "</span></button>";
+      } else {
+        stat = dot + '<span class="label">' + lab + "</span>" + (isHost && away ? '<button class="mon" data-act="rm" data-id="' + esc(p.id) + '">Remove</button>' : "");
+      }
       return '<div class="pcell">' + avatarHtml(s, p, "avatar--md") + '<span class="pn"><span class="title">' + esc(p.name) +
-        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="mstat"><i class="mdot' + (on ? " on" : kb ? " kb" : "") + '"></i>' + (showLab ? '<span class="label">' + lab + "</span>" : "") + act + "</span></span></div>";
+        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="mstat">' + stat + "</span></span></div>";
     }).join("");
     return {
       key: "lobby", field: "pink",
@@ -706,6 +713,10 @@
       bind: function () {
         $("#helpBtn").onclick = showHelp;
         $("#copyLink").onclick = function () { copyText(linkFor(s.code), false); };
+        var mps = document.querySelectorAll(".mpill");
+        for (var pi = 0; pi < mps.length; pi++) {
+          mps[pi].onclick = function () { if (mic.state === "on") { micStop(); render(); } else { mic.typeMode = false; micStart(); } };
+        }
         var mons = document.querySelectorAll(".mon");
         for (var mi = 0; mi < mons.length; mi++) {
           mons[mi].onclick = function () {
