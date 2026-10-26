@@ -194,9 +194,9 @@
     mic.rec = rec; mic.state = "starting";
     var startTimer = setTimeout(function () {
       if (mic.rec === rec && mic.state === "starting") { mic.fails = (mic.fails || 0) + 1; mic.state = "stopped"; micGiveUp(); refreshMic(); }
-    }, 3500);
+    }, mic.everStarted ? 3500 : 12000);
     rec.onsoundstart = rec.onspeechstart = function () { mic.level = Math.max(mic.level, 0.7); };
-    rec.onstart = function () { mic.fails = 0; mic.base = 0; mic.total = 0; clearTimeout(startTimer); if (mic.rec === rec) { mic.state = "on"; refreshMic(); } };
+    rec.onstart = function () { mic.everStarted = true; mic.fails = 0; mic.base = 0; mic.total = 0; clearTimeout(startTimer); if (mic.rec === rec) { mic.state = "on"; refreshMic(); } };
     rec.onresult = function (e) {
       var text = "", i, k;
       mic.total = e.results.length;
@@ -677,12 +677,11 @@
       var mine = p.id === s.me, away = !p.connected;
       var lab = away ? "Away" : mine ? (mic.state === "on" ? "Mic on" : mic.typeMode || mic.state === "unsupported" ? "Keyboard" : "Mic off") : micLabel(p);
       var on = lab === "Mic on", kb = lab === "Keyboard";
-      var act = "";
-      if (mine && !s.admin && SR && mic.state !== "on" && mic.state !== "starting" && mic.state !== "blocked") { act = '<button class="mon" data-act="mic">Turn on</button>'; }
-      else if (mine && !s.admin && mic.state === "on") { act = '<button class="mon" data-act="micoff">Turn off</button>'; }
+      var act = "", showLab = true;
+      if (mine && !s.admin && SR && mic.state !== "on" && mic.state !== "starting" && mic.state !== "blocked") { act = '<button class="mon" data-act="mic">Turn on mic</button>'; showLab = false; }
       else if (isHost && away) { act = '<button class="mon" data-act="rm" data-id="' + esc(p.id) + '">Remove</button>'; }
       return '<div class="pcell">' + avatarHtml(s, p, "avatar--md") + '<span class="pn"><span class="title">' + esc(p.name) +
-        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="mstat"><i class="mdot' + (on ? " on" : kb ? " kb" : "") + '"></i><span class="label">' + lab + "</span>" + act + "</span></span></div>";
+        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="mstat"><i class="mdot' + (on ? " on" : kb ? " kb" : "") + '"></i>' + (showLab ? '<span class="label">' + lab + "</span>" : "") + act + "</span></span></div>";
     }).join("");
     return {
       key: "lobby", field: "pink",
