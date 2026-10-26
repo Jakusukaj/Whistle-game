@@ -279,8 +279,11 @@
 
   var lobbyMicSig = "";
   function refreshMic() {
-    var sig = mic.state + "|" + mic.typeMode;
-    if (st && $(".pgrid") && sig !== lobbyMicSig) { lobbyMicSig = sig; try { render(); } catch (e) {} }
+    var mineBox = $('.mstat[data-mine]');
+    if (st && mineBox) {
+      var me = null; st.players.forEach(function (q) { if (q.id === st.me) { me = q; } });
+      if (me) { var h = lobbyStat(st, me, st.hostId === st.me); if (mineBox.innerHTML !== h) { mineBox.innerHTML = h; bindPill(); } }
+    }
     var boxes = document.querySelectorAll("[data-mic]");
     for (var i = 0; i < boxes.length; i++) {
       boxes[i].innerHTML = boxes[i].getAttribute("data-mic") === "note" ? micRowHtml() : micHtml();
@@ -673,11 +676,8 @@
       '<button class="btn" id="setDone">Done</button></div></div>';
   }
 
-  function viewLobby(s) {
-    var isHost = s.hostId === s.me;
-    var turns = s.rounds * s.players.length;
-    var cells = s.players.map(function (p) {
-      var mine = p.id === s.me, away = !p.connected;
+  function lobbyStat(s, p, isHost) {
+    var mine = p.id === s.me, away = !p.connected;
       var lab = away ? "Away" : mine ? (mic.state === "on" ? "Mic on" : mic.state === "starting" ? "Starting" : mic.state === "blocked" || mic.state === "unsupported" ? "Keyboard" : "Mic off") : micLabel(p);
       var on = lab === "Mic on", kb = lab === "Keyboard";
       var dot = '<i class="mdot' + (on ? " on" : kb ? " kb" : "") + '"></i>';
@@ -687,8 +687,22 @@
       } else {
         stat = dot + '<span class="label">' + lab + "</span>" + (isHost && away ? '<button class="mon" data-act="rm" data-id="' + esc(p.id) + '">Remove</button>' : "");
       }
+    return stat;
+  }
+  function bindPill() {
+    var mps = document.querySelectorAll(".mpill");
+    for (var pi = 0; pi < mps.length; pi++) {
+      mps[pi].onclick = function () { if (mic.state === "on") { micStop(); } else { mic.typeMode = false; micStart(); } };
+    }
+  }
+  function viewLobby(s) {
+    var isHost = s.hostId === s.me;
+    var turns = s.rounds * s.players.length;
+    var cells = s.players.map(function (p) {
+      var mine = p.id === s.me, away = !p.connected;
+      var stat = lobbyStat(s, p, isHost);
       return '<div class="pcell">' + avatarHtml(s, p, "avatar--md") + '<span class="pn"><span class="title">' + esc(p.name) +
-        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="mstat">' + stat + "</span></span></div>";
+        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="mstat"' + (mine ? ' data-mine="1"' : "") + '>' + stat + "</span></span></div>";
     }).join("");
     return {
       key: "lobby", field: "pink",
@@ -713,10 +727,7 @@
       bind: function () {
         $("#helpBtn").onclick = showHelp;
         $("#copyLink").onclick = function () { copyText(linkFor(s.code), false); };
-        var mps = document.querySelectorAll(".mpill");
-        for (var pi = 0; pi < mps.length; pi++) {
-          mps[pi].onclick = function () { if (mic.state === "on") { micStop(); render(); } else { mic.typeMode = false; micStart(); } };
-        }
+        bindPill();
         var mons = document.querySelectorAll(".mon");
         for (var mi = 0; mi < mons.length; mi++) {
           mons[mi].onclick = function () {
