@@ -650,10 +650,19 @@
   }
   function songsRowHtml(s, isHost) {
     var room = s.packMode === "room";
-    var cue = room ? (s.myPackVotes.length ? "Change votes" : "Vote") : isHost ? "Choose" : "See";
+    var cue = room ? "Change" : isHost ? "Choose" : "See";
     var d = songsDetail(s);
-    return '<button class="lrow lrow--top" id="openPacks"><span class="lrow__t"><span class="label">Songs' + (room ? ", room picks" : "") + '</span><span class="title">' + esc(songsTitle(s)) + "</span>" +
-      (d ? '<span class="small lrow__list">' + esc(d) + "</span>" : "") + '</span><span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
+    var inner = '<span class="lrow__t"><span class="label">Songs' + (room ? ", room picks" : "") + '</span><span class="title">' + esc(songsTitle(s)) + "</span>" +
+      (d ? '<span class="small lrow__list">' + esc(d) + "</span>" : "") + "</span>";
+    if (room && !isHost) { return '<div class="lrow lrow--top lrow--static">' + inner + "</div>"; }
+    return '<button class="lrow lrow--top" id="openPacks">' + inner + '<span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
+  }
+  // Room-picks mode: a clear primary action for every player, kept apart from the settings rows.
+  function voteCtaHtml(s) {
+    if (s.packMode !== "room") { return ""; }
+    var n = (s.myPackVotes || []).length;
+    return '<div class="votecta"><button class="btn" id="voteBtn">' + (n ? "Change your votes" : "Vote for song packs") + "</button>" +
+      '<p class="small center">' + (n ? "You have voted for " + n + (n === 1 ? " pack." : " packs.") : "Pick up to 3. The most popular packs get played.") + "</p></div>";
   }
   function inviteRowHtml(s) {
     return '<button class="lrow" id="copyLink" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Invite friends</span></span><span class="lrow__c label">Copy link</span></button>';
@@ -710,7 +719,7 @@
         '<div class="screen">' +
           '<div class="head"><h1 class="headline">' + esc(pname(s, s.hostId)) + "'s game</h1>" +
             '<p class="small">' + s.players.length + " of " + s.maxPlayers + " players are in</p></div>" +
-          '<div class="pgrid">' + cells + "</div>" +
+          '<div class="pgrid">' + cells + "</div>" + voteCtaHtml(s) +
           '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + inviteRowHtml(s) + "</div>" +
           '<div class="spacer"></div>' +
           (isHost ? "" : '<p class="headline waiting">Waiting for ' + esc(pname(s, s.hostId)) + " to start</p><div class=\"spacer\"></div>") +
@@ -743,7 +752,9 @@
           $("#setDone").onclick = function () { settingsOpen = false; render(); };
           $("#setScrim").onclick = function () { settingsOpen = false; render(); };
         }
-        $("#openPacks").onclick = function () { pickerOpen = true; keepPickerScroll = false; render(); };
+        var openP = function () { pickerOpen = true; keepPickerScroll = false; render(); };
+        var op = $("#openPacks"); if (op) { op.onclick = openP; }
+        var vb = $("#voteBtn"); if (vb) { vb.onclick = openP; }
         if (pickerOpen) {
           $("#pkDone").onclick = function () { pickerOpen = false; render(); };
           var rows = document.querySelectorAll(".pgroup__row");
