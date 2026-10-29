@@ -733,9 +733,9 @@
     return '<button class="lrow" id="copyLink" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Invite friends</span></span><span class="lrow__c label">Copy link</span></button>';
   }
   // A fair guess at game length. Most songs are guessed well inside the clock, so a turn is mostly the set-up
-  // around it (splash, picking, countdown, reveal), plus about 40 percent of the clock on average.
+  // around it (splash, picking, countdown, reveal), plus about 30 percent of the clock on average (about 18 seconds on a minute clock).
   function estMinutes(players, rounds, limitMs) {
-    var perTurn = 35 + 0.405 * limitMs / 1000, total = perTurn * players * rounds + (rounds >= 4 ? 8 : 0);
+    var perTurn = 30 + 0.3 * limitMs / 1000, total = perTurn * players * rounds + (rounds >= 4 ? 8 : 0);
     return Math.max(5, Math.round(total / 60 / 5) * 5);
   }
   function estText(s) {
