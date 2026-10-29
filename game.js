@@ -175,6 +175,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     packPicks: PACK_PICKS,
     packVotes: this.packVoteMap(room),
     myPackVotes: (room.packVotes[pid] || []).slice(),
+    interlude: room.interlude ? { turnId: room.interlude.turnId, ageMs: this.now() - room.interlude.at, seed: room.interlude.seed, performer: room.interlude.performer, guesser: room.interlude.guesser, worst: room.interlude.worst } : null,
     myGame: room.phase === "gameover" ? this.gameSummary(room, pid) : null,
     songsInPlay: this.poolFor(room).length,
     turn: tv,
@@ -608,7 +609,7 @@ RoomManager.prototype.start = function (room, conn) {
     }
   }
   room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
-  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1;
+  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.interlude = null; room.interludeDone = false;
   room.players.forEach(function (p) { p.bonus = 0; });
   room.phase = "turn";
   this.advance(room);
@@ -627,8 +628,31 @@ RoomManager.prototype.advance = function (room) {
   // those totals become the baseline for the next leaderboard's rank changes.
   if (room.turn && isRoundEnd(room)) { room.players.forEach(function (p) { p.prev = p.total; }); }
   room.turnPos++;
+  this.maybeInterlude(room);
   if (room.turnPos < room.turns.length) { return this.beginTurn(room, room.turns[room.turnPos]); }
   this.afterTurns(room);
+};
+
+// Halfway through a game of four or more rounds: a quick scoreboard moment with a few cheeky stats.
+RoomManager.prototype.maybeInterlude = function (room) {
+  var t = room.turns[room.turnPos], prev = room.turns[room.turnPos - 1];
+  if (!t || !prev || t.sd || prev.sd || room.interludeDone || room.rounds < 4) { return; }
+  if (t.round !== prev.round + 1 || prev.round !== Math.ceil(room.rounds / 2)) { return; }
+  var rows = room.players.filter(function (p) { return !p.sitOut && room.stats && room.stats[p.id] && room.stats[p.id].whistles > 0; })
+    .map(function (p) { var st = room.stats[p.id]; return { id: p.id, avg: Math.round(st.whistlePts / st.whistles), guessed: st.guessed, gms: st.guessBestMs }; });
+  room.interludeDone = true;
+  if (rows.length < 2) { return; }
+  var byAvg = rows.slice().sort(function (a, b) { return b.avg - a.avg; });
+  var best = byAvg[0], worst = byAvg[byAvg.length - 1];
+  var byGuess = rows.slice().sort(function (a, b) { return b.guessed - a.guessed || a.gms - b.gms; });
+  var g = byGuess[0];
+  var iv = { turnId: room.turnCounter + 1, at: this.now(), seed: Math.floor(this.random() * 1000), performer: null, guesser: null, worst: null };
+  if (best.avg > worst.avg) { iv.performer = { id: best.id, avg: best.avg }; }
+  if (g.guessed > 0) { iv.guesser = { id: g.id, n: g.guessed }; }
+  // Only name a worst performer when they are alone at the bottom and not also the star.
+  if (worst.avg < byAvg[byAvg.length - 2].avg) { iv.worst = { id: worst.id, avg: worst.avg }; }
+  if (!iv.performer && !iv.guesser && !iv.worst) { return; }
+  room.interlude = iv;
 };
 
 RoomManager.prototype.beginTurn = function (room, t) {

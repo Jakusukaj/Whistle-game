@@ -1585,7 +1585,48 @@
     var done = function () { clearTimeout(splashTimer); if (el.parentNode) { el.remove(); } };
     splashTimer = setTimeout(done, SPLASH_MS);
   }
+  // ---- Halfway interlude: "check the scores on the doors" with a few cheeky stats, before the next round starts.
+  var IV_TITLES = ["Halftime. Check the scores on the doors.", "Check the scores on the doors!", "Interval. Check the scores on the doors.", "Halfway there. Check the scores on the doors."];
+  var IV_PERF = ["Star performer: {n}. Someone get this one a record deal.", "Star performer: {n}. Averaging {pts} a turn. Show off.", "Top of the bill: {n}. The rest of you have some catching up to do.", "{n} is the one to beat. {pts} a turn."];
+  var IV_GUESS = ["Top guesser: {n}. Suspiciously good at this. We're watching.", "Sharpest ears: {n}. {k} so far.", "{n} has named {k} so far. Did you peek?", "Ears of the night: {n}. {k} and counting."];
+  var IV_WORST = ["Needs more practice: {n}. The kazoo is not an enemy.", "Room for improvement: {n}. It's the taking part that counts.", "{n} is saving their best for later. Probably.", "Still warming up: {n}. Any minute now."];
+  var IV_MS = 8000, lastIvTurn = null, ivTimer = null;
+  function ivLine(list, seed, off, n, extra) {
+    var t = esc(list[(seed + off) % list.length]);
+    t = t.replace("{n}", '<span class="iv-n">' + esc(n) + "</span>");
+    Object.keys(extra || {}).forEach(function (k) { t = t.replace("{" + k + "}", extra[k]); });
+    return t;
+  }
+  function ivRow(s, id, html, delay) {
+    var p = player(s, id);
+    return '<div class="iv-row" style="animation-delay:' + delay + 'ms">' + (p ? avatarHtml(s, p, "avatar--md") : "") + '<p class="iv-tx">' + html + "</p></div>";
+  }
+  function showInterlude(s) {
+    var iv = s.interlude, old = document.getElementById("interlude"); if (old) { old.remove(); }
+    clearTimeout(ivTimer);
+    var rows = "", sd = iv.seed, i = 1;
+    if (iv.performer) { rows += ivRow(s, iv.performer.id, ivLine(IV_PERF, sd, 0, pname(s, iv.performer.id), { pts: iv.performer.avg }), 1400 * i++); }
+    if (iv.guesser) { rows += ivRow(s, iv.guesser.id, ivLine(IV_GUESS, sd, 1, pname(s, iv.guesser.id), { k: iv.guesser.n + (iv.guesser.n === 1 ? " song" : " songs") }), 1400 * i++); }
+    if (iv.worst) { rows += ivRow(s, iv.worst.id, ivLine(IV_WORST, sd, 2, pname(s, iv.worst.id)), 1400 * i++); }
+    var el = document.createElement("div");
+    el.id = "interlude"; el.setAttribute("role", "status");
+    el.style.setProperty("--iv-ms", IV_MS + "ms");
+    el.innerHTML = '<h1 class="iv-title">' + esc(IV_TITLES[sd % IV_TITLES.length]) + '</h1><div class="iv-rows">' + rows + '</div><p class="small iv-skip">Tap to skip</p>';
+    document.body.appendChild(el);
+    var done = function () { clearTimeout(ivTimer); if (el.parentNode) { el.remove(); } maybeSplash(); };
+    el.onclick = done;
+    ivTimer = setTimeout(done, IV_MS);
+  }
+  function interludeShowing() { return !!document.getElementById("interlude"); }
+  function maybeInterlude() {
+    if (!st || st.phase !== "turn" || !st.turn || !st.interlude || st.interlude.turnId === lastIvTurn) { return false; }
+    lastIvTurn = st.interlude.turnId;
+    if (st.interlude.ageMs > 3000 || st.turn.id !== st.interlude.turnId) { return false; }
+    showInterlude(st); return true;
+  }
+
   function maybeSplash() {
+    if (interludeShowing()) { return; }
     if (!st || st.phase !== "turn" || !st.turn || st.turn.stage !== "choose" || st.turn.id === lastSplashTurn) { return; }
     lastSplashTurn = st.turn.id;
     var p = null; st.players.forEach(function (q) { if (q.id === st.turn.playerId) { p = q; } });
@@ -1620,6 +1661,7 @@
     refreshAdmin();
     syncBg();
     refreshTip();
+    maybeInterlude();
     maybeSplash();
   }
 
