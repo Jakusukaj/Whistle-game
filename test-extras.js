@@ -32,7 +32,7 @@ function client(port) {
   check("late joiner accepted mid-game", !!C.id && C.errors.length === 0);
   check("late joiner sees the turn screen", C.state && C.state.phase === "turn");
   check("three players listed", A.state.players.length === 3);
-  check("late joiner has same number of turns as others", A.state.totalTurns === 6);
+  check("late joiner only gets turns from the next round", A.state.totalTurns === 5 && A.state.players.filter(function (p) { return p.late; }).length === 1);
 
   B.send({ t: "cancelGame" }); await sleep(100);
   check("non-host cannot cancel", A.state.phase === "turn");

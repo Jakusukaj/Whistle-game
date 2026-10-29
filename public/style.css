@@ -523,3 +523,7 @@ html, body { min-height: 100%; }
 .helpfab { position: fixed; z-index: 25; top: calc(10px + env(safe-area-inset-top)); right: 12px; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid currentColor; background: rgba(236,234,228,.9); color: #111; font: 700 17px/1 var(--font, "Inter Tight", sans-serif); display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
 body.admin .helpfab { top: 54px; }
 #topLabel { padding-right: 44px; }
+.pn .nmtx .late { display: block; font-size: 11px; line-height: 13px; font-weight: 500; opacity: .7; }
+#sfxfab { right: 54px; }
+body.admin #sfxfab { top: 54px; }
+#topLabel { padding-right: 88px; }

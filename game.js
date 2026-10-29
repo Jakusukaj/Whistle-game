@@ -147,7 +147,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     var locked = t.lockUntil && t.lockUntil > this.now();
     if (locked) { tv.lockUntil = t.lockUntil; }
     if (isW && t.options && t.stage === "choose" && !t.difficulty) {
-      tv.canRefresh = !t.refreshed;
+      tv.canRefresh = (t.refreshes || 0) < 3; tv.refreshesLeft = 3 - (t.refreshes || 0);
       tv.options = t.options.map(function (o) {
         return { difficulty: o.difficulty, multiplier: self.opts.multipliers[o.difficulty], title: o.song.title, artist: o.song.artist };
       });
@@ -165,7 +165,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
     players: room.players.filter(function (p) { return !p.sitOut; }).map(function (p) {
-      return { id: p.id, name: p.name, ci: (p.ci || 0) % 20, connected: p.connected, total: p.total, prev: p.prev || 0, last: p.last, turns: p.turns, mic: p.mic || null, bonus: p.bonus || 0 };
+      return { id: p.id, name: p.name, ci: (p.ci || 0) % 20, connected: p.connected, total: p.total, prev: p.prev || 0, last: p.last, turns: p.turns, mic: p.mic || null, bonus: p.bonus || 0, late: !!p.late };
     }),
     packs: PACKS.map(function (p) {
       return { id: p.id, group: p.group, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
@@ -220,7 +220,7 @@ RoomManager.prototype.listRooms = function () {
     var host = findPlayer(r, r.hostId);
     var count = r.players.filter(function (p) { return !p.sitOut; }).length;
     if (!host || count >= this.opts.maxPlayers) { continue; }
-    out.push({ code: r.code, host: host.name, players: count, max: this.opts.maxPlayers, inProgress: r.phase === "turn" });
+    out.push({ code: r.code, host: host.name, players: count, max: this.opts.maxPlayers, inProgress: r.phase === "turn" && !!r.sd, live: r.phase === "turn" && !r.sd });
   }
   return out;
 };
@@ -353,8 +353,8 @@ RoomManager.prototype.peek = function (conn, msg) {
   var room = this.rooms[code], host = room ? findPlayer(room, room.hostId) : null;
   if (!room || !host) { return conn.send({ t: "roomInfo", code: code, found: false }); }
   var count = room.players.filter(function (p) { return !p.sitOut; }).length;
-  var state = room.phase === "lobby" ? "open" : (room.phase === "gameover" ? "over" : "started");
-  if (state === "open" && count >= this.opts.maxPlayers) { state = "full"; }
+  var state = room.phase === "lobby" ? "open" : (room.phase === "gameover" ? "over" : (room.sd ? "started" : "live"));
+  if ((state === "open" || state === "live") && count >= this.opts.maxPlayers) { state = "full"; }
   conn.send({ t: "roomInfo", code: room.code, found: true, host: host.name, players: count, max: this.opts.maxPlayers, state: state });
 };
 
@@ -397,19 +397,18 @@ RoomManager.prototype.join = function (conn, msg) {
   this.broadcast(room);
 };
 
-// Someone joining mid-game plays the rest of this round and every later round.
-// The rounds they missed are added to the very end so everyone gets the same
-// number of turns.
+// Someone joining mid-game guesses for the rest of this round and performs from the next round on.
+// They are not given extra turns for the rounds they missed.
 RoomManager.prototype.scheduleLatePlayer = function (room, p) {
   var cur = room.turns[room.turnPos] ? room.turns[room.turnPos].round : room.rounds;
   var r, i, last;
-  for (r = cur; r <= room.rounds; r++) {
+  p.late = true;
+  for (r = cur + 1; r <= room.rounds; r++) {
     last = -1;
     for (i = 0; i < room.turns.length; i++) { if (room.turns[i].round === r && !room.turns[i].sd) { last = i; } }
     if (last < 0) { continue; }
     room.turns.splice(last + 1, 0, { playerId: p.id, round: r, sd: false });
   }
-  for (r = 1; r < cur; r++) { room.turns.push({ playerId: p.id, round: room.rounds, sd: false }); }
 };
 
 RoomManager.prototype.closeAdmin = function (room, conn) {
@@ -610,7 +609,7 @@ RoomManager.prototype.start = function (room, conn) {
   }
   room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
   room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.interlude = null; room.interludeDone = false;
-  room.players.forEach(function (p) { p.bonus = 0; });
+  room.players.forEach(function (p) { p.bonus = 0; p.late = false; });
   room.phase = "turn";
   this.advance(room);
 };
@@ -692,10 +691,11 @@ RoomManager.prototype.dealOptions = function (room, avoid) {
 // Whistler does not know any of the three songs: new cards, once per turn, free.
 RoomManager.prototype.refreshOptions = function (room, me) {
   var t = this.currentTurnFor(room, me, ["choose"]);
-  if (!t || t.difficulty || !t.options || t.refreshed) { return; }
-  var fresh = this.dealOptions(room, t.options.map(function (o) { return o.song.title; }));
+  if (!t || t.difficulty || !t.options || (t.refreshes || 0) >= 3) { return; }
+  t.seen = (t.seen || []).concat(t.options.map(function (o) { return o.song.title; }));
+  var fresh = this.dealOptions(room, t.seen);
   if (!fresh.length) { return; }
-  t.options = fresh; t.refreshed = true;
+  t.options = fresh; t.refreshes = (t.refreshes || 0) + 1;
   this.broadcast(room);
 };
 

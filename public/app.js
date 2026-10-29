@@ -79,7 +79,9 @@
 
   function onMessage(m) {
     if (m.t === "state") {
+      var prevSt = st;
       st = m.state;
+      audioEvents(prevSt, st);
       offset = st.serverNow - Date.now();
       var T = st.turn;
       if (T && T.stage === "whistling" && (prevStage !== "whistling" || prevTurnId !== T.id)) { mic.lastSent = ""; }
@@ -105,7 +107,7 @@
         toast(m.message || "Oops, something went wrong.");
       }
     } else if (m.t === "guessFeedback") {
-      toast("Nope! Try again.");
+      toast("Nope! Try again."); sfx("nope"); buzz(40);
     }
   }
 
@@ -364,7 +366,7 @@
       var chg = r.chg === undefined ? "" : (r.chg > 0 ? "+" + r.chg : String(r.chg));
       var g = gained[p.id] !== undefined && gained[p.id] > 0 && final ? "+" + pts(gained[p.id]) : "";
       return '<div class="' + (final ? "finalrow" : "stand" + (me ? " me" : "")) + '"><span class="label">' + r.rank + "</span>" +
-        '<span class="title pn">' + avatarHtml(s, p) + '<span class="nmtx">' + esc(p.name) + "</span>" + (win ? '<span class="tag">Winner</span>' : "") + "</span>" +
+        '<span class="title pn">' + avatarHtml(s, p) + '<span class="nmtx">' + esc(p.name) + (p.late ? '<small class="late">joined late</small>' : "") + "</span>" + (win ? '<span class="tag">Winner</span>' : "") + "</span>" +
         '<span class="title">' + pts(p.total) + "</span>" +
         (final ? '<span class="bn">' + g + "</span>" : '<span class="ch">' + chg + "</span>") + "</div>";
     }).join("");
@@ -376,11 +378,11 @@
       return '<div class="gamerow"><span class="gtxt"><span class="title">Nobody\'s hosting yet</span></span></div>';
     }
     return gameList.map(function (g) {
-      var closed = g.inProgress;
+      var closed = g.inProgress, live = g.live;
       return (closed ? '<div class="gamerow dead">' : '<button class="gamebtn" data-code="' + esc(g.code) + '">') +
         '<span class="gtxt"><span class="title">' + esc(g.host) + "'s game</span>" +
-        '<span class="small">' + (closed ? g.players + (g.players === 1 ? " player" : " players") + ", in progress" : g.players + " of " + (g.max || 20) + " players") + "</span></span>" +
-        '<span class="label">' + (closed ? "In progress" : "Join") + "</span>" + (closed ? "</div>" : "</button>");
+        '<span class="small">' + (closed ? g.players + (g.players === 1 ? " player" : " players") + ", in a tie-break" : g.players + " of " + (g.max || 20) + " players" + (live ? ", game under way" : "")) + "</span></span>" +
+        '<span class="label">' + (closed ? "Tie-break" : "Join") + "</span>" + (closed ? "</div>" : "</button>");
     }).join("");
   }
 
@@ -406,7 +408,7 @@
         bind: function () { $("#inviteHome").onclick = function () { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} lastKey = null; render(); }; } };
     }
     var closed = !info.found ? ["Game not found", "That link's not working any more. Ask the host for a new one."]
-      : info.state === "started" ? [esc(info.host) + "'s game has started", "You can jump in once it's back in the lobby."]
+      : info.state === "started" ? [esc(info.host) + "'s game is in a tie-break", "You can jump in once it's back in the lobby."]
       : info.state === "over" ? [esc(info.host) + "'s game has finished", "Ask the host for a new link."]
       : info.state === "full" ? [esc(info.host) + "'s game is full", "All " + info.max + " places are taken."] : null;
     if (closed) {
@@ -417,7 +419,8 @@
       key: "invite", field: "orange",
       html: '<div class="screen"><div class="brand"><h1 class="headline">' + esc(info.host) + "'s game</h1>" +
         '<p class="title">' + info.players + " of " + info.max + " players are in</p></div>" +
-        '<div class="field-group">' + nameField(name) + '<button id="joinBtn" class="btn" style="margin-top:12px">Join lobby</button></div>' +
+        '<div class="field-group">' + nameField(name) + '<button id="joinBtn" class="btn" style="margin-top:12px">' + (info.state === "live" ? "Join game" : "Join lobby") + "</button>" +
+          (info.state === "live" ? '<p class="small">The game\'s under way. You\'ll guess for the rest of this round, then perform from the next one.</p>' : "") + "</div>" +
         '<div class="spacer"></div>' + goHome + "</div>",
       bind: function () {
         var go = function () { var n = readName(); if (n) { autoMic(); send({ t: "join", code: invite.code, name: n }); } };
@@ -729,17 +732,27 @@
   function inviteRowHtml(s) {
     return '<button class="lrow" id="copyLink" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Invite friends</span></span><span class="lrow__c label">Copy link</span></button>';
   }
+  // A fair guess at game length. Most songs are guessed well inside the clock, so a turn is mostly the set-up
+  // around it (splash, picking, countdown, reveal), plus about 40 percent of the clock on average.
+  function estMinutes(players, rounds, limitMs) {
+    var perTurn = 35 + 0.405 * limitMs / 1000, total = perTurn * players * rounds + (rounds >= 4 ? 8 : 0);
+    return Math.max(5, Math.round(total / 60 / 5) * 5);
+  }
+  function estText(s) {
+    var n = Math.max(2, s.players.length);
+    return "About " + estMinutes(n, s.rounds, s.limitMs) + " min with " + n + (n === 1 ? " player" : " players");
+  }
   function settingsText(s) {
     return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
   }
   function settingsRowHtml(s, isHost) {
-    if (!isHost) { return '<div class="lrow lrow--static" id="guestSettings"><span class="lrow__t"><span class="label">Game</span><span class="title">' + settingsText(s) + "</span></span></div>"; }
-    return '<button class="lrow" id="openSettings"><span class="lrow__t"><span class="label">Game settings</span><span class="title" id="settingsLine">' + settingsText(s) + '</span></span><span class="lrow__c label">Change</span>' + ico("chevron", "chev") + "</button>";
+    if (!isHost) { return '<div class="lrow lrow--static" id="guestSettings"><span class="lrow__t"><span class="label">Game</span><span class="title">' + settingsText(s) + '</span><span class="small">' + estText(s) + "</span></span></div>"; }
+    return '<button class="lrow" id="openSettings"><span class="lrow__t"><span class="label">Game settings</span><span class="title" id="settingsLine">' + settingsText(s) + '</span><span class="small">' + estText(s) + '</span></span><span class="lrow__c label">Change</span>' + ico("chevron", "chev") + "</button>";
   }
   function settingsSheetHtml(s, turns) {
     var opts = s.limitOptions || [30000, 60000, 90000, 120000];
     return '<div class="sheetwrap"><div class="scrim" id="setScrim"></div><div class="sheet"><span class="label">Game settings</span>' +
-      '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all</p></div>" +
+      '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all, about " + estMinutes(Math.max(2, s.players.length), s.rounds, s.limitMs) + " min</p></div>" +
       '<div class="stepper"><button id="minus" class="txt" aria-label="Fewer rounds">Less</button><span class="title val" id="roundsVal">' + s.rounds + '</span><button id="plus" class="txt" aria-label="More rounds">More</button></div></div>' +
       '<div class="stack"><div class="label">Round length</div><div class="seg">' + opts.map(function (ms) {
         return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" aria-pressed="' + (ms === s.limitMs) + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
@@ -1055,7 +1068,7 @@
     if (whoState.built === t.id) { return; }
     whoState.built = t.id;
     whoState.picks = t.pending && t.pending.from ? [t.pending.from] : [];
-    var sub = (t.pending && t.pending.heard ? "Heard “" + t.pending.heard + "”. " : "") + "Tap everyone who got it right. They each bag half the points.";
+    var sub = (t.pending && t.pending.heard ? "Heard “" + t.pending.heard + "”. " : "") + "You can select more than one, in case two people shouted at once.";
     $("#confSub").textContent = sub;
     var grid = $("#whoGrid");
     grid.innerHTML = st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
@@ -1096,8 +1109,8 @@
           '<div class="head"><h1 class="headline">Pick a song</h1>' +
           '<p class="small">Harder songs earn bonus points. Only you can see these! The 3, 2, 1 starts as soon as you pick.</p></div>' +
           '<div class="stack">' + offs + "</div>" +
-          (T.canRefresh ? '<button id="refreshBtn" class="btn btn--outline">Refresh options</button>' +
-            '<p class="small center">Don\'t know any of these? Refresh once for three new ones.</p>' : "") +
+          (T.canRefresh ? '<button id="refreshBtn" class="btn btn--outline">Refresh options (' + (T.refreshesLeft || 0) + ' left)</button>' +
+            '<p class="small center">Don\'t know any of these? You can refresh up to 3 times.</p>' : "") +
           '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: function () {
           var rf = $("#refreshBtn"); if (rf) { rf.onclick = function () { send({ t: "refreshOptions" }); }; }
@@ -1159,7 +1172,7 @@
           '<div class="actions2">' + actionHtml("shuffleBtn", "Song", "", "Shuffle", T.penalty + " point penalty") +
           actionHtml("hintBtn", (T.hints || 0) + " of 3", "", "Give hint", hintCostText(T)) + "</div>" +
           '<button id="gotBtn" class="btn gotbtn">Someone got it</button>' + skipHtml(s) +
-          '<div class="ovl" id="confirm" hidden><div class="scrim"></div><div class="sheet"><span class="label">Who got it?</span>' +
+          '<div class="ovl" id="confirm" hidden><div class="scrim"></div><div class="sheet"><span class="label">Who got it first?</span>' +
           '<p class="small" id="confSub"></p><div class="whogrid" id="whoGrid"></div>' +
           '<button id="yesBtn" class="btn" disabled>Confirm</button><button id="noBtn" class="txt" style="align-self:center">Not yet, keep going</button></div></div></div>',
         bind: function () {
@@ -1407,10 +1420,10 @@
       { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is performing. Your phone's mic should catch your guess. If it doesn't, tap Type instead.", bg: FIELD_BG.green,
         mock: '<div class="m-orbwrap"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
           '<div class="m-say"><span>You say</span><b>Dancing Queen</b></div></div><div class="m-head">Listening</div><div class="m-link">Type instead</div>' },
-      { ms: 5600, role: "w", chip: "Your turn to perform", head: "Say who got it", text: "Someone nailed it? Tap Someone got it, tick who named the song, then confirm.", bg: FIELD_BG.ground,
+      { ms: 5600, role: "w", chip: "Your turn to perform", head: "Say who got it", text: "Someone nailed it? Tap Someone got it, pick who got it first, then confirm.", bg: FIELD_BG.ground,
         mock: '<div class="m-rows">' +
           '<div class="m-row m-on">' + AV("Theo", 1) + '<b>Theo</b><em>Got it</em></div><div class="m-row">' + AV("Priya", 2) + '<b>Priya</b></div><div class="m-row">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="m-btn">Confirm</div>' + TAP(80, 135, 1500) },
-      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The performer bags the full score. Each guesser gets half.", bg: FIELD_BG.blue, light: true,
+      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The performer bags the full score. Whoever got it first gets half.", bg: FIELD_BG.blue, light: true,
         mock: '<div class="m-big" data-count="917" data-ms="1600">0</div><div class="m-label">Guessed in 12.4s</div><div class="m-sub2">Maya scores<br>Theo named it and earns 459</div>' },
       { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards chuck in bonus points at the end.", bg: FIELD_BG.pink,
         mock: '<div class="m-rows">' +
@@ -1492,9 +1505,9 @@
         ? ["Countdown", "When it ends, whistle or kazoo the tune. No words! Shuffles and hints cost points."]
         : ["Countdown", "When it ends, " + who + " starts performing. Shout the title as soon as you know it, or tap Type instead."];
     }
-    if (/^w-/.test(key)) { return ["You are performing", "Whistle or kazoo the tune. No words! When someone says the right title, tap Someone got it, tick who named it, then confirm."]; }
+    if (/^w-/.test(key)) { return ["You are performing", "Whistle or kazoo the tune. No words! When someone says the right title, tap Someone got it, pick who got it first, then confirm."]; }
     if (/^g-/.test(key)) { return ["You are guessing", "Listen to " + who + " and shout the song title, or tap Type instead. The faster you guess, the more you score. Stuck? Ask for a hint."]; }
-    if (/^reveal-/.test(key)) { return ["Score", "The performer bags the full score and everyone who named the song gets half. Next turn coming up!"]; }
+    if (/^reveal-/.test(key)) { return ["Score", "The performer bags the full score and whoever got it first gets half. Next turn coming up!"]; }
     if (key === "lobby") {
       return host
         ? ["You are the host", "Send the invite link to your friends. Choose the song packs and rounds, then tap Start game once everyone's in. Keep your mic on so the game can hear guesses!"]
@@ -1536,8 +1549,15 @@
   // The ? button sits in the corner of every in-game screen.
   function refreshTip() {
     var old = document.getElementById("helpfab");
-    if (!st || st.admin) { if (old) { old.parentNode.removeChild(old); } return; }
+    if (!st || st.admin) { if (old) { old.parentNode.removeChild(old); } var sf = document.getElementById("sfxfab"); if (sf) { sf.parentNode.removeChild(sf); } return; }
     if (newbie === null && !askedPlayed) { askPlayed(); }
+    if (!document.getElementById("sfxfab")) {
+      var sb = document.createElement("button");
+      sb.id = "sfxfab"; sb.className = "helpfab"; sb.innerHTML = sfxIcon(); sb.setAttribute("aria-pressed", String(sfxOn));
+      sb.setAttribute("aria-label", sfxOn ? "Sound and buzz on, tap to mute" : "Muted, tap to turn sound and buzz on");
+      sb.onclick = function () { setSfx(!sfxOn); };
+      document.body.appendChild(sb);
+    }
     if (!old) {
       var b = document.createElement("button");
       b.id = "helpfab"; b.className = "helpfab"; b.setAttribute("aria-label", "Help: what should I do now?"); b.textContent = "?";
@@ -1557,6 +1577,109 @@
     return frac > 0.5 ? "green" : frac > 0.2 ? "yellow" : "orange";
   }
 
+  // ------------------------------------------------------- sound effects and haptics (no music, all synthesised)
+  var sfxOn = true; try { sfxOn = localStorage.getItem("ttt_sfx") !== "off"; } catch (e) {}
+  var actx = null, hapEl = null;
+  function audioCtx() {
+    if (!actx) { try { var AC = window.AudioContext || window.webkitAudioContext; if (AC) { actx = new AC(); } } catch (e) {} }
+    if (actx && actx.state === "suspended") { try { actx.resume(); } catch (e) {} }
+    return actx;
+  }
+  ["touchstart", "pointerdown", "keydown"].forEach(function (ev) { document.addEventListener(ev, audioCtx, { passive: true }); });
+  function tone(f, at, dur, type, vol, to, vib) {
+    var c = actx; if (!c) { return; }
+    var t0 = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(f, t0);
+    if (to) { o.frequency.exponentialRampToValueAtTime(to, t0 + dur); }
+    if (vib) { var l = c.createOscillator(), lg = c.createGain(); l.frequency.value = vib; lg.gain.value = f * 0.03; l.connect(lg); lg.connect(o.frequency); l.start(t0); l.stop(t0 + dur + 0.05); }
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function noise(at, dur, vol, freq, q, hp) {
+    var c = actx; if (!c) { return; }
+    var n = Math.max(1, Math.floor(c.sampleRate * dur)), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) { d[i] = Math.random() * 2 - 1; }
+    var src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), t0 = c.currentTime + at;
+    src.buffer = buf; f.type = hp ? "highpass" : "bandpass"; f.frequency.value = freq || 2000; f.Q.value = q || 1;
+    g.gain.setValueAtTime(vol || 0.15, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(c.destination); src.start(t0);
+  }
+  var SFX = {
+    pop: function () { tone(520, 0, 0.1, "sine", 0.22, 900); },
+    turn: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, i * 0.09, 0.22, "triangle", 0.22); }); tone(1568, 0.38, 0.4, "sine", 0.12, null, 9); noise(0.38, 0.3, 0.05, 6000, 1, true); },
+    next: function () { tone(440, 0, 0.1, "triangle", 0.15); tone(587, 0.1, 0.16, "triangle", 0.15); },
+    tick: function () { tone(880, 0, 0.09, "square", 0.08); },
+    go: function () { [523, 659, 784].forEach(function (f) { tone(f, 0, 0.45, "sawtooth", 0.07); }); tone(1047, 0, 0.4, "triangle", 0.12); },
+    ping: function () { tone(1175, 0, 0.18, "sine", 0.2); tone(1568, 0.12, 0.3, "sine", 0.2); },
+    win: function () { tone(300, 0, 0.45, "sine", 0.2, 1600); [784, 1047, 1319, 1568].forEach(function (f, i) { tone(f, 0.42 + i * 0.07, 0.35, "triangle", 0.18); }); noise(0.42, 0.5, 0.1, 5000, 0.8, true); },
+    fail: function () { [[294, 0], [277, 0.32], [262, 0.64]].forEach(function (a) { tone(a[0], a[1], 0.3, "sawtooth", 0.1); }); tone(247, 0.96, 0.7, "sawtooth", 0.1, 196, 6); },
+    nope: function () { tone(220, 0, 0.12, "square", 0.1); tone(165, 0.12, 0.2, "square", 0.1); },
+    hint: function () { tone(220, 0, 0.3, "sine", 0.25, 620, 14); tone(620, 0.3, 0.2, "sine", 0.2, 260); },
+    shuffle: function () { for (var i = 0; i < 6; i++) { noise(i * 0.045, 0.06, 0.1, 2600 + i * 250, 2); } },
+    drum: function () { var t = 0; for (var i = 0; i < 14; i++) { noise(t, 0.07, 0.07 + i * 0.006, 1800, 1.2); t += Math.max(0.045, 0.14 - i * 0.008); } },
+    crash: function () { noise(0, 1.1, 0.14, 4000, 0.6, true); tone(110, 0, 0.3, "sine", 0.2, 55); },
+    fanfare: function () { [523, 659, 784, 1047, 784, 1047, 1319].forEach(function (f, i) { tone(f, i * 0.11, 0.3, "triangle", 0.18); }); noise(0.8, 1, 0.12, 4500, 0.6, true); }
+  };
+  function sfx(name) {
+    if (!sfxOn) { return; }
+    if (!audioCtx()) { return; }
+    try { SFX[name](); } catch (e) {}
+  }
+  // Android and desktop use the Vibration API. Safari on iPhone does not have it, so a hidden switch checkbox gives a tick instead
+  // (this only works when it follows a tap).
+  function iosTick() {
+    try {
+      if (!hapEl) {
+        hapEl = document.createElement("label"); hapEl.setAttribute("aria-hidden", "true");
+        hapEl.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none";
+        var i = document.createElement("input"); i.type = "checkbox"; i.setAttribute("switch", ""); hapEl.appendChild(i); document.body.appendChild(hapEl);
+      }
+      hapEl.click();
+    } catch (e) {}
+  }
+  function buzz(p) {
+    if (!sfxOn) { return; }
+    try {
+      if (navigator.vibrate) { navigator.vibrate(p); return; }
+      var a = [].concat(p), at = 0;
+      for (var i = 0; i < a.length; i += 2) { (function (d) { setTimeout(iosTick, d); })(at); at += (a[i] || 0) + (a[i + 1] || 0); }
+    } catch (e) {}
+  }
+  function setSfx(on) {
+    sfxOn = on; try { localStorage.setItem("ttt_sfx", on ? "on" : "off"); } catch (e) {}
+    var b = document.getElementById("sfxfab"); if (b) { b.innerHTML = sfxIcon(); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", on ? "Sound and buzz on, tap to mute" : "Muted, tap to turn sound and buzz on"); }
+    if (on) { sfx("pop"); buzz(30); }
+  }
+  function sfxIcon() {
+    return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/>' +
+      (sfxOn ? '<path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>' : '<path d="M17 9l5 6M22 9l-5 6"/>') + "</svg>";
+  }
+  // Sounds that follow state changes. They run before the screen is redrawn.
+  var sfxTimers = [], sfxTurn = null, drumTurn = null, slamTurn = null;
+  function clearSfxTimers() { sfxTimers.forEach(clearTimeout); sfxTimers = []; }
+  function audioEvents(prev, cur) {
+    if (!cur) { return; }
+    var T = cur.turn, P = prev && prev.turn;
+    if (cur.phase === "lobby" && prev && prev.phase === "lobby" && cur.players.length > prev.players.length) { sfx("pop"); buzz(25); }
+    if (cur.phase === "gameover" && (!prev || prev.phase !== "gameover")) { sfx("fanfare"); buzz([60, 40, 60, 40, 140]); }
+    if (!T) { return; }
+    var same = P && P.id === T.id;
+    if (T.stage === "countdown" && !(same && P.stage === "countdown")) {
+      clearSfxTimers();
+      var end = T.countdownEndsAt;
+      [3, 2, 1].forEach(function (k) {
+        var d = end - k * 1000 - nowS();
+        if (d > -150) { sfxTimers.push(setTimeout(function () { sfx("tick"); buzz(25); }, Math.max(0, d))); }
+      });
+      var gd = end - nowS();
+      if (gd > -150) { sfxTimers.push(setTimeout(function () { sfx("go"); buzz(T.playerId === cur.me ? [70, 40, 120] : 50); }, Math.max(0, gd))); }
+    }
+    if (same && T.stage !== "countdown" && P.stage === "countdown") { /* the go cue is already scheduled */ }
+    if (T.stage === "confirming" && !(same && P.stage === "confirming") && T.playerId === cur.me) { sfx("ping"); buzz([50, 40, 50]); }
+    if (same && (T.hints || 0) > (P.hints || 0)) { sfx("hint"); buzz(40); }
+    if (same && T.shuffles !== undefined && P.shuffles !== undefined && T.shuffles > P.shuffles) { sfx("shuffle"); buzz(30); }
+  }
+
   // ---- Turn splash: a full-screen "it's show time" card, about three seconds, before each player's turn.
   var SPLASH_LINES = [
     "{n}, it's show time!", "{n}, you're up!", "{n}, it's your turn!", "{n}, your time to shine!",
@@ -1567,9 +1690,12 @@
   var SPLASH_HUES = [["#FF4B14", "#111"], ["#FF4FA3", "#111"], ["#00B86B", "#111"], ["#FFD21F", "#111"], ["#2640EC", "#ECEAE4"]];
   var SPLASH_MS = 4000, lastSplashTurn = null, lastSplashLine = -1, lastSplashHue = -1, splashTimer = null;
   function pickDifferent(n, last) { var i; do { i = Math.floor(Math.random() * n); } while (n > 1 && i === last); return i; }
-  function showSplash(name, avatar) {
+  var splashSfx = [];
+  function showSplash(name, avatar, mine) {
     var old = document.getElementById("splash"); if (old) { old.remove(); }
-    clearTimeout(splashTimer);
+    clearTimeout(splashTimer); splashSfx.forEach(clearTimeout); splashSfx = [];
+    sfx(mine ? "turn" : "next"); buzz(mine ? [80, 50, 80, 50, 140] : 30);
+    [1000, 2000, 3000].forEach(function (d) { splashSfx.push(setTimeout(function () { sfx("tick"); buzz(20); }, d)); });
     var li = lastSplashLine = pickDifferent(SPLASH_LINES.length, lastSplashLine);
     var hi = lastSplashHue = pickDifferent(SPLASH_HUES.length, lastSplashHue);
     var text = esc(SPLASH_LINES[li]).replace(/\{n\}([,!]?)/, function (m, pu) { return '<span class="sp-n">' + esc(name) + pu + "</span>"; });
@@ -1587,7 +1713,7 @@
   var IV_PERF = ["Star performer: {n}. Someone get this one a record deal.", "Star performer: {n}. Averaging {pts} a turn. Show off.", "Top of the bill: {n}. The rest of you have some catching up to do.", "{n} is the one to beat. {pts} a turn."];
   var IV_GUESS = ["Top guesser: {n}. Suspiciously good at this. We're watching.", "Sharpest ears: {n}. {k} so far.", "{n} has named {k} so far. Did you peek?", "Ears of the night: {n}. {k} and counting."];
   var IV_WORST = ["Needs more practice: {n}. The kazoo is not an enemy.", "Room for improvement: {n}. It's the taking part that counts.", "{n} is saving their best for later. Probably.", "Still warming up: {n}. Any minute now."];
-  var IV_MS = 8000, lastIvTurn = null, ivTimer = null;
+  var IV_MS = 8000, lastIvTurn = null, ivTimer = null, ivSfx = [];
   function ivLine(list, seed, off, n, extra) {
     var t = esc(list[(seed + off) % list.length]);
     t = t.replace("{n}", '<span class="iv-n">' + esc(n) + "</span>");
@@ -1610,7 +1736,9 @@
     el.style.setProperty("--iv-ms", IV_MS + "ms");
     el.innerHTML = '<h1 class="iv-title">' + esc(IV_TITLES[sd % IV_TITLES.length]) + '</h1><div class="iv-rows">' + rows + '</div><p class="small iv-skip">Tap to skip</p>';
     document.body.appendChild(el);
-    var done = function () { clearTimeout(ivTimer); if (el.parentNode) { el.remove(); } maybeSplash(); };
+    sfx("drum"); buzz(40); ivSfx.forEach(clearTimeout); ivSfx = [setTimeout(function () { sfx("crash"); buzz([60, 30, 100]); }, 1250)];
+    for (var q = 1; q < i; q++) { (function (d) { ivSfx.push(setTimeout(function () { sfx("pop"); }, d)); })(1400 * q + 150); }
+    var done = function () { clearTimeout(ivTimer); ivSfx.forEach(clearTimeout); if (el.parentNode) { el.remove(); } maybeSplash(); };
     el.onclick = done;
     ivTimer = setTimeout(done, IV_MS);
   }
@@ -1622,12 +1750,18 @@
     showInterlude(st); return true;
   }
 
+  var lateNoted = false;
+  function lateNote() {
+    if (!st || st.phase !== "turn") { return; }
+    var me = player(st, st.me);
+    if (me && me.late && !lateNoted) { lateNoted = true; toast("You're in! You'll guess for now and perform from the next round."); }
+  }
   function maybeSplash() {
     if (interludeShowing()) { return; }
     if (!st || st.phase !== "turn" || !st.turn || st.turn.stage !== "choose" || st.turn.id === lastSplashTurn) { return; }
     lastSplashTurn = st.turn.id;
     var p = null; st.players.forEach(function (q) { if (q.id === st.turn.playerId) { p = q; } });
-    if (p) { showSplash(p.name, avatarHtml(st, p, "sp-avatar")); }
+    if (p) { showSplash(p.name, avatarHtml(st, p, "sp-avatar"), p.id === st.me); }
   }
 
   function render() {
@@ -1658,6 +1792,7 @@
     refreshAdmin();
     syncBg();
     refreshTip();
+    lateNote();
     maybeInterlude();
     maybeSplash();
   }
@@ -1703,7 +1838,8 @@
         if (mb) { mb.hidden = !fr.badge || fr.final; if (fr.badge && mb.textContent !== fr.badge) { mb.textContent = fr.badge; } }
         if (dt) { dt.hidden = !fr.delta || fr.final; if (fr.delta && dt.textContent !== fr.delta) { dt.textContent = fr.delta; } }
         sn.classList.toggle("big", !!fr.final);
-        if (fr.final && !sn.classList.contains("slam")) { sn.classList.add("slam"); try { if (navigator.vibrate) { navigator.vibrate(R.score > 0 ? [60, 40, 90] : 40); } } catch (e) {} }
+        if (fr.drum && drumTurn !== T.id && R.outcome === "correct") { drumTurn = T.id; sfx("drum"); }
+        if (fr.final && !sn.classList.contains("slam")) { sn.classList.add("slam"); buzz(R.score > 0 ? [60, 40, 90] : 40); if (slamTurn !== T.id) { slamTurn = T.id; if (R.outcome === "correct") { sfx("win"); } else if (R.outcome !== "skipped") { sfx("fail"); } } }
         var late = ms >= fr.finalAt + 300;
         var bd = $("#board");
         if (bd) { bd.classList.toggle("rvhide", !late); }
@@ -1723,7 +1859,7 @@
       if (app.className !== cls) { app.className = cls; syncBg(); }
       if (remain <= 10000 && T.stage === "whistling") {
         var sec = Math.ceil(remain / 1000);
-        if (sec !== lastSecond) { lastSecond = sec; try { if (navigator.vibrate) { navigator.vibrate(40); } } catch (e) {} }
+        if (sec !== lastSecond) { lastSecond = sec; buzz(40); }
       } else { lastSecond = null; }
     } else {
       lastSecond = null;
