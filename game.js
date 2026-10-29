@@ -175,6 +175,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     packPicks: PACK_PICKS,
     packVotes: this.packVoteMap(room),
     myPackVotes: (room.packVotes[pid] || []).slice(),
+    myGame: room.phase === "gameover" ? this.gameSummary(room, pid) : null,
     songsInPlay: this.poolFor(room).length,
     turn: tv,
     winners: room.winners || null,
@@ -607,7 +608,7 @@ RoomManager.prototype.start = function (room, conn) {
     }
   }
   room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
-  room.stats = {}; room.endAwards = null; room.bonusCapped = false;
+  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1;
   room.players.forEach(function (p) { p.bonus = 0; });
   room.phase = "turn";
   this.advance(room);
@@ -910,12 +911,13 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
   if (!t.sd) {
     var ws = statFor(room, t.playerId);
     ws.whistles++; ws.whistlePts += score;
+    if (t.song && t.song.packs) { t.song.packs.forEach(function (id) { ws.packs[id] = (ws.packs[id] || 0) + 1; }); }
     if (outcome === "correct") {
       ws.solved++; ws.streak++;
       if (ws.streak > ws.bestStreak) { ws.bestStreak = ws.streak; }
       if (timeMs < ws.bestTimeMs) { ws.bestTimeMs = timeMs; }
       if (t.difficulty === "hard") { ws.hardSolved++; }
-      awards.forEach(function (a) { if (a.role === "guesser") { statFor(room, a.id).guessed++; } });
+      awards.forEach(function (a) { if (a.role === "guesser") { var gs = statFor(room, a.id); gs.guessed++; if (timeMs < gs.guessBestMs) { gs.guessBestMs = timeMs; } } });
     } else { ws.streak = 0; }
   }
   t.stage = "reveal";
@@ -954,7 +956,7 @@ RoomManager.prototype.next = function (room) {
 function statFor(room, id) {
   if (!room.stats) { room.stats = {}; }
   if (!room.stats[id]) {
-    room.stats[id] = { whistles: 0, solved: 0, streak: 0, bestStreak: 0, bestTimeMs: Infinity, hardSolved: 0, guessed: 0, whistlePts: 0 };
+    room.stats[id] = { whistles: 0, solved: 0, streak: 0, bestStreak: 0, bestTimeMs: Infinity, hardSolved: 0, guessed: 0, whistlePts: 0, guessBestMs: Infinity, packs: {} };
   }
   return room.stats[id];
 }
@@ -1043,6 +1045,20 @@ RoomManager.prototype.queueSuddenDeath = function (room) {
   room.turns = room.sd.contenders.map(function (id) { return { playerId: id, round: 0, sd: true }; });
   room.turnPos = -1;
   this.advance(room);
+};
+
+// One player's game, for the lifetime stats kept on their own phone.
+RoomManager.prototype.gameSummary = function (room, pid) {
+  var p = findPlayer(room, pid), st = room.stats && room.stats[pid];
+  if (!p || p.sitOut || !st) { return null; }
+  var better = room.players.filter(function (o) { return !o.sitOut && o.total > p.total; }).length;
+  var fin = function (n) { return isFinite(n) ? n : null; };
+  return {
+    key: room.code + ":" + (room.gameNo || 0), points: p.total, rank: better + 1,
+    won: (room.winners || []).indexOf(pid) !== -1, players: room.players.filter(function (o) { return !o.sitOut; }).length,
+    performed: st.whistles, solved: st.solved, hardSolved: st.hardSolved, guessed: st.guessed, bestStreak: st.bestStreak,
+    bestPerformMs: fin(st.bestTimeMs), bestGuessMs: fin(st.guessBestMs), packs: st.packs
+  };
 };
 
 RoomManager.prototype.gameOver = function (room, winnerIds, viaTieBreak) {

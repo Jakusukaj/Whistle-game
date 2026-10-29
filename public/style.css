@@ -508,3 +508,5 @@ html, body { min-height: 100%; }
 .pfloat { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px var(--gutter) calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--ground) 70%, transparent); }
 .pfloat .btn { width: 100%; }
 .picker:has(.pfloat) .pbody { padding-bottom: 110px; }
+.strow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(17,17,17,.12); }
+.strow:last-of-type { border-bottom: 0; }

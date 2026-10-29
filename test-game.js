@@ -231,6 +231,9 @@ async function mainScenario() {
   await A.waitFor(function (s) { return s.phase === "gameover"; }, "game over");
   check("game ends with one winner", A.state.winners.length === 1 && A.state.winners[0] === C.playerId, A.state.winners);
   check("no tie-break needed", A.state.tieBreakWon === false);
+  var mg = A.state.myGame;
+  check("a player gets a game summary for their lifetime stats", !!mg && typeof mg.points === "number" && mg.players === 3 && mg.rank >= 1, JSON.stringify(mg));
+  check("the summary agrees with the winners list", mg.won === (A.state.winners.indexOf(A.playerId) !== -1), JSON.stringify(mg));
 
   A.send({ t: "playAgain" });
   await A.waitFor(function (s) { return s.phase === "lobby"; }, "back to lobby");

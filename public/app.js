@@ -428,6 +428,66 @@
     };
   }
 
+  // ------------------------------------------------------- lifetime stats (kept on this phone, per name)
+  var STATS_KEY = "ttt_stats";
+  function readStats() { try { return JSON.parse(localStorage.getItem(STATS_KEY) || "{}") || {}; } catch (e) { return {}; } }
+  function fmtSec(ms) { return (ms / 1000).toFixed(1) + "s"; }
+  function favPack(rec) {
+    var best = null;
+    Object.keys(rec.packs || {}).forEach(function (id) { if (!best || rec.packs[id] > rec.packs[best]) { best = id; } });
+    return best ? (rec.packNames && rec.packNames[best]) || best : null;
+  }
+  // Adds this game to the player's record once. Returns the "new best" labels for the results screen.
+  function recordGame(s) {
+    var g = s.myGame; if (!g) { return []; }
+    var name = pname(s, s.me), id = name.toLowerCase();
+    var all = readStats(), rec = all[id];
+    if (rec && rec.seen && rec.seen.indexOf(g.key) !== -1) { return (rec.lastBests && rec.lastKey === g.key) ? rec.lastBests : []; }
+    var first = !rec;
+    rec = rec || { name: name, games: 0, wins: 0, points: 0, performed: 0, solved: 0, guessed: 0, hardSolved: 0, bestStreak: 0, bestGuessMs: null, bestPerformMs: null, bestGame: 0, packs: {}, packNames: {}, seen: [] };
+    var bests = [];
+    if (g.bestGuessMs !== null && (rec.bestGuessMs === null || g.bestGuessMs < rec.bestGuessMs)) { if (!first) { bests.push("Fastest guess"); } rec.bestGuessMs = g.bestGuessMs; }
+    if (g.bestPerformMs !== null && (rec.bestPerformMs === null || g.bestPerformMs < rec.bestPerformMs)) { if (!first) { bests.push("Your song guessed fastest"); } rec.bestPerformMs = g.bestPerformMs; }
+    if (g.points > rec.bestGame) { if (!first) { bests.push("Highest score"); } rec.bestGame = g.points; }
+    if (g.bestStreak > rec.bestStreak) { if (!first) { bests.push("Longest streak"); } rec.bestStreak = g.bestStreak; }
+    rec.name = name; rec.games++; if (g.won) { rec.wins++; }
+    rec.points += g.points; rec.performed += g.performed; rec.solved += g.solved; rec.guessed += g.guessed; rec.hardSolved += g.hardSolved;
+    Object.keys(g.packs || {}).forEach(function (pid) {
+      rec.packs[pid] = (rec.packs[pid] || 0) + g.packs[pid];
+      var pk = s.packs.filter(function (p) { return p.id === pid; })[0]; if (pk) { rec.packNames[pid] = pk.name; }
+    });
+    rec.seen.push(g.key); rec.seen = rec.seen.slice(-20);
+    rec.lastKey = g.key; rec.lastBests = bests;
+    all[id] = rec;
+    try { localStorage.setItem(STATS_KEY, JSON.stringify(all)); } catch (e) {}
+    return bests;
+  }
+  function statRows(rec) {
+    var rows = [
+      ["Games played", rec.games], ["Wins", rec.wins], ["Total points", rec.points],
+      ["Fastest guess", rec.bestGuessMs !== null ? fmtSec(rec.bestGuessMs) : "None yet"],
+      ["Your song guessed fastest", rec.bestPerformMs !== null ? fmtSec(rec.bestPerformMs) : "None yet"],
+      ["Highest score in a game", rec.bestGame], ["Longest streak", rec.bestStreak],
+      ["Songs guessed", rec.guessed], ["Hard songs got", rec.hardSolved],
+      ["Favourite pack", favPack(rec) || "None yet"]
+    ];
+    return rows.map(function (r) { return '<div class="strow"><span class="small">' + r[0] + '</span><b class="title">' + esc(r[1]) + "</b></div>"; }).join("");
+  }
+  function showStats(name) {
+    var rec = readStats()[String(name || "").toLowerCase()];
+    var all = readStats(), names = Object.keys(all);
+    if (!rec) { rec = all[names[0]]; }
+    if (!rec) { return; }
+    var o = document.createElement("div"); o.className = "ovl";
+    o.innerHTML = '<div class="scrim"></div><div class="sheet"><div class="label">Your stats, ' + esc(rec.name) + "</div>" + statRows(rec) +
+      '<p class="small">Saved on this phone only.</p><button class="btn" id="stDone">Done</button></div>';
+    document.body.appendChild(o);
+    var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
+    o.querySelector("#stDone").onclick = close; o.querySelector(".scrim").onclick = close;
+  }
+  function hasStats() { return Object.keys(readStats()).length > 0; }
+
+  function readNameQuiet() { try { return localStorage.getItem("whistle.name") || ""; } catch (e) { return ""; } }
   function viewHome() {
     if (invite) { return viewInvite(); }
     var name = ""; try { name = localStorage.getItem("whistle.name") || ""; } catch (e) {}
@@ -441,7 +501,7 @@
           '<p class="small">Starting a lobby copies a link you can send to your friends.</p></div>' +
           '<div class="stack"><h2 class="label">Join a game</h2><div class="line-list" id="games">' + gamesHtml() + "</div></div>" +
           '<div class="spacer"></div>' +
-          '<div class="homefoot"><button id="helpBtn" class="txt">How to play</button>' +
+          '<div class="homefoot"><button id="helpBtn" class="txt">How to play</button>' + (hasStats() ? '<button id="statsBtn" class="txt">Your stats</button>' : "") +
           '<button id="adminDot" class="admindot" aria-label="Admin"></button></div>' +
         "</div>",
       update: function () {
@@ -457,6 +517,7 @@
         $("#hostBtn").onclick = go;
         $("#name").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
         $("#helpBtn").onclick = showHelp;
+        var sb = $("#statsBtn"); if (sb) { sb.onclick = function () { showStats(readNameQuiet()); }; }
         $("#adminDot").onclick = function () { adminLogin = true; render(); };
       }
     };
@@ -1300,6 +1361,10 @@
     var isHost = s.hostId === s.me;
     var bonuses = s.players.filter(function (p) { return p.bonus > 0; }).map(function (p) { return { id: p.id, points: p.bonus }; });
     var names = (s.winners || []).map(function (id) { return pname(s, id); });
+    var bests = recordGame(s), mine = readStats()[pname(s, s.me).toLowerCase()];
+    var myStatsHtml = s.myGame && mine ? '<div class="stack"><div class="label">Your lifetime stats</div>' +
+      (bests.length ? '<p class="title">New best: ' + esc(bests.join(", ")) + "</p>" : "") +
+      '<button id="myStatsBtn" class="txt" style="align-self:flex-start;padding-left:0">See your stats</button></div>' : "";
     var head = names.length > 1 ? "It's a draw: " + names.map(esc).join(" and ") : esc(names[0] || "Nobody") + " wins";
     return {
       key: "over", field: "blue",
@@ -1308,7 +1373,7 @@
         '<div class="head"><h1 class="display">' + head + "</h1>" +
         (s.tieBreakWon ? '<p class="small">Settled in a tie-break.</p>' : "") + "</div>" +
         '<div class="stack"><div class="label">Final scores</div>' + standingsHtml(s, bonuses, s.winners, { bonus: true }) + "</div>" +
-        (bonuses.length ? '<p class="small">Bonus points from the awards are included.' + (s.bonusCapped ? " A big lead cannot be overturned by bonuses." : "") + "</p>" : "") +
+        myStatsHtml + (bonuses.length ? '<p class="small">Bonus points from the awards are included.' + (s.bonusCapped ? " A big lead cannot be overturned by bonuses." : "") + "</p>" : "") +
         '<div class="spacer"></div>' +
         (s.endAwards && s.endAwards.length ? '<button id="awardsBtn" class="btn btn--outline">View awards</button>' : "") +
         (isHost ? '<button id="againBtn" class="btn">Play again</button>' : '<p class="title center">Waiting for ' + esc(pname(s, s.hostId)) + "</p>") +
@@ -1316,6 +1381,7 @@
       bind: function () {
         var a = $("#againBtn"); if (a) { a.onclick = function () { send({ t: "playAgain" }); }; }
         $("#leaveBtn").onclick = leaveRoom;
+        var ms = $("#myStatsBtn"); if (ms) { ms.onclick = function () { showStats(pname(s, s.me)); }; }
         var aw = $("#awardsBtn"); if (aw) { aw.onclick = function () { awardState.idx = 0; awardState.done = false; render(); }; }
       }
     };
