@@ -311,14 +311,27 @@ body.admin .scrim { top: 44px; }
 
 /* player colours: each player keeps one colour for the whole game */
 .pc { box-shadow: inset 0 0 0 1.5px var(--ink); }
+/* Player colours, best first: later ones only appear when the lobby is busy */
 .pc0 { background: var(--orange); color: var(--ink); }
 .pc1 { background: var(--blue); color: var(--light); }
 .pc2 { background: var(--yellow); color: var(--ink); }
 .pc3 { background: var(--green); color: var(--ink); }
 .pc4 { background: var(--pink); color: var(--ink); }
-.pc5 { background: var(--ink); color: var(--light); }
-.pc6 { background: var(--light); color: var(--ink); }
-.pc7 { background: var(--sunk); color: var(--ink); }
+.pc5 { background: #A66BFF; color: var(--ink); }
+.pc6 { background: #0FB5C8; color: var(--ink); }
+.pc7 { background: #FF9A1F; color: var(--ink); }
+.pc8 { background: #9BE23A; color: var(--ink); }
+.pc9 { background: #FF5252; color: var(--ink); }
+.pc10 { background: var(--ink); color: var(--light); }
+.pc11 { background: #2EE6D6; color: var(--ink); }
+.pc12 { background: #C9B8FF; color: var(--ink); }
+.pc13 { background: #F68675; color: var(--ink); }
+.pc14 { background: #8FD3FF; color: var(--ink); }
+.pc15 { background: #A8E6CF; color: var(--ink); }
+.pc16 { background: var(--light); color: var(--ink); }
+.pc17 { background: #FFC9A3; color: var(--ink); }
+.pc18 { background: #E8D27A; color: var(--ink); }
+.pc19 { background: var(--sunk); color: var(--ink); }
 .stand.me .pc, .field--blue .stand .pc { box-shadow: inset 0 0 0 1.5px var(--ink); }
 .avatar--md { width: 40px; height: 40px; font-size: 18px; line-height: 18px; }
 
@@ -470,3 +483,22 @@ html, body { min-height: 100%; }
 .mpill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; margin: 2px 0 0 -2px; border: 1.5px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; }
 .mpill .label { font-size: 11px; letter-spacing: .1em; line-height: 14px; }
 .mpill:active { background: var(--ink); color: var(--raised); }
+
+/* Turn splash */
+#splash { position: fixed; inset: 0; z-index: 9000; display: flex; flex-direction: column; justify-content: center; gap: 28px; padding: 0 28px; box-sizing: border-box; animation: spIn 380ms cubic-bezier(.2,.8,.2,1) both, spOut 380ms calc(var(--sp-ms, 4000ms) - 380ms) ease-in both; }
+.sp-av { animation: spPop 520ms 160ms cubic-bezier(.2,1.4,.4,1) both; }
+.sp-avatar { width: 132px; height: 132px; font-size: 64px; display: flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: inset 0 0 0 4px #111; font-weight: 800; }
+.sp-tx { font-size: 54px; line-height: 1.02; letter-spacing: -.035em; font-weight: 800; margin: 0; animation: spUp 520ms 260ms cubic-bezier(.2,.8,.2,1) both; }
+.sp-tx.sp-long { font-size: 44px; }
+.sp-n { display: inline-block; animation: spWob 900ms 700ms ease-in-out both; }
+@keyframes spIn { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes spOut { to { opacity: 0; transform: translateY(-3%); } }
+@keyframes spPop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes spUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spWob { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-3deg) scale(1.06); } 60% { transform: rotate(2deg) scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { #splash, .sp-av, .sp-tx, .sp-n { animation: none; } }
+.sp-count { position: absolute; left: 28px; right: 28px; bottom: calc(9% + env(safe-area-inset-bottom)); height: 190px; }
+.sp-count span { position: absolute; left: 0; bottom: 0; font-size: 190px; line-height: 1; font-weight: 800; letter-spacing: -.05em; opacity: 0; animation: spNum 1000ms ease-out both; }
+.sp-count span:nth-child(1) { animation-delay: 1000ms; } .sp-count span:nth-child(2) { animation-delay: 2000ms; } .sp-count span:nth-child(3) { animation-delay: 3000ms; }
+@keyframes spNum { 0% { opacity: 0; transform: scale(.55); } 18% { opacity: 1; transform: scale(1.08); } 30% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.92); } }
+@media (prefers-reduced-motion: reduce) { .sp-count span { animation: none; } .sp-count span:not(:last-child) { display: none; } .sp-count span:last-child { opacity: 1; } }

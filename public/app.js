@@ -325,7 +325,7 @@
 
   function avatarHtml(s, p, cls) {
     var ch = (String(p.name).trim().charAt(0) || "?").toUpperCase();
-    return '<span class="avatar pc pc' + ((p.ci || 0) % 8) + (cls ? " " + cls : "") + '">' + esc(ch) + "</span>";
+    return '<span class="avatar pc pc' + ((p.ci || 0) % 20) + (cls ? " " + cls : "") + '">' + esc(ch) + "</span>";
   }
 
   function pts(n) { return Math.round(n).toLocaleString("en-GB"); }
@@ -379,7 +379,7 @@
       var closed = g.inProgress;
       return (closed ? '<div class="gamerow dead">' : '<button class="gamebtn" data-code="' + esc(g.code) + '">') +
         '<span class="gtxt"><span class="title">' + esc(g.host) + "'s game</span>" +
-        '<span class="small">' + (closed ? g.players + (g.players === 1 ? " player" : " players") + ", in progress" : g.players + " of 8 players") + "</span></span>" +
+        '<span class="small">' + (closed ? g.players + (g.players === 1 ? " player" : " players") + ", in progress" : g.players + " of " + (g.max || 20) + " players") + "</span></span>" +
         '<span class="label">' + (closed ? "In progress" : "Join") + "</span>" + (closed ? "</div>" : "</button>");
     }).join("");
   }
@@ -1477,6 +1477,38 @@
     return frac > 0.5 ? "green" : frac > 0.2 ? "yellow" : "orange";
   }
 
+  // ---- Turn splash: a full-screen "it's show time" card, about three seconds, before each player's turn.
+  var SPLASH_LINES = [
+    "{n}, it's show time!", "{n}, you're up!", "{n}, it's your turn!", "{n}, your time to shine!",
+    "{n}, the floor is yours!", "{n}, take centre stage!", "{n}, take it away!", "{n}, over to you!",
+    "{n}, the room is ready!", "{n}, give us a tune!", "{n}, let's hear it!", "{n}, the stage is set!",
+    "You've got this, {n}!", "Break a leg, {n}!", "All eyes on {n}!"
+  ];
+  var SPLASH_HUES = [["#FF4B14", "#111"], ["#FF4FA3", "#111"], ["#00B86B", "#111"], ["#FFD21F", "#111"], ["#2640EC", "#ECEAE4"]];
+  var SPLASH_MS = 4000, lastSplashTurn = null, lastSplashLine = -1, lastSplashHue = -1, splashTimer = null;
+  function pickDifferent(n, last) { var i; do { i = Math.floor(Math.random() * n); } while (n > 1 && i === last); return i; }
+  function showSplash(name, avatar) {
+    var old = document.getElementById("splash"); if (old) { old.remove(); }
+    clearTimeout(splashTimer);
+    var li = lastSplashLine = pickDifferent(SPLASH_LINES.length, lastSplashLine);
+    var hi = lastSplashHue = pickDifferent(SPLASH_HUES.length, lastSplashHue);
+    var text = esc(SPLASH_LINES[li]).replace(/\{n\}([,!]?)/, function (m, pu) { return '<span class="sp-n">' + esc(name) + pu + "</span>"; });
+    var el = document.createElement("div");
+    el.id = "splash"; el.setAttribute("role", "status");
+    el.style.background = SPLASH_HUES[hi][0]; el.style.color = SPLASH_HUES[hi][1];
+    el.style.setProperty("--sp-ms", SPLASH_MS + "ms");
+    el.innerHTML = '<div class="sp-av">' + avatar + '</div><h1 class="sp-tx' + (name.length > 10 ? " sp-long" : "") + '">' + text + '</h1><div class="sp-count" aria-hidden="true"><span>3</span><span>2</span><span>1</span></div>';
+    document.body.appendChild(el);
+    var done = function () { clearTimeout(splashTimer); if (el.parentNode) { el.remove(); } };
+    splashTimer = setTimeout(done, SPLASH_MS);
+  }
+  function maybeSplash() {
+    if (!st || st.phase !== "turn" || !st.turn || st.turn.stage !== "choose" || st.turn.id === lastSplashTurn) { return; }
+    lastSplashTurn = st.turn.id;
+    var p = null; st.players.forEach(function (q) { if (q.id === st.turn.playerId) { p = q; } });
+    if (p) { showSplash(p.name, avatarHtml(st, p, "sp-avatar")); }
+  }
+
   function render() {
     var view;
     if (st && st.phase !== "lobby") { pickerOpen = false; }
@@ -1505,6 +1537,7 @@
     refreshAdmin();
     syncBg();
     refreshTip();
+    maybeSplash();
   }
 
   // Keep the page behind the app (overscroll, notch) the same colour as the current field.

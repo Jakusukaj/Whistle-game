@@ -45,7 +45,7 @@ var DEFAULTS = {
   sdDifficulty: "medium",
   sdMaxRounds: 3,
   minPlayers: 2,
-  maxPlayers: 8,
+  maxPlayers: 20,
   adminPassword: process.env.ADMIN_PASSWORD || "bean",
   defaultRounds: 5,
   minRounds: 1,
@@ -164,7 +164,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
     players: room.players.filter(function (p) { return !p.sitOut; }).map(function (p) {
-      return { id: p.id, name: p.name, ci: (p.ci || 0) % 8, connected: p.connected, total: p.total, prev: p.prev || 0, last: p.last, turns: p.turns, mic: p.mic || null, bonus: p.bonus || 0 };
+      return { id: p.id, name: p.name, ci: (p.ci || 0) % 20, connected: p.connected, total: p.total, prev: p.prev || 0, last: p.last, turns: p.turns, mic: p.mic || null, bonus: p.bonus || 0 };
     }),
     packs: PACKS.map(function (p) {
       return { id: p.id, group: p.group, name: p.name, blurb: p.blurb, colour: p.colour, ink: p.ink, count: PACK_COUNTS[p.id] || 0 };
@@ -216,7 +216,7 @@ RoomManager.prototype.listRooms = function () {
     var host = findPlayer(r, r.hostId);
     var count = r.players.filter(function (p) { return !p.sitOut; }).length;
     if (!host || count >= this.opts.maxPlayers) { continue; }
-    out.push({ code: r.code, host: host.name, players: count, inProgress: r.phase === "turn" });
+    out.push({ code: r.code, host: host.name, players: count, max: this.opts.maxPlayers, inProgress: r.phase === "turn" });
   }
   return out;
 };
