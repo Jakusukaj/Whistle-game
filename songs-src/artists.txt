@@ -190,3 +190,19 @@ The Great Curve | Talking Heads | h | 1980 | KA
 Born Under Punches | Talking Heads | m | 1980 | KA
 Sax and Violins | Talking Heads | m | 1991 | KA
 Lifetime Piling Up | Talking Heads | m | 1992 | KA
+# --- ABBA (picked up from the artist name; the songs already in the decade and party lists join automatically)
+Ring Ring | ABBA | m | 1973 | A
+Honey, Honey | ABBA | m | 1974 | A | Honey Honey
+I Do, I Do, I Do, I Do, I Do | ABBA | m | 1975 | A | I Do I Do I Do I Do I Do
+Summer Night City | ABBA | m | 1978 | A
+Eagle | ABBA | h | 1977 | A
+The Name of the Game | ABBA | m | 1977 | A | Name of the Game
+Angeleyes | ABBA | m | 1979 | A
+Happy New Year | ABBA | m | 1980 | A
+Slipping Through My Fingers | ABBA | m | 1981 | A
+When All Is Said and Done | ABBA | h | 1981 | A
+The Day Before You Came | ABBA | h | 1982 | A
+Under Attack | ABBA | m | 1982 | A
+Kisses of Fire | ABBA | m | 1979 | A
+Hasta Mañana | ABBA | m | 1974 | A | Hasta Manana
+Bang-A-Boomerang | ABBA | m | 1975 | A | Bang a Boomerang

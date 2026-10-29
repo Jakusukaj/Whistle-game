@@ -3,7 +3,7 @@
 // Run: node tools/build-songs.js
 // Line format:  Title | Artist | e/m/h | year or - | flags | aliases (separated by ;)
 // Flags: B all-time bangers, V Pop Off Diva (artists in the DIVA list join automatically), P party, S soul/Motown, F film, D Disney/musicals, X Christmas, T TV,
-//        H Halloween, L Beatles, O Bowie, G Lady Gaga, K Talking Heads (artist packs are also picked up from the artist name),
+//        H Halloween, L Beatles, O Bowie, G Lady Gaga, K Talking Heads, ABBA (picked up from the artist name; no flag needed) (artist packs are also picked up from the artist name),
 //        A artist/special-pack only: keeps a deeper cut out of the decade and "today" packs (ignored if the song is also listed without A)
 // Decade and "today" packs come from the year. A song is listed ONCE however many packs it is in.
 var fs = require("fs"), path = require("path");
@@ -136,6 +136,7 @@ function packsFor(s) {
   if (f.indexOf("O") !== -1 || /\bdavid bowie\b/.test(a)) { out.push("bowie"); }
   if (f.indexOf("G") !== -1 || /\blady gaga\b/.test(a)) { out.push("gaga"); }
   if (f.indexOf("K") !== -1 || /\btalking heads\b/.test(a)) { out.push("talkingheads"); }
+  if (/\babba\b/.test(a)) { out.push("abba"); }
   return out;
 }
 

@@ -59,7 +59,7 @@ function phone(port, name) {
   var A_ = A.w.document, ticked = function (d) { return d.querySelectorAll(".pack.on").length; };
   check("lobby summary shows the chosen pack", /All Time Bangers/.test(A.q("#openPacks").textContent) && !A_.querySelector(".pack"));
   A.click("#openPacks"); B.click("#openPacks");
-  check("picker shows 20 pack cards", A_.querySelectorAll(".pack").length === 20 && B.w.document.querySelectorAll(".pack").length === 20);
+  check("picker shows 21 pack cards", A_.querySelectorAll(".pack").length === 21 && B.w.document.querySelectorAll(".pack").length === 21);
   check("pack cards are grouped under four collapsible rows", A_.querySelectorAll(".pgroup__row").length === 4);
   check("first pack is All Time Bangers", /All Time Bangers/.test(A_.querySelector(".pack").textContent));
   check("nothing is ticked by default in a real room", true);
@@ -68,9 +68,9 @@ function phone(port, name) {
   check("host tap ticks a pack for everyone", ticked(A_) === 2 && ticked(B.w.document) === 2);
   check("tick icon present on ticked pack", !!A_.querySelector(".pack.on .tickc svg"));
   A_.querySelector("#packAll").click();
-  await until(function () { return ticked(B.w.document) === 20; }, 3000, "select all");
-  check("select all ticks every pack", ticked(A_) === 20);
-  check("guests cannot tap packs", B.w.document.querySelectorAll(".pack.ro").length === 20);
+  await until(function () { return ticked(B.w.document) === 21; }, 3000, "select all");
+  check("select all ticks every pack", ticked(A_) === 21);
+  check("guests cannot tap packs", B.w.document.querySelectorAll(".pack.ro").length === 21);
   A.click("#pkDone"); B.click("#pkDone");
   check("picker closes", !A_.querySelector("#picker"));
   A.click("#openSettings");

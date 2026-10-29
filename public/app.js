@@ -311,14 +311,14 @@
   var PACK_GROUPS = [
     { name: "Vibe", ids: ["bangers", "diva", "party", "soul", "tv", "film", "disney"] },
     { name: "Eras", ids: ["sixties", "seventies", "eighties", "nineties", "noughties", "tens", "today"] },
-    { name: "Artists", ids: ["beatles", "bowie", "gaga", "talkingheads"] },
+    { name: "Artists", ids: ["beatles", "bowie", "gaga", "talkingheads", "abba"] },
     { name: "Special events", ids: ["halloween", "xmas"] }
   ];
   // Pack colour tokens from the design system. "l" means light text, "i" ink text.
   var PACK_COL = {
     bangers: ["#00B86B", "i"], diva: ["#FF3D81", "i"], party: ["#3DDC84", "i"], soul: ["#FF9A1F", "i"], tv: ["#0FB5C8", "i"], film: ["#A66BFF", "i"], disney: ["#FFD21F", "i"],
     sixties: ["#2EE6D6", "i"], seventies: ["#F68675", "i"], eighties: ["#9BE23A", "i"], nineties: ["#FF4FA3", "i"], noughties: ["#4D7CFF", "i"], tens: ["#FF6A3D", "i"], today: ["#C77DFF", "i"],
-    beatles: ["#6F8DFF", "i"], bowie: ["#00D1FF", "i"], gaga: ["#E040FB", "i"], talkingheads: ["#B09CFF", "i"],
+    beatles: ["#6F8DFF", "i"], bowie: ["#00D1FF", "i"], gaga: ["#E040FB", "i"], talkingheads: ["#B09CFF", "i"], abba: ["#FFE14D", "i"],
     halloween: ["#FF5252", "i"], xmas: ["#FFC9A3", "i"]
   };
   var openGroups = { Vibe: true };

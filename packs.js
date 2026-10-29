@@ -28,5 +28,6 @@ module.exports = [
   { id: "beatles",      group: "Artists",       name: "The Beatles",          blurb: "Beatlemania, start to finish",      colour: "#f7e08a", ink: "#4a3a00" },
   { id: "bowie",        group: "Artists",       name: "David Bowie",          blurb: "Starman, Heroes and more",  colour: "#c6b5f5", ink: "#2a1a63" },
   { id: "gaga",         group: "Artists",       name: "Lady Gaga",             blurb: "Just Dance to now",         colour: "#ffa8c8", ink: "#5a0a33" },
-  { id: "talkingheads", group: "Artists",       name: "Talking Heads",         blurb: "Psycho Killer and friends",       colour: "#9fe3d0", ink: "#08443a" }
+  { id: "talkingheads", group: "Artists",       name: "Talking Heads",         blurb: "Psycho Killer and friends",       colour: "#9fe3d0", ink: "#08443a" },
+  { id: "abba",         group: "Artists",       name: "ABBA",                  blurb: "Waterloo to The Winner Takes It All", colour: "#a9c7ff", ink: "#14306b" }
 ];
