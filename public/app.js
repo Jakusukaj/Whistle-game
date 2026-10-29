@@ -1414,7 +1414,8 @@
         mock: '<div class="m-big" data-count="917" data-ms="1600">0</div><div class="m-label">Guessed in 12.4s</div><div class="m-sub2">Maya scores<br>Theo named it and earns 459</div>' },
       { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards add bonus points at the end.", bg: FIELD_BG.pink,
         mock: '<div class="m-rows">' +
-          '<div class="m-row m-light"><b class="m-rk">1</b>' + AV("Maya", 0) + '<b>Maya</b><em>2,140</em></div><div class="m-row m-light"><b class="m-rk">2</b>' + AV("Theo", 1) + '<b>Theo</b><em>1,820</em></div><div class="m-row m-light"><b class="m-rk">3</b>' + AV("Priya", 2) + '<b>Priya</b><em>1,310</em></div></div>' }
+          '<div class="m-row m-light"><b class="m-rk">1</b>' + AV("Maya", 0) + '<b>Maya</b><em>2,140</em></div><div class="m-row m-light"><b class="m-rk">2</b>' + AV("Theo", 1) + '<b>Theo</b><em>1,820</em></div><div class="m-row m-light"><b class="m-rk">3</b>' + AV("Priya", 2) + '<b>Priya</b><em>1,310</em></div></div>' },
+      { ms: 4500, full: true, chip: "Stuck?", head: "Just press the ? icon.", text: "It is in the corner of every screen and tells you what to do right now.", bg: FIELD_BG.orange }
     ];
     var o = document.createElement("div");
     o.className = "hv"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "How to play");
@@ -1477,76 +1478,72 @@
   }
 
   // ------------------------------------------------------- first-time tips
-  var newbie = null, tipSeen = {}, askedPlayed = false;
+  var newbie = null, askedPlayed = false;
   try { var np = localStorage.getItem("ttt_played"); newbie = np === "yes" ? false : np === "no" ? true : null; } catch (e) {}
-  var TIPS = {
-    lobbyHost: "Start when everyone is in. Keep your mic on so we can hear guesses.",
-    lobby: "The host starts the game when everyone is in. Keep your mic on so we can hear guesses.",
-    wait: "Say the song title out loud when you think you know it. You can type it instead.",
-    cd: "Get ready to say the title out loud when the performing starts.",
-    cdw: "Whistle or kazoo the tune clearly, with no words, once the countdown ends. Shuffles and hints cost points.",
-    w: "Tap Someone got it when a guess is right. Shuffles and hints cost points.",
-    g: "Shout your guess, or tap Type instead. The faster you guess, the more you score.",
-    reveal: "The performer earns the full score. Each guesser earns half."
-  };
-  function tipFor(key) {
-    if (/^ready-/.test(key)) { return "ready"; }
-    if (/^wait-/.test(key)) { return "wait"; }
-    if (/^cd-/.test(key)) { return st && st.turn && st.turn.playerId === st.me ? "cdw" : "cd"; }
-    if (/^w-/.test(key)) { return "w"; }
-    if (/^g-/.test(key)) { return "g"; }
-    if (/^reveal-/.test(key)) { return "reveal"; }
-    if (key === "lobby") { return st && st.hostId === st.me ? "lobbyHost" : "lobby"; }
-    return null;
+
+  // What to do on this screen, for the ? button. It depends on the screen and on whether you are performing or guessing.
+  function helpFor(key) {
+    var host = st && st.hostId === st.me, T = st && st.turn, who = T && st.players ? pname(st, T.playerId) : "The performer";
+    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Harder songs earn bonus points. If you do not know any of them, ask for new cards once. Only you can see the songs."]; }
+    if (/^ready-/.test(key)) { return ["Get ready", "Only you can see your song. When you are ready, tap Ready and a 3, 2, 1 countdown starts for everyone. Then whistle or kazoo the tune, with no words."]; }
+    if (/^wait-/.test(key)) { return ["Get ready to guess", who + " is getting ready to perform. When they start, say the song title out loud. If your mic is off, you can type it instead."]; }
+    if (/^cd-/.test(key)) {
+      return T && T.playerId === st.me
+        ? ["Countdown", "When it ends, whistle or kazoo the tune clearly, with no words. Shuffling the song or giving hints costs points."]
+        : ["Countdown", "When it ends, " + who + " starts performing. Say the song title out loud as soon as you know it, or tap Type instead."];
+    }
+    if (/^w-/.test(key)) { return ["You are performing", "Whistle or kazoo the tune, with no words. When someone says the right title, tap Someone got it, tick who named it, then confirm. Shuffles and hints cost points."]; }
+    if (/^g-/.test(key)) { return ["You are guessing", "Listen to " + who + " and say the song title out loud, or tap Type instead. The faster you guess, the more you score. You can ask for a hint."]; }
+    if (/^reveal-/.test(key)) { return ["Score", "The performer earns the full score and each person who named the song earns half. The next turn starts soon."]; }
+    if (key === "lobby") {
+      return host
+        ? ["You are the host", "Send the invite link to your friends. Choose the song packs and rounds, then tap Start game once everyone is in. Keep your mic on so the game can hear guesses."]
+        : ["Waiting to start", "The host starts the game once everyone is in. If room picks is on, tap Pick song packs. Keep your mic on so the game can hear your guesses."];
+    }
+    if (/^awards-/.test(key)) { return ["Awards", "These awards add bonus points to the final scores. Tap to see the next one."]; }
+    if (key === "over") { return ["Game over", "The top score wins. " + (host ? "Tap Play again to start another game with the same players." : "The host can start another game with the same players.")]; }
+    return ["Need a hand?", "Tap How to play on the home screen to see the rules."];
   }
+  function showHelpSheet() {
+    if (document.getElementById("helpsheet")) { return; }
+    var h = helpFor(lastKey || "");
+    var o = document.createElement("div");
+    o.id = "helpsheet"; o.className = "sheetwrap";
+    o.innerHTML = '<div class="scrim"></div><div class="sheet"><div class="label">' + esc(h[0]) + '</div><p class="title">' + esc(h[1]) + '</p>' +
+      '<button class="btn" id="hsOk">Got it</button><button class="txt" id="hsHow" style="align-self:center">Show how to play</button></div>';
+    document.body.appendChild(o);
+    var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
+    $("#hsOk", o).onclick = close; $(".scrim", o).onclick = close;
+    $("#hsHow", o).onclick = function () { close(); showHelp(); };
+  }
+  // First time in a room: ask once. A first-timer gets a short line and the how-to-play walkthrough.
   function askPlayed() {
     askedPlayed = true;
     var o = document.createElement("div");
     o.className = "sheetwrap";
-    o.innerHTML = '<div class="scrim"></div><div class="sheet"><p class="headline">Have you played before?</p>' +
-      '<p class="small">Say no and we will show a few short tips as you play.</p><div class="rowc" style="gap:12px"><button class="btn btn--outline" id="pYes" style="flex:1">Yes</button><button class="btn" id="pNo" style="flex:1">No</button></div></div>';
+    o.innerHTML = '<div class="scrim"></div><div class="sheet" id="apSheet"><p class="headline">Have you played before?</p>' +
+      '<div class="rowc" style="gap:12px"><button class="btn btn--outline" id="pYes" style="flex:1">Yes</button><button class="btn" id="pNo" style="flex:1">No</button></div></div>';
     document.body.appendChild(o);
-    var done = function (v) { newbie = !v; try { localStorage.setItem("ttt_played", v ? "yes" : "no"); } catch (e) {} if (o.parentNode) { o.parentNode.removeChild(o); } render(); };
+    var done = function (v) {
+      newbie = !v; try { localStorage.setItem("ttt_played", v ? "yes" : "no"); } catch (e) {}
+      if (v) { if (o.parentNode) { o.parentNode.removeChild(o); } return; }
+      $("#apSheet", o).innerHTML = '<p class="headline">It is simple.</p><p class="title">Here is how to play.</p>';
+      setTimeout(function () { if (o.parentNode) { o.parentNode.removeChild(o); } showHelp(); }, 1400);
+    };
     $("#pYes", o).onclick = function () { done(true); };
     $("#pNo", o).onclick = function () { done(false); };
   }
+  // The ? button sits in the corner of every in-game screen.
   function refreshTip() {
-    var old = document.getElementById("tipbubble"); if (old) { old.parentNode.removeChild(old); }
-    document.body.classList.remove("hastip");
-    if (!st || st.admin) { return; }
-    if (newbie === null) { if (!askedPlayed) { askPlayed(); } return; }
-    if (!newbie) { return; }
-    var id = tipFor(lastKey || ""); if (!id || tipSeen[id]) { return; }
-    var b = document.createElement("button");
-    b.id = "tipbubble"; b.className = "tipbubble"; b.setAttribute("aria-label", "Tip, tap to close");
-    b.innerHTML = '<span class="th"><span class="tg">Tip</span><span class="tc">Tap to close</span></span><span class="tt">' + esc(TIPS[id]) + "</span>";
-    var close = function () {
-      tipSeen[id] = true; document.body.classList.remove("hastip");
-      b.classList.add("out"); setTimeout(function () { if (b.parentNode) { b.parentNode.removeChild(b); } }, 120);
-    };
-    b.onclick = close;
-    document.body.appendChild(b);
-    // Sit 12px above the main button. With no main button, sit above the lowest link so it is never covered.
-    // The countdown tips go at the top, because the headline sits at the bottom there.
-    var vh = window.innerHeight;
-    if (id === "cd" || id === "cdw") { b.style.top = "56px"; b.style.bottom = "auto"; }
-    else {
-      var tgt = app.querySelector("#toType"), i, cand = app.querySelectorAll(".btn, #gotBtn");
-      if (tgt && !(tgt.offsetParent !== null && tgt.getBoundingClientRect().height > 0)) { tgt = null; }
-      if (!tgt) {
-      for (i = cand.length - 1; i >= 0; i--) { if (cand[i].offsetParent !== null && cand[i].getBoundingClientRect().height > 0) { tgt = cand[i]; break; } }
-      }
-      if (!tgt) {
-        cand = app.querySelectorAll(".txt, .tbtn, a");
-        for (i = 0; i < cand.length; i++) {
-          var r = cand[i].getBoundingClientRect();
-          if (cand[i].offsetParent !== null && r.height > 0 && (!tgt || r.top > tgt.getBoundingClientRect().top)) { tgt = cand[i]; }
-        }
-      }
-      var bot = tgt ? vh - tgt.getBoundingClientRect().top + 12 : 36;
-      b.style.bottom = Math.max(16, Math.min(bot, vh - 140)) + "px";
+    var old = document.getElementById("helpfab");
+    if (!st || st.admin) { if (old) { old.parentNode.removeChild(old); } return; }
+    if (newbie === null && !askedPlayed) { askPlayed(); }
+    if (!old) {
+      var b = document.createElement("button");
+      b.id = "helpfab"; b.className = "helpfab"; b.setAttribute("aria-label", "Help: what should I do now?"); b.textContent = "?";
+      b.onclick = showHelpSheet;
+      document.body.appendChild(b);
     }
-    document.body.classList.add("hastip");
   }
 
   // ---------------------------------------------------------------- render
