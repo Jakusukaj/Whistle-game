@@ -5,7 +5,7 @@
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   var ws = null, connected = false, session = null, rejoining = false, pendingName = "";
-  var gameList = [], adminLogin = false, pickerOpen = false, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
+  var gameList = [], adminLogin = false, pickerOpen = false, packDraft = null, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
   var lastMicSent = "";
   var invite = null, copyOnJoin = false, linkResolve = null;
   var st = null, offset = 0, lastKey = null, wakeLock = null, prevStage = null, prevTurnId = null;
@@ -436,7 +436,7 @@
       html:
         '<div class="screen">' +
           '<div class="brand"><h1 class="headline">Tip of My Tongue</h1>' +
-          '<p class="title">One person whistles a song and everyone else guesses it. The quicker the guess, the more points.</p></div>' +
+          '<p class="title">One person performs a song and everyone else guesses it. The quicker the guess, the more points.</p></div>' +
           '<div class="field-group">' + nameField(name) + '<button id="hostBtn" class="btn" style="margin-top:12px">Start lobby</button>' +
           '<p class="small">Starting a lobby copies a link you can send to your friends.</p></div>' +
           '<div class="stack"><h2 class="label">Join a game</h2><div class="line-list" id="games">' + gamesHtml() + "</div></div>" +
@@ -559,16 +559,16 @@
     var room = s.packMode === "room";
     var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
     var need = s.rounds * s.players.length + 5, short = s.songsInPlay < need;
-    var note = !on.length ? (room ? "Everyone votes for up to 3 packs" : isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
+    var note = !on.length ? (room ? "Everyone picks up to " + (s.packPicks || 5) + " packs" : isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
       : short ? "Not enough songs for this many turns: pick more packs or lower the rounds"
-      : room ? "The top 3 packs play. Small ties all play." : "No song is played twice in a game.";
+      : room ? "Every pack picked goes in the mix. Popular ones come up more." : "No song is played twice in a game.";
     var mode = isHost
       ? '<div class="seg packmode"><button class="pmode" data-m="host" aria-pressed="' + !room + '">Host picks</button><button class="pmode" data-m="room" aria-pressed="' + room + '">Room picks</button></div>'
       : "";
-    var btn = room ? (s.myPackVotes.length ? "Change votes" : "Vote for song packs") : (isHost ? "Select song packs" : "See packs");
+    var btn = room ? (s.myPackVotes.length ? "Change your picks" : "Pick song packs") : (isHost ? "Select song packs" : "See packs");
     var r = rankingList(s).slice(0, 3);
     var body = room
-      ? (r.length ? r.map(function (x) { return '<p class="small">' + esc(x.p.name) + ", " + x.n + (x.n === 1 ? " vote" : " votes") + "</p>"; }).join("") : '<p class="small">No votes yet</p>')
+      ? (r.length ? r.map(function (x) { return '<p class="small">' + esc(x.p.name) + ", " + x.n + (x.n === 1 ? " pick" : " picks") + "</p>"; }).join("") : '<p class="small">No picks yet</p>')
       : '<p class="title">' + esc(packSummaryLine(on)) + "</p>";
     return '<div class="stack"><div class="label">Songs</div>' + mode + '<div class="packline">' + body + '<p class="small">' + esc(note) + "</p></div>" +
       '<button class="btn btn--outline" id="openPacks">' + btn + "</button></div>";
@@ -578,16 +578,17 @@
   function guestSongsHtml(s) {
     var room = s.packMode === "room";
     var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
-    var line = room ? (rankingList(s).length ? "Leading: " + rankingList(s).slice(0, 3).map(function (x) { return x.p.name; }).join(", ") : "No votes yet") : packSummaryLine(on);
+    var line = room ? (rankingList(s).length ? "In the mix: " + packSummaryLine(on) : "No picks yet") : packSummaryLine(on);
     return '<div class="stack"><div class="label">Songs</div><p class="title">' + esc(line) + "</p>" +
-      (room ? '<button class="btn btn--outline" id="openPacks">' + (s.myPackVotes.length ? "Change votes" : "Vote for song packs") + "</button>"
+      (room ? '<button class="btn btn--outline" id="openPacks">' + (s.myPackVotes.length ? "Change your picks" : "Pick song packs") + "</button>"
             : '<div><button class="txt" id="openPacks">See packs</button></div>') + "</div>";
   }
 
   function pickerHtml(s, isHost) {
     var room = s.packMode === "room", votes = s.packVotes || {};
     var all = s.packs.length === s.selectedPacks.length;
-    var mine = s.myPackVotes || [];
+    var cap = s.packPicks || 5;
+    var mine = room ? (packDraft || s.myPackVotes || []) : [];
     var byId = {}, used = {};
     s.packs.forEach(function (p) { byId[p.id] = p; });
     var groups = PACK_GROUPS.map(function (g) {
@@ -610,21 +611,21 @@
         (!open && cnt ? '<span class="pgroup__sel">' + cnt + (cnt === 1 ? " pack selected" : " packs selected") + "</span>" : "") + "</span>" +
         ico("chevron", "chev") + '</button><div class="pdeck">' + cards + "</div></div>";
     }).join("");
-    var intro = room ? "Pick up to 3. The most popular play first." : isHost ? "Pick as many as you like. They decide which songs come up." : "The host picks the packs.";
-    var count = room ? mine.length + " of 3 votes used" : s.selectedPacks.length + " of " + s.packs.length + " packs picked";
+    var intro = room ? "Pick up to " + cap + ". Every pack anyone picks goes into one mix, and the popular ones come up more." : isHost ? "Pick as many as you like. They decide which songs come up." : "The host picks the packs.";
+    var count = room ? mine.length + " of " + cap + " picks used" : s.selectedPacks.length + " of " + s.packs.length + " packs picked";
     return '<div class="picker" id="picker"><div class="pwrap">' +
-      '<div class="phead"><div class="toprow"><span class="label">Song packs</span><button class="txt" id="pkDone">Done</button></div>' +
-      '<h1 class="headline">' + (room ? "Vote for the packs you want" : isHost ? "Choose the packs to play" : "The packs in play") + "</h1>" +
+      '<div class="phead"><div class="toprow"><span class="label">Song packs</span><button class="txt" id="pkDone">' + (room ? "Close" : "Done") + '</button></div>' +
+      '<h1 class="headline">' + (room ? "Pick the packs you want" : isHost ? "Choose the packs to play" : "The packs in play") + "</h1>" +
       '<div class="stack" style="gap:2px"><p class="small">' + intro + '</p><p class="small">' + count + "</p></div>" +
       (isHost ? '<div class="seg packmode"><button class="pmode" data-m="host" aria-pressed="' + !room + '">Host picks</button><button class="pmode" data-m="room" aria-pressed="' + room + '">Room picks</button></div>' : "") +
       (isHost && !room ? '<div><button class="txt" id="packAll" style="padding-left:0">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") + "</div>" +
       '<div class="pbody"><div>' + html + "</div></div>" +
-    "</div></div>";
+    "</div>" + (room ? '<div class="pfloat"><button class="btn" id="pkSubmit">' + ((s.myPackVotes || []).length ? "Update my picks" : "Submit picks") + "</button></div>" : "") + "</div>";
   }
 
   function startNote(s, turns) {
     if (s.players.length < s.minPlayers) { return "Waiting for at least " + s.minPlayers + " players"; }
-    if (!s.selectedPacks.length) { return s.packMode === "room" ? "Waiting for votes on the song packs" : "Pick at least one song pack to start"; }
+    if (!s.selectedPacks.length) { return s.packMode === "room" ? "Waiting for someone to pick song packs" : "Pick at least one song pack to start"; }
     if (s.songsInPlay < turns + 5) { return "Not enough songs for this many turns. Pick more packs or lower the rounds."; }
     var off = s.players.filter(function (p) { return p.mic === "off"; }).map(function (p) { return p.name; });
     if (off.length) { return (off.length > 1 ? off.slice(0, -1).join(", ") + " and " + off[off.length - 1] : off[0]) + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses."; }
@@ -634,7 +635,7 @@
   function songsLine(s) {
     var room = s.packMode === "room";
     var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
-    if (room) { var r = rankingList(s); return r.length ? "Leading: " + r.slice(0, 3).map(function (x) { return x.p.name; }).join(", ") : "No votes yet"; }
+    if (room) { var r = rankingList(s); return r.length ? "In the mix: " + packSummaryLine(on) : "No picks yet"; }
     return packSummaryLine(on);
   }
   function songsDetail(s) {
@@ -645,14 +646,14 @@
   }
   function songsTitle(s) {
     var n = s.selectedPacks.length;
-    if (s.packMode === "room") { var r = rankingList(s).length; return r ? r + (r === 1 ? " pack voted for" : " packs voted for") : "No votes yet"; }
+    if (s.packMode === "room") { var r = rankingList(s).length; return r ? r + (r === 1 ? " pack in the mix" : " packs in the mix") : "No picks yet"; }
     return n ? n + (n === 1 ? " pack" : " packs") : "No packs chosen yet";
   }
   function songsRowHtml(s, isHost) {
     var room = s.packMode === "room";
     var cue = room ? "Change" : isHost ? "Choose" : "See";
     var d = songsDetail(s);
-    var inner = '<span class="lrow__t"><span class="label">Songs' + (room ? ", room picks" : "") + '</span><span class="title">' + esc(songsTitle(s)) + "</span>" +
+    var inner = '<span class="lrow__t"><span class="label">Songs' + (room ? ", everyone's picks" : "") + '</span><span class="title">' + esc(songsTitle(s)) + "</span>" +
       (d ? '<span class="small lrow__list">' + esc(d) + "</span>" : "") + "</span>";
     if (room && !isHost) { return '<div class="lrow lrow--top lrow--static">' + inner + "</div>"; }
     return '<button class="lrow lrow--top" id="openPacks">' + inner + '<span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
@@ -661,8 +662,8 @@
   function voteCtaHtml(s) {
     if (s.packMode !== "room") { return ""; }
     var n = (s.myPackVotes || []).length;
-    return '<div class="votecta"><button class="btn" id="voteBtn">' + (n ? "Change your votes" : "Vote for song packs") + "</button>" +
-      '<p class="small center">' + (n ? "You have voted for " + n + (n === 1 ? " pack." : " packs.") : "Pick up to 3. The most popular packs get played.") + "</p></div>";
+    return '<div class="votecta"><button class="btn" id="voteBtn">' + (n ? "Change your picks" : "Pick song packs") + "</button>" +
+      '<p class="small center">' + (n ? "You picked " + n + (n === 1 ? " pack." : " packs.") : "Pick up to " + (s.packPicks || 5) + ". Everyone's picks go into one mix.") + "</p></div>";
   }
   function inviteRowHtml(s) {
     return '<button class="lrow" id="copyLink" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Invite friends</span></span><span class="lrow__c label">Copy link</span></button>';
@@ -752,26 +753,31 @@
           $("#setDone").onclick = function () { settingsOpen = false; render(); };
           $("#setScrim").onclick = function () { settingsOpen = false; render(); };
         }
-        var openP = function () { pickerOpen = true; keepPickerScroll = false; render(); };
+        var openP = function () { pickerOpen = true; if (s.packMode === "room") { packDraft = (s.myPackVotes || []).slice(); } keepPickerScroll = false; render(); };
         var op = $("#openPacks"); if (op) { op.onclick = openP; }
         var vb = $("#voteBtn"); if (vb) { vb.onclick = openP; }
         if (pickerOpen) {
-          $("#pkDone").onclick = function () { pickerOpen = false; render(); };
+          $("#pkDone").onclick = function () { pickerOpen = false; packDraft = null; render(); };
           var rows = document.querySelectorAll(".pgroup__row");
           for (var g = 0; g < rows.length; g++) {
             rows[g].onclick = function () { var n = this.getAttribute("data-g"); openGroups[n] = !openGroups[n]; render(); };
           }
           var cardsEl = document.querySelectorAll(".pack");
           if (s.packMode === "room") {
-            var mine = (s.myPackVotes || []).slice();
+            var cap = s.packPicks || 5;
+            if (!packDraft) { packDraft = (s.myPackVotes || []).slice(); }
             for (var c2 = 0; c2 < cardsEl.length; c2++) {
               cardsEl[c2].onclick = function () {
-                var id = this.getAttribute("data-id"), at = mine.indexOf(id);
-                if (at === -1) { if (mine.length >= 3) { toast("You can vote for up to 3 packs."); return; } mine.push(id); }
-                else { mine.splice(at, 1); }
-                send({ t: "votePacks", packs: mine.slice() });
+                var id = this.getAttribute("data-id"), at = packDraft.indexOf(id);
+                if (at === -1) { if (packDraft.length >= cap) { toast("You can pick up to " + cap + " packs."); return; } packDraft.push(id); }
+                else { packDraft.splice(at, 1); }
+                render();
               };
             }
+            $("#pkSubmit").onclick = function () {
+              send({ t: "votePacks", packs: packDraft.slice() });
+              pickerOpen = false; packDraft = null; render();
+            };
           } else if (isHost) {
             var sel = s.selectedPacks.slice(), allIds = s.packs.map(function (p) { return p.id; });
             var sendPacks = function () { send({ t: "setPacks", packs: sel }); };
@@ -816,7 +822,7 @@
     if (T.sd) { return "Tie-break round " + s.sdRound; }
     var base = "Round " + T.round + " of " + s.rounds;
     if (T.stage === "whistling" || T.stage === "confirming") {
-      return base + ", " + (T.playerId === s.me ? "you are whistling" : pname(s, T.playerId) + " is whistling");
+      return base + ", " + (T.playerId === s.me ? "you are performing" : pname(s, T.playerId) + " is performing");
     }
     return base + ", turn " + s.turnNumber + " of " + s.totalTurns;
   }
@@ -943,7 +949,7 @@
     var cue = t.hints ? "Hint " + t.hints + " of 3" : "No hints yet";
     setAction("askHintBtn", cue, done ? "Asked" : asked ? "Asked" : "Ask",
       done ? "No more hints" : asked ? "Hint asked" : "Ask for a hint",
-      done ? "All three hints given" : "Sends a request to the whistler", done || asked);
+      done ? "All three hints given" : "Sends a request to the performer", done || asked);
     b.disabled = done || asked || t.stage === "confirming";
   }
 
@@ -1048,7 +1054,7 @@
       return {
         key: "ready-" + T.id, field: "ground",
         html: '<div class="screen">' + topBar(s) + songBlock(T, "Your song to perform") +
-          '<p class="small">Only you can see this. Do not whistle yet. Tap Ready and a 3, 2, 1 countdown starts for everyone; whistle when it ends.</p>' +
+          '<p class="small">Only you can see this. Do not perform yet. Tap Ready and a 3, 2, 1 countdown starts for everyone; perform when it ends.</p>' +
           '<div class="spacer"></div>' +
           '<button id="readyBtn" class="btn">Ready</button>' + skipHtml(s) + "</div>",
         bind: function () {
@@ -1064,7 +1070,7 @@
         key: "wait-" + T.id, field: "ground",
         html: '<div class="screen">' + topBar(s) +
           '<div class="mid"><h1 class="headline">' + esc(who) + (T.difficulty ? " is getting ready" : " is choosing a song") + "</h1>" +
-          '<p class="small">' + (T.difficulty ? "A 3, 2, 1 countdown starts as soon as they tap Ready. No whistling until it ends." : "Get ready to guess. Say the title out loud or type it.") + "</p>" +
+          '<p class="small">' + (T.difficulty ? "A 3, 2, 1 countdown starts as soon as they tap Ready. No performing until it ends." : "Get ready to guess. Say the title out loud or type it.") + "</p>" +
           '<div class="micline" data-mic></div></div>' + skipHtml(s) + "</div>",
         bind: bindSkip
       };
@@ -1077,7 +1083,7 @@
         html: '<div class="screen">' + topBar(s) +
           (isW && T.song ? songBlock(T, "Your song to perform") : "") +
           '<div class="cdwrap"><div class="cdcircle"><div class="numeral" id="cd">3</div></div></div>' +
-          '<h1 class="headline center">' + (isW ? "Whistle when it ends" : "Get ready to guess " + esc(who)) + "</h1>" +
+          '<h1 class="headline center">' + (isW ? "Perform when it ends" : "Get ready to guess " + esc(who)) + "</h1>" +
           skipHtml(s) + "</div>",
         bind: bindSkip
       };
@@ -1121,7 +1127,7 @@
         key: "g-" + T.id + (mic.typeMode ? "-t" : "-m"), field: "time",
         html: '<div class="screen">' + topBar(s) + timerHtml(mic.typeMode) +
           '<div class="hstack" id="hintBox" hidden></div>' +
-          actionHtml("askHintBtn", "No hints yet", "Ask", "Ask for a hint", "Sends a request to the whistler") +
+          actionHtml("askHintBtn", "No hints yet", "Ask", "Ask for a hint", "Sends a request to the performer") +
           (mic.typeMode
             ? '<div class="typebox"><form id="gform" class="typebox">' +
               '<input id="ginput" class="input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title">' +
@@ -1132,7 +1138,7 @@
               '<button id="toType" class="txt">Type instead</button></div>') +
           skipHtml(s) +
           '<div class="checking" id="checking" hidden><h2 class="headline pulse">Checking</h2>' +
-          '<p class="small">Someone may have got it. Waiting for the whistler to confirm.</p></div></div>',
+          '<p class="small">Someone may have got it. Waiting for the performer to confirm.</p></div></div>',
         bind: function () {
           if (mic.turnSeen !== st.turn.id) { mic.turnSeen = st.turn.id; mic.base = mic.total || 0; mic.heard = ""; }
           var f = $("#gform");
@@ -1321,24 +1327,24 @@
     var AV = function (n, k) { return '<span class="avatar pc pc' + k + ' avatar--md">' + n.charAt(0) + "</span>"; };
     var TAP = function (x, y, d) { return '<i class="hv-tap" style="left:' + x + 'px;top:' + y + 'px;animation-delay:' + d + 'ms"></i>'; };
     var scenes = [
-      { ms: 5000, full: true, chip: "How to play", head: "One person whistles.<br>Everyone else listens and guesses.", text: "Take turns. The quicker the guess, the more points.", bg: FIELD_BG.orange },
-      { ms: 5400, role: "w", chip: "Your turn to whistle", head: "Pick a song", text: "Only you can see it. Harder songs earn bonus points.", bg: FIELD_BG.ground,
+      { ms: 5000, full: true, chip: "How to play", head: "One person performs.<br>Everyone else listens and guesses.", text: "Take turns. The quicker the guess, the more points.", bg: FIELD_BG.orange },
+      { ms: 5400, role: "w", chip: "Your turn to perform", head: "Pick a song", text: "Only you can see it. Harder songs earn bonus points.", bg: FIELD_BG.ground,
         mock: '<div class="m-cards">' +
           '<div class="m-card"><span>Easy</span><b>Dancing Queen</b><i>ABBA</i></div>' +
           '<div class="m-card m-pick"><span>Medium</span><b>Wonderwall</b><i>Oasis</i></div>' +
           '<div class="m-card"><span>Hard</span><b>Rolling in the Deep</b><i>Adele</i></div></div>' + TAP(300, 215, 1900) },
-      { ms: 5000, role: "e", chip: "Everyone", head: "The countdown starts", text: "It starts as soon as the song is picked. Do not whistle until it ends.", bg: FIELD_BG.green,
+      { ms: 5000, role: "e", chip: "Everyone", head: "The countdown starts", text: "It starts as soon as the song is picked. Do not perform until it ends.", bg: FIELD_BG.green,
         mock: '<div class="m-disc"><div class="m-num" data-seq="3,2,1,Go" data-step="1000">3</div></div>' },
-      { ms: 6200, role: "w", chip: "Your turn to whistle", head: "Whistle the tune", text: "No words. Shuffling the song and giving hints both cost points.", bg: FIELD_BG.green,
+      { ms: 6200, role: "w", chip: "Your turn to perform", head: "Whistle or kazoo the tune", text: "Whistle it or play it on a kazoo, with no words. Shuffling the song and giving hints both cost points.", bg: FIELD_BG.green,
         mock: '<div><div class="m-label">Your song to perform</div><div class="m-song">Dancing Queen</div><div class="m-art">ABBA</div></div><div class="m-timer" data-timer="42">42</div>' +
           '<div class="m-two"><div class="m-mini"><span>Song</span><b>Shuffle</b></div><div class="m-mini"><span>0 of 3</span><b>Give hint</b></div></div><div class="m-btn">Someone got it</div>' },
-      { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is whistling. Your phone mic should pick it up by itself. If it does not, tap Type instead.", bg: FIELD_BG.green,
+      { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is performing. Your phone mic should pick it up by itself. If it does not, tap Type instead.", bg: FIELD_BG.green,
         mock: '<div class="m-orbwrap"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
           '<div class="m-say"><span>You say</span><b>Dancing Queen</b></div></div><div class="m-head">Listening</div><div class="m-link">Type instead</div>' },
-      { ms: 5600, role: "w", chip: "Your turn to whistle", head: "Say who got it", text: "When someone gets it, tap Someone got it. Tick everyone who named the song, then confirm.", bg: FIELD_BG.ground,
+      { ms: 5600, role: "w", chip: "Your turn to perform", head: "Say who got it", text: "When someone gets it, tap Someone got it. Tick everyone who named the song, then confirm.", bg: FIELD_BG.ground,
         mock: '<div class="m-rows">' +
           '<div class="m-row m-on">' + AV("Theo", 1) + '<b>Theo</b><em>Got it</em></div><div class="m-row">' + AV("Priya", 2) + '<b>Priya</b></div><div class="m-row">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="m-btn">Confirm</div>' + TAP(80, 135, 1500) },
-      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The whistler earns the full score. Each guesser earns half.", bg: FIELD_BG.blue, light: true,
+      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The performer earns the full score. Each guesser earns half.", bg: FIELD_BG.blue, light: true,
         mock: '<div class="m-big" data-count="917" data-ms="1600">0</div><div class="m-label">Guessed in 12.4s</div><div class="m-sub2">Maya scores<br>Theo named it and earns 459</div>' },
       { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards add bonus points at the end.", bg: FIELD_BG.pink,
         mock: '<div class="m-rows">' +
@@ -1366,7 +1372,7 @@
     };
     window.addEventListener("resize", fit);
     try { document.querySelector('meta[name="theme-color"]').setAttribute("content", DARK); document.documentElement.style.background = DARK; document.body.style.background = DARK; var bf = document.getElementById("bgfill"); if (bf) { bf.style.background = DARK; } } catch (e) {}
-    var ROLE = { w: "whistle", l: "listen", e: "all" };
+    var ROLE = { w: "perform", l: "listen", e: "all" };
     var go = function (n) {
       clearAll();
       if (n >= scenes.length) { close(); return; }
@@ -1411,11 +1417,11 @@
     lobbyHost: "Start when everyone is in. Keep your mic on so we can hear guesses.",
     lobby: "The host starts the game when everyone is in. Keep your mic on so we can hear guesses.",
     wait: "Say the song title out loud when you think you know it. You can type it instead.",
-    cd: "Get ready to say the title out loud when the whistling starts.",
-    cdw: "Whistle the tune clearly, with no words, once the countdown ends. Shuffles and hints cost points.",
+    cd: "Get ready to say the title out loud when the performing starts.",
+    cdw: "Whistle or kazoo the tune clearly, with no words, once the countdown ends. Shuffles and hints cost points.",
     w: "Tap Someone got it when a guess is right. Shuffles and hints cost points.",
     g: "Shout your guess, or tap Type instead. The faster you guess, the more you score.",
-    reveal: "The whistler earns the full score. Each guesser earns half."
+    reveal: "The performer earns the full score. Each guesser earns half."
   };
   function tipFor(key) {
     if (/^ready-/.test(key)) { return "ready"; }
@@ -1522,7 +1528,7 @@
 
   function render() {
     var view;
-    if (st && st.phase !== "lobby") { pickerOpen = false; }
+    if (st && st.phase !== "lobby") { pickerOpen = false; packDraft = null; }
     var pb = document.querySelector(".pbody"), pTop = pb ? pb.scrollTop : 0;
     if (!st && adminLogin) { view = viewAdminLogin(); }
     else if (!st) { view = viewHome(); }

@@ -1,6 +1,6 @@
 # Whistle
 
-A living-room party game. Everyone uses their own phone. Take turns whistling a classic song shown only on your phone; the others guess out loud or by typing. Your time is your score, lowest total wins.
+A living-room party game. Everyone uses their own phone. Take turns performing (whistling or kazooing) a classic song shown only on your phone; the others guess out loud or by typing. Your time is your score, lowest total wins.
 
 ## Run it on your computer (optional)
     npm install

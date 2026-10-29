@@ -504,3 +504,7 @@ html, body { min-height: 100%; }
 @media (prefers-reduced-motion: reduce) { .sp-count span { animation: none; } .sp-count span:not(:last-child) { display: none; } .sp-count span:last-child { opacity: 1; } }
 
 .votecta { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
+
+.pfloat { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px var(--gutter) calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--ground) 70%, transparent); }
+.pfloat .btn { width: 100%; }
+.picker:has(.pfloat) .pbody { padding-bottom: 110px; }

@@ -22,6 +22,7 @@ Matcher.useSongs(SONGS);
 var PACK_COUNTS = {};
 SONGS.forEach(function (s) { (s.packs || []).forEach(function (id) { PACK_COUNTS[id] = (PACK_COUNTS[id] || 0) + 1; }); });
 var PACK_IDS = PACKS.map(function (p) { return p.id; });
+var PACK_PICKS = 5;
 var SONG_BUFFER = 5; // spare songs a game needs beyond one per turn (shuffles, tie-breaks)
 
 var DEFAULTS = {
@@ -171,6 +172,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     }),
     selectedPacks: room.packs.slice(),
     packMode: room.packMode,
+    packPicks: PACK_PICKS,
     packVotes: this.packVoteMap(room),
     myPackVotes: (room.packVotes[pid] || []).slice(),
     songsInPlay: this.poolFor(room).length,
@@ -554,7 +556,7 @@ RoomManager.prototype.setPackMode = function (room, msg) {
 
 RoomManager.prototype.votePacks = function (room, me, msg) {
   if (room.phase !== "lobby" || room.packMode !== "room" || !Array.isArray(msg.packs)) { return; }
-  room.packVotes[me.id] = msg.packs.filter(function (id, i) { return PACK_IDS.indexOf(id) !== -1 && msg.packs.indexOf(id) === i; }).slice(0, 3);
+  room.packVotes[me.id] = msg.packs.filter(function (id, i) { return PACK_IDS.indexOf(id) !== -1 && msg.packs.indexOf(id) === i; }).slice(0, PACK_PICKS);
   this.recomputePacks(room);
   this.broadcast(room);
 };
@@ -576,28 +578,19 @@ RoomManager.prototype.packVoteMap = function (room) {
   return map;
 };
 
-// Top three packs win. Packs level with third place all come in if that keeps
-// the total at five or fewer; with a bigger pile-up (say, everything on one
-// vote) the earliest-voted packs fill the three places, so a result is always
-// useful and never changes just because someone refreshed.
+// Shared pool: every pack anyone has ticked goes into the deck. Songs are
+// drawn at random, weighted by how many players ticked the packs they sit in.
 RoomManager.prototype.recomputePacks = function (room) {
   if (room.packMode !== "room") { return; }
-  room.voteSeq = room.voteSeq || { n: 0, at: {} };
-  var seq = room.voteSeq;
-  var ranked = this.packTally(room);
-  ranked.forEach(function (r) { if (seq.at[r.id] === undefined) { seq.at[r.id] = seq.n++; } });
-  ranked.sort(function (a, b) { return b.votes - a.votes || seq.at[a.id] - seq.at[b.id]; });
-  if (!ranked.length) { room.packs = []; return; }
-  var cutoff = ranked[Math.min(2, ranked.length - 1)].votes;
-  var above = ranked.filter(function (r) { return r.votes > cutoff; });
-  var level = ranked.filter(function (r) { return r.votes === cutoff; });
-  var chosen = above.concat(level);
-  if (chosen.length > 5) { chosen = chosen.slice(0, Math.max(3, above.length)); }
-  room.packs = PACK_IDS.filter(function (id) { return chosen.some(function (r) { return r.id === id; }); });
+  var tally = {};
+  this.packTally(room).forEach(function (r) { tally[r.id] = r.votes; });
+  room.packs = PACK_IDS.filter(function (id) { return tally[id]; });
+  room.packWeight = tally;
 };
 
 RoomManager.prototype.start = function (room, conn) {
   if (room.phase !== "lobby") { return; }
+  if (room.packMode === "room" && !room.packs.length) { room.packs = ["bangers"]; room.packWeight = { bangers: 1 }; }
   if (room.players.length < this.opts.minPlayers) {
     return err(conn, "too_few", "You need at least " + this.opts.minPlayers + " players.");
   }
@@ -692,6 +685,17 @@ RoomManager.prototype.drawFrom = function (room, difficulty, avoid) {
   var same = pool.filter(function (s) { return s.difficulty === difficulty; });
   var from = same.length ? same : pool;
   if (!from.length) { return null; }
+  if (room.packMode === "room" && room.packWeight) {
+    var w = room.packWeight, tot = 0;
+    var ws = from.map(function (s) {
+      var x = 0; s.packs.forEach(function (id) { x += w[id] || 0; });
+      tot += x; return x;
+    });
+    if (tot > 0) {
+      var r = this.random() * tot;
+      for (var i = 0; i < from.length; i++) { r -= ws[i]; if (r < 0) { return from[i]; } }
+    }
+  }
   return from[Math.floor(this.random() * from.length)];
 };
 
@@ -972,8 +976,8 @@ RoomManager.prototype.applyEndBonuses = function (room) {
     });
     if (ids.length) { defs.push({ key: key, title: title, bonus: amt(o.awardBonus[key]), winners: ids.map(function (id) { return { id: id, detail: detail(statFor(room, id)) }; }) }); }
   }
-  pickBest("whistler", "Best whistler", function (st) { return st.whistles ? st.whistlePts / st.whistles : null; },
-    function (st) { return "Averaged " + Math.round(st.whistlePts / st.whistles) + " points a whistle"; }, 1);
+  pickBest("whistler", "Best performer", function (st) { return st.whistles ? st.whistlePts / st.whistles : null; },
+    function (st) { return "Averaged " + Math.round(st.whistlePts / st.whistles) + " points a turn"; }, 1);
   pickBest("guesser", "Best guesser", function (st) { return st.guessed; },
     function (st) { return "Named " + st.guessed + (st.guessed === 1 ? " song" : " songs"); }, 1);
   pickBest("quickest", "Quickest tune", function (st) { return st.solved ? -st.bestTimeMs : null; },
@@ -1096,7 +1100,7 @@ RoomManager.prototype.autoTick = function (room) {
       bots.forEach(function (b) {
         if (room.packVotes[b.id] && room.packVotes[b.id].length) { return; }
         var ids = PACK_IDS.slice(), mine = [];
-        while (mine.length < 3) { mine.push(ids.splice(Math.floor(self.random() * ids.length), 1)[0]); }
+        while (mine.length < 3 + Math.floor(self.random() * 3)) { mine.push(ids.splice(Math.floor(self.random() * ids.length), 1)[0]); }
         self.votePacks(room, b, { packs: mine });
       });
     }
