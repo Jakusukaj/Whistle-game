@@ -71,7 +71,7 @@
     };
     ws.onclose = function () {
       connected = false;
-      setBanner("Reconnecting...");
+      setBanner("Hang on, reconnecting...");
       setTimeout(connect, 1500);
     };
     ws.onerror = function () { try { ws.close(); } catch (e) {} };
@@ -100,12 +100,12 @@
         session = null; saveSession(); st = null; rejoining = false; lastKey = null; toast("The host removed you from the game."); render();
       } else if (rejoining && (m.code === "room_not_found" || m.code === "game_started")) {
         session = null; saveSession(); st = null; rejoining = false; lastKey = null;
-        toast("That game has ended."); render();
+        toast("That game's all over."); render();
       } else {
-        toast(m.message || "Something went wrong.");
+        toast(m.message || "Oops, something went wrong.");
       }
     } else if (m.t === "guessFeedback") {
-      toast("Not it. Try again.");
+      toast("Nope! Try again.");
     }
   }
 
@@ -131,7 +131,7 @@
       if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
         var pr = new Promise(function (res) { linkResolve = res; });
         navigator.clipboard.write([new ClipboardItem({ "text/plain": pr.then(function (t) { return new Blob([t], { type: "text/plain" }); }) })])
-          .then(function () { toast("Link copied. Paste it into your group chat."); })
+          .then(function () { toast("Link copied! Pop it in the group chat."); })
           .catch(function () { linkResolve = null; });
       }
     } catch (e) { linkResolve = null; }
@@ -142,7 +142,7 @@
     copyText(url, true);
   }
   function copyText(text, quiet) {
-    var done = function () { toast("Link copied. Paste it into your group chat."); };
+    var done = function () { toast("Link copied! Pop it in the group chat."); };
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(done).catch(function () { if (!quiet) { toast(text); } });
@@ -183,7 +183,7 @@
       mic.want = false; mic.typeMode = true; mic.state = "stopped";
       try { if (mic.rec) { mic.rec.onend = null; mic.rec.abort(); } } catch (e) {}
       mic.rec = null;
-      toast("This browser cannot hear guesses. Type them instead.");
+      toast("This browser can't hear guesses. Type them instead.");
       if (st) { render(); }
     }
   }
@@ -373,7 +373,7 @@
 
   function gamesHtml() {
     if (!gameList.length) {
-      return '<div class="gamerow"><span class="gtxt"><span class="title">Nobody is hosting yet</span></span></div>';
+      return '<div class="gamerow"><span class="gtxt"><span class="title">Nobody\'s hosting yet</span></span></div>';
     }
     return gameList.map(function (g) {
       var closed = g.inProgress;
@@ -402,11 +402,11 @@
     var info = invite.info;
     var goHome = '<div class="homefoot"><button id="inviteHome" class="txt">Back to home</button><span></span></div>';
     if (!info || invite.loading) {
-      return { key: "invite-load", field: "orange", html: '<div class="screen"><div class="brand"><h1 class="headline">Joining the game</h1><p class="title">Finding the lobby</p></div><div class="bar"><i></i></div><div class="spacer"></div>' + goHome + "</div>",
+      return { key: "invite-load", field: "orange", html: '<div class="screen"><div class="brand"><h1 class="headline">Joining the game</h1><p class="title">Finding the lobby...</p></div><div class="bar"><i></i></div><div class="spacer"></div>' + goHome + "</div>",
         bind: function () { $("#inviteHome").onclick = function () { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} lastKey = null; render(); }; } };
     }
-    var closed = !info.found ? ["Game not found", "That link is no longer working. Ask the host for a new one."]
-      : info.state === "started" ? [esc(info.host) + "'s game has started", "You can join once it is back in the lobby."]
+    var closed = !info.found ? ["Game not found", "That link's not working any more. Ask the host for a new one."]
+      : info.state === "started" ? [esc(info.host) + "'s game has started", "You can jump in once it's back in the lobby."]
       : info.state === "over" ? [esc(info.host) + "'s game has finished", "Ask the host for a new link."]
       : info.state === "full" ? [esc(info.host) + "'s game is full", "All " + info.max + " places are taken."] : null;
     if (closed) {
@@ -496,9 +496,9 @@
       html:
         '<div class="screen">' +
           '<div class="brand"><h1 class="headline">Tip of My Tongue</h1>' +
-          '<p class="title">One person performs a song and everyone else guesses it. The quicker the guess, the more points.</p></div>' +
+          '<p class="title">One person performs a song. Everyone else guesses it. Quick guesses score big!</p></div>' +
           '<div class="field-group">' + nameField(name) + '<button id="hostBtn" class="btn" style="margin-top:12px">Start lobby</button>' +
-          '<p class="small">Starting a lobby copies a link you can send to your friends.</p></div>' +
+          '<p class="small">Start a lobby and we\'ll copy a link to send to your friends.</p></div>' +
           '<div class="stack"><h2 class="label">Join a game</h2><div class="line-list" id="games">' + gamesHtml() + "</div></div>" +
           '<div class="spacer"></div>' +
           '<div class="homefoot"><button id="helpBtn" class="txt">How to play</button>' + (hasStats() ? '<button id="statsBtn" class="txt">Your stats</button>' : "") +
@@ -620,8 +620,8 @@
     var room = s.packMode === "room";
     var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
     var need = s.rounds * s.players.length + 5, short = s.songsInPlay < need;
-    var note = !on.length ? (room ? "Everyone picks up to " + (s.packPicks || 5) + " packs" : isHost ? "Pick at least one pack to start" : "Waiting for the host to pick packs")
-      : short ? "Not enough songs for this many turns: pick more packs or lower the rounds"
+    var note = !on.length ? (room ? "Everyone picks up to " + (s.packPicks || 5) + " packs" : isHost ? "Pick a pack to get going" : "Waiting for the host to pick packs")
+      : short ? "Not enough songs for that many turns. Add more packs or drop a round"
       : room ? "Every pack picked goes in the mix. Popular ones come up more." : "No song is played twice in a game.";
     var mode = isHost
       ? '<div class="seg packmode"><button class="pmode" data-m="host" aria-pressed="' + !room + '">Host picks</button><button class="pmode" data-m="room" aria-pressed="' + room + '">Room picks</button></div>'
@@ -685,11 +685,11 @@
   }
 
   function startNote(s, turns) {
-    if (s.players.length < s.minPlayers) { return "Waiting for at least " + s.minPlayers + " players"; }
-    if (!s.selectedPacks.length) { return s.packMode === "room" ? "Waiting for someone to pick song packs" : "Pick at least one song pack to start"; }
-    if (s.songsInPlay < turns + 5) { return "Not enough songs for this many turns. Pick more packs or lower the rounds."; }
+    if (s.players.length < s.minPlayers) { return "Need at least " + s.minPlayers + " players to get going. Share the link!"; }
+    if (!s.selectedPacks.length) { return s.packMode === "room" ? "Waiting for someone to pick some song packs" : "Pick a song pack to get going"; }
+    if (s.songsInPlay < turns + 5) { return "Not enough songs for that many turns. Add more packs or drop a round."; }
     var off = s.players.filter(function (p) { return p.mic === "off"; }).map(function (p) { return p.name; });
-    if (off.length) { return (off.length > 1 ? off.slice(0, -1).join(", ") + " and " + off[off.length - 1] : off[0]) + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses."; }
+    if (off.length) { return (off.length > 1 ? off.slice(0, -1).join(", ") + " and " + off[off.length - 1] : off[0]) + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses, no worries."; }
     return "";
   }
 
@@ -1010,7 +1010,7 @@
     var cue = t.hints ? "Hint " + t.hints + " of 3" : "No hints yet";
     setAction("askHintBtn", cue, done ? "Asked" : asked ? "Asked" : "Ask",
       done ? "No more hints" : asked ? "Hint asked" : "Ask for a hint",
-      done ? "All three hints given" : "Sends a request to the performer", done || asked);
+      done ? "All three hints given" : "Nudges the performer", done || asked);
     b.disabled = done || asked || t.stage === "confirming";
   }
 
@@ -1055,7 +1055,7 @@
     if (whoState.built === t.id) { return; }
     whoState.built = t.id;
     whoState.picks = t.pending && t.pending.from ? [t.pending.from] : [];
-    var sub = (t.pending && t.pending.heard ? "Heard “" + t.pending.heard + "”. " : "") + "Tap everyone who got it right. Each of them earns half the points.";
+    var sub = (t.pending && t.pending.heard ? "Heard “" + t.pending.heard + "”. " : "") + "Tap everyone who got it right. They each bag half the points.";
     $("#confSub").textContent = sub;
     var grid = $("#whoGrid");
     grid.innerHTML = st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
@@ -1094,10 +1094,10 @@
         key: "choose-" + T.id, field: "ground",
         html: '<div class="screen">' + topBar(s) +
           '<div class="head"><h1 class="headline">Pick a song</h1>' +
-          '<p class="small">A harder song earns bonus points. Only you can see these. The 3, 2, 1 countdown starts as soon as you pick.</p></div>' +
+          '<p class="small">Harder songs earn bonus points. Only you can see these! The 3, 2, 1 starts as soon as you pick.</p></div>' +
           '<div class="stack">' + offs + "</div>" +
           (T.canRefresh ? '<button id="refreshBtn" class="btn btn--outline">Refresh options</button>' +
-            '<p class="small center">Don\'t know any of these? Refresh once for three new songs.</p>' : "") +
+            '<p class="small center">Don\'t know any of these? Refresh once for three new ones.</p>' : "") +
           '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: function () {
           var rf = $("#refreshBtn"); if (rf) { rf.onclick = function () { send({ t: "refreshOptions" }); }; }
@@ -1131,7 +1131,7 @@
         key: "wait-" + T.id, field: "ground",
         html: '<div class="screen">' + topBar(s) +
           '<div class="mid"><h1 class="headline">' + esc(who) + (T.difficulty ? " is getting ready" : " is choosing a song") + "</h1>" +
-          '<p class="small">' + (T.difficulty ? "A 3, 2, 1 countdown starts as soon as they tap Ready. No performing until it ends." : "Get ready to guess. Say the title out loud or type it.") + "</p>" +
+          '<p class="small">' + (T.difficulty ? "The 3, 2, 1 starts as soon as they tap Ready. No performing till it ends!" : "Get ready to guess! Shout the title or type it.") + "</p>" +
           '<div class="micline" data-mic></div></div>' + skipHtml(s) + "</div>",
         bind: bindSkip
       };
@@ -1188,7 +1188,7 @@
         key: "g-" + T.id + (mic.typeMode ? "-t" : "-m"), field: "time",
         html: '<div class="screen">' + topBar(s) + timerHtml(mic.typeMode) +
           '<div class="hstack" id="hintBox" hidden></div>' +
-          actionHtml("askHintBtn", "No hints yet", "Ask", "Ask for a hint", "Sends a request to the performer") +
+          actionHtml("askHintBtn", "No hints yet", "Ask", "Ask for a hint", "Nudges the performer") +
           (mic.typeMode
             ? '<div class="typebox"><form id="gform" class="typebox">' +
               '<input id="ginput" class="input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title">' +
@@ -1199,7 +1199,7 @@
               '<button id="toType" class="txt">Type instead</button></div>') +
           skipHtml(s) +
           '<div class="checking" id="checking" hidden><h2 class="headline pulse">Checking</h2>' +
-          '<p class="small">Someone may have got it. Waiting for the performer to confirm.</p></div></div>',
+          '<p class="small">Someone might\'ve got it! Waiting for the performer to confirm.</p></div></div>',
         bind: function () {
           if (mic.turnSeen !== st.turn.id) { mic.turnSeen = st.turn.id; mic.base = mic.total || 0; mic.heard = ""; }
           var f = $("#gform");
@@ -1236,7 +1236,7 @@
       sub = guessers.length ? guessers.map(esc).join(", ").replace(/, ([^,]*)$/, " and $1") + (guessers.length > 1 ? " named it and earn " + pts(gAwards[0].points) + " each" : " named it and earns " + pts(gAwards[0].points)) : "";
     } else if (R.outcome === "timeout") {
       head = "Time's up";
-      sub = "Nobody guessed " + esc(who) + "'s song, so it scores nothing.";
+      sub = "Nobody guessed " + esc(who) + "'s song, so no points. Ouch.";
     } else {
       head = "Turn skipped";
       sub = esc(who) + " scores nothing.";
@@ -1327,7 +1327,7 @@
     return '<div class="awardcard awardcard--' + hue + '"><span class="label">' + esc(d.title) + '</span><h1 class="display" style="font-size:' + (who.length > 12 ? 40 : 56) + 'px;line-height:1.0">' + who + "</h1>" +
       '<p class="title">' + detail + "</p>" +
       (got > 0 ? '<div class="numeral numeral--80 awardcard__p">+' + pts(got) + '</div><p class="label">' + (d.winners.length > 1 ? "Points each" : "Bonus points") + "</p>"
-               : '<p class="title awardcard__p">Bonus held back to keep the lead</p>') + "</div>" +
+               : '<p class="title awardcard__p">Bonus held back so the leader stays the leader</p>') + "</div>" +
       '<div class="adots">' + dots + "</div>";
   }
 
@@ -1393,29 +1393,29 @@
     var AV = function (n, k) { return '<span class="avatar pc pc' + k + ' avatar--md">' + n.charAt(0) + "</span>"; };
     var TAP = function (x, y, d) { return '<i class="hv-tap" style="left:' + x + 'px;top:' + y + 'px;animation-delay:' + d + 'ms"></i>'; };
     var scenes = [
-      { ms: 5000, full: true, chip: "How to play", head: "One person performs.<br>Everyone else listens and guesses.", text: "Take turns. The quicker the guess, the more points.", bg: FIELD_BG.orange },
-      { ms: 5400, role: "w", chip: "Your turn to perform", head: "Pick a song", text: "Only you can see it. Harder songs earn bonus points.", bg: FIELD_BG.ground,
+      { ms: 5000, full: true, chip: "How to play", head: "One person performs.<br>Everyone else listens and guesses.", text: "Take turns. Guess fast, score big!", bg: FIELD_BG.orange },
+      { ms: 5400, role: "w", chip: "Your turn to perform", head: "Pick a song", text: "Only you can see it. Go harder for bonus points!", bg: FIELD_BG.ground,
         mock: '<div class="m-cards">' +
           '<div class="m-card"><span>Easy</span><b>Dancing Queen</b><i>ABBA</i></div>' +
           '<div class="m-card m-pick"><span>Medium</span><b>Wonderwall</b><i>Oasis</i></div>' +
           '<div class="m-card"><span>Hard</span><b>Rolling in the Deep</b><i>Adele</i></div></div>' + TAP(300, 215, 1900) },
-      { ms: 5000, role: "e", chip: "Everyone", head: "The countdown starts", text: "It starts as soon as the song is picked. Do not perform until it ends.", bg: FIELD_BG.green,
+      { ms: 5000, role: "e", chip: "Everyone", head: "The countdown starts", text: "It kicks off the second a song's picked. No performing until it ends!", bg: FIELD_BG.green,
         mock: '<div class="m-disc"><div class="m-num" data-seq="3,2,1,Go" data-step="1000">3</div></div>' },
-      { ms: 6200, role: "w", chip: "Your turn to perform", head: "Whistle or kazoo the tune", text: "Whistle it or play it on a kazoo, with no words. Shuffling the song and giving hints both cost points.", bg: FIELD_BG.green,
+      { ms: 6200, role: "w", chip: "Your turn to perform", head: "Whistle or kazoo the tune", text: "Whistle it or kazoo it. No words allowed! Shuffles and hints cost points.", bg: FIELD_BG.green,
         mock: '<div><div class="m-label">Your song to perform</div><div class="m-song">Dancing Queen</div><div class="m-art">ABBA</div></div><div class="m-timer" data-timer="42">42</div>' +
           '<div class="m-two"><div class="m-mini"><span>Song</span><b>Shuffle</b></div><div class="m-mini"><span>0 of 3</span><b>Give hint</b></div></div><div class="m-btn">Someone got it</div>' },
-      { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is performing. Your phone mic should pick it up by itself. If it does not, tap Type instead.", bg: FIELD_BG.green,
+      { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is performing. Your phone's mic should catch your guess. If it doesn't, tap Type instead.", bg: FIELD_BG.green,
         mock: '<div class="m-orbwrap"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
           '<div class="m-say"><span>You say</span><b>Dancing Queen</b></div></div><div class="m-head">Listening</div><div class="m-link">Type instead</div>' },
-      { ms: 5600, role: "w", chip: "Your turn to perform", head: "Say who got it", text: "When someone gets it, tap Someone got it. Tick everyone who named the song, then confirm.", bg: FIELD_BG.ground,
+      { ms: 5600, role: "w", chip: "Your turn to perform", head: "Say who got it", text: "Someone nailed it? Tap Someone got it, tick who named the song, then confirm.", bg: FIELD_BG.ground,
         mock: '<div class="m-rows">' +
           '<div class="m-row m-on">' + AV("Theo", 1) + '<b>Theo</b><em>Got it</em></div><div class="m-row">' + AV("Priya", 2) + '<b>Priya</b></div><div class="m-row">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="m-btn">Confirm</div>' + TAP(80, 135, 1500) },
-      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The performer earns the full score. Each guesser earns half.", bg: FIELD_BG.blue, light: true,
+      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The performer bags the full score. Each guesser gets half.", bg: FIELD_BG.blue, light: true,
         mock: '<div class="m-big" data-count="917" data-ms="1600">0</div><div class="m-label">Guessed in 12.4s</div><div class="m-sub2">Maya scores<br>Theo named it and earns 459</div>' },
-      { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards add bonus points at the end.", bg: FIELD_BG.pink,
+      { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards chuck in bonus points at the end.", bg: FIELD_BG.pink,
         mock: '<div class="m-rows">' +
           '<div class="m-row m-light"><b class="m-rk">1</b>' + AV("Maya", 0) + '<b>Maya</b><em>2,140</em></div><div class="m-row m-light"><b class="m-rk">2</b>' + AV("Theo", 1) + '<b>Theo</b><em>1,820</em></div><div class="m-row m-light"><b class="m-rk">3</b>' + AV("Priya", 2) + '<b>Priya</b><em>1,310</em></div></div>' },
-      { ms: 4500, full: true, chip: "Stuck?", head: "Just press the ? icon.", text: "It is in the corner of every screen and tells you what to do right now.", bg: FIELD_BG.orange }
+      { ms: 4500, full: true, chip: "Stuck?", head: "Stuck? Hit the ? icon.", text: "It lives in the corner of every screen and tells you exactly what to do.", bg: FIELD_BG.orange }
     ];
     var o = document.createElement("div");
     o.className = "hv"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "How to play");
@@ -1484,24 +1484,24 @@
   // What to do on this screen, for the ? button. It depends on the screen and on whether you are performing or guessing.
   function helpFor(key) {
     var host = st && st.hostId === st.me, T = st && st.turn, who = T && st.players ? pname(st, T.playerId) : "The performer";
-    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Harder songs earn bonus points. If you do not know any of them, ask for new cards once. Only you can see the songs."]; }
-    if (/^ready-/.test(key)) { return ["Get ready", "Only you can see your song. When you are ready, tap Ready and a 3, 2, 1 countdown starts for everyone. Then whistle or kazoo the tune, with no words."]; }
-    if (/^wait-/.test(key)) { return ["Get ready to guess", who + " is getting ready to perform. When they start, say the song title out loud. If your mic is off, you can type it instead."]; }
+    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Harder ones earn bonus points! Don't know any? Refresh once for new ones. Only you can see them."]; }
+    if (/^ready-/.test(key)) { return ["Get ready", "Only you can see your song. Ready? Tap Ready and a 3, 2, 1 starts for everyone. Then whistle or kazoo the tune. No words!"]; }
+    if (/^wait-/.test(key)) { return ["Get ready to guess", who + " is getting ready to perform. When they start, shout the song title. Mic off? Type it instead."]; }
     if (/^cd-/.test(key)) {
       return T && T.playerId === st.me
-        ? ["Countdown", "When it ends, whistle or kazoo the tune clearly, with no words. Shuffling the song or giving hints costs points."]
-        : ["Countdown", "When it ends, " + who + " starts performing. Say the song title out loud as soon as you know it, or tap Type instead."];
+        ? ["Countdown", "When it ends, whistle or kazoo the tune. No words! Shuffles and hints cost points."]
+        : ["Countdown", "When it ends, " + who + " starts performing. Shout the title as soon as you know it, or tap Type instead."];
     }
-    if (/^w-/.test(key)) { return ["You are performing", "Whistle or kazoo the tune, with no words. When someone says the right title, tap Someone got it, tick who named it, then confirm. Shuffles and hints cost points."]; }
-    if (/^g-/.test(key)) { return ["You are guessing", "Listen to " + who + " and say the song title out loud, or tap Type instead. The faster you guess, the more you score. You can ask for a hint."]; }
-    if (/^reveal-/.test(key)) { return ["Score", "The performer earns the full score and each person who named the song earns half. The next turn starts soon."]; }
+    if (/^w-/.test(key)) { return ["You are performing", "Whistle or kazoo the tune. No words! When someone says the right title, tap Someone got it, tick who named it, then confirm."]; }
+    if (/^g-/.test(key)) { return ["You are guessing", "Listen to " + who + " and shout the song title, or tap Type instead. The faster you guess, the more you score. Stuck? Ask for a hint."]; }
+    if (/^reveal-/.test(key)) { return ["Score", "The performer bags the full score and everyone who named the song gets half. Next turn coming up!"]; }
     if (key === "lobby") {
       return host
-        ? ["You are the host", "Send the invite link to your friends. Choose the song packs and rounds, then tap Start game once everyone is in. Keep your mic on so the game can hear guesses."]
-        : ["Waiting to start", "The host starts the game once everyone is in. If room picks is on, tap Pick song packs. Keep your mic on so the game can hear your guesses."];
+        ? ["You are the host", "Send the invite link to your friends. Choose the song packs and rounds, then tap Start game once everyone's in. Keep your mic on so the game can hear guesses!"]
+        : ["Waiting to start", "The host starts the game once everyone's in. If room picks is on, tap Pick song packs. Keep your mic on so the game can hear your guesses!"];
     }
-    if (/^awards-/.test(key)) { return ["Awards", "These awards add bonus points to the final scores. Tap to see the next one."]; }
-    if (key === "over") { return ["Game over", "The top score wins. " + (host ? "Tap Play again to start another game with the same players." : "The host can start another game with the same players.")]; }
+    if (/^awards-/.test(key)) { return ["Awards", "These awards add bonus points to the final scores. Tap for the next one!"]; }
+    if (key === "over") { return ["Game over", "Top score wins! " + (host ? "Tap Play again for another go with the same players." : "The host can start another go with the same players.")]; }
     return ["Need a hand?", "Tap How to play on the home screen to see the rules."];
   }
   function showHelpSheet() {
@@ -1527,7 +1527,7 @@
     var done = function (v) {
       newbie = !v; try { localStorage.setItem("ttt_played", v ? "yes" : "no"); } catch (e) {}
       if (v) { if (o.parentNode) { o.parentNode.removeChild(o); } return; }
-      $("#apSheet", o).innerHTML = '<p class="headline">It is simple.</p><p class="title">Here is how to play.</p>';
+      $("#apSheet", o).innerHTML = '<p class="headline">It\'s eaaaaaasy!</p><p class="title">Here\'s how to play.</p>';
       setTimeout(function () { if (o.parentNode) { o.parentNode.removeChild(o); } showHelp(); }, 1400);
     };
     $("#pYes", o).onclick = function () { done(true); };

@@ -228,7 +228,7 @@ RoomManager.prototype.listRooms = function () {
 // Admin / test mode: a room with test players, driven by one person.
 RoomManager.prototype.createAdmin = function (conn, msg) {
   var pw = String(msg.password == null ? "" : msg.password).trim().toLowerCase();
-  if (pw !== String(this.opts.adminPassword).toLowerCase()) { return err(conn, "bad_password", "Wrong password."); }
+  if (pw !== String(this.opts.adminPassword).toLowerCase()) { return err(conn, "bad_password", "Wrong password. Nice try!"); }
   this.create(conn, { name: "Admin" });
   var room = this.rooms[conn.roomCode];
   if (!room) { return; }
@@ -257,9 +257,9 @@ RoomManager.prototype.handle = function (conn, msg) {
   if (msg.t === "peek") { return this.peek(conn, msg); }
 
   var room = conn.roomCode ? this.rooms[conn.roomCode] : null;
-  if (!room) { return err(conn, "room_not_found", "You are not in a room."); }
+  if (!room) { return err(conn, "room_not_found", "You're not in a room."); }
   var me = findPlayer(room, conn.playerId);
-  if (!me) { return err(conn, "room_not_found", "You are not in this room."); }
+  if (!me) { return err(conn, "room_not_found", "You're not in this room."); }
   var isHost = room.hostId === me.id;
 
   if (room.admin && me.id === room.admin.pid) {
@@ -287,20 +287,20 @@ RoomManager.prototype.handle = function (conn, msg) {
   }
 
   switch (msg.t) {
-    case "setRounds":  return isHost ? this.setRounds(room, msg) : err(conn, "not_host", "Only the host can do that.");
-    case "start":      return isHost ? this.start(room, conn) : err(conn, "not_host", "Only the host can do that.");
-    case "next":       return isHost ? this.next(room) : err(conn, "not_host", "Only the host can do that.");
-    case "skip":       return isHost ? this.skip(room) : err(conn, "not_host", "Only the host can do that.");
-    case "playAgain":  return isHost ? this.playAgain(room) : err(conn, "not_host", "Only the host can do that.");
-    case "setLimit":   return isHost ? this.setLimit(room, msg) : err(conn, "not_host", "Only the host can do that.");
-    case "setPacks":   return isHost ? this.setPacks(room, msg) : err(conn, "not_host", "Only the host can do that.");
-    case "setPackMode": return isHost ? this.setPackMode(room, msg) : err(conn, "not_host", "Only the host can do that.");
+    case "setRounds":  return isHost ? this.setRounds(room, msg) : err(conn, "not_host", "Only the host can do that one.");
+    case "start":      return isHost ? this.start(room, conn) : err(conn, "not_host", "Only the host can do that one.");
+    case "next":       return isHost ? this.next(room) : err(conn, "not_host", "Only the host can do that one.");
+    case "skip":       return isHost ? this.skip(room) : err(conn, "not_host", "Only the host can do that one.");
+    case "playAgain":  return isHost ? this.playAgain(room) : err(conn, "not_host", "Only the host can do that one.");
+    case "setLimit":   return isHost ? this.setLimit(room, msg) : err(conn, "not_host", "Only the host can do that one.");
+    case "setPacks":   return isHost ? this.setPacks(room, msg) : err(conn, "not_host", "Only the host can do that one.");
+    case "setPackMode": return isHost ? this.setPackMode(room, msg) : err(conn, "not_host", "Only the host can do that one.");
     case "votePacks":  return this.votePacks(room, me, msg);
     case "voteRound":  return this.voteRound(room, me);
     case "askHint":    return this.askHint(room, me);
-    case "addRound":   return isHost ? this.addRound(room, conn) : err(conn, "not_host", "Only the host can do that.");
-    case "cancelGame": return isHost ? this.cancelGame(room) : err(conn, "not_host", "Only the host can do that.");
-    case "removePlayer": return isHost ? this.removePlayer(room, me, msg) : err(conn, "not_host", "Only the host can do that.");
+    case "addRound":   return isHost ? this.addRound(room, conn) : err(conn, "not_host", "Only the host can do that one.");
+    case "cancelGame": return isHost ? this.cancelGame(room) : err(conn, "not_host", "Only the host can do that one.");
+    case "removePlayer": return isHost ? this.removePlayer(room, me, msg) : err(conn, "not_host", "Only the host can do that one.");
     case "refreshOptions": return this.refreshOptions(room, me);
     case "pickDifficulty": return this.pickDifficulty(room, me, msg);
     case "shuffle":    return this.shuffle(room, me);
@@ -331,7 +331,7 @@ RoomManager.prototype.addPlayer = function (room, name) {
 
 RoomManager.prototype.create = function (conn, msg) {
   var name = cleanName(msg.name);
-  if (!name) { return err(conn, "bad_name", "Enter a name first."); }
+  if (!name) { return err(conn, "bad_name", "Pop a name in first!"); }
   var room = {
     code: this.makeCode(), hostId: null, players: [], phase: "lobby",
     rounds: this.opts.defaultRounds, limitMs: this.opts.limitMs, turns: [], turnPos: -1, turn: null, turnCounter: 0,
@@ -361,7 +361,7 @@ RoomManager.prototype.peek = function (conn, msg) {
 RoomManager.prototype.join = function (conn, msg) {
   var code = String(msg.code || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
   var room = this.rooms[code];
-  if (!room) { return err(conn, "room_not_found", "No room with that code."); }
+  if (!room) { return err(conn, "room_not_found", "Hmm, no room with that code."); }
 
   if (msg.playerId) {
     var existing = findPlayer(room, msg.playerId);
@@ -373,10 +373,10 @@ RoomManager.prototype.join = function (conn, msg) {
     }
   }
   if (room.phase === "turn" && room.sd) {
-    return err(conn, "game_started", "That game is in its final tie-break. Try again once it has finished.");
+    return err(conn, "game_started", "That game's in a nail-biting tie-break. Try again once it's over!");
   }
   var name = cleanName(msg.name);
-  if (!name) { return err(conn, "bad_name", "Enter a name first."); }
+  if (!name) { return err(conn, "bad_name", "Pop a name in first!"); }
   for (var i = 0; i < room.players.length; i++) {
     var same = room.players[i];
     if (same.removed || same.name.toLowerCase() !== name.toLowerCase()) { continue; }
@@ -386,9 +386,9 @@ RoomManager.prototype.join = function (conn, msg) {
       conn.send({ t: "joined", code: room.code, playerId: same.id });
       return this.broadcast(room);
     }
-    return err(conn, "name_taken", "That name is taken in this room.");
+    return err(conn, "name_taken", "Someone's already using that name. Try another!");
   }
-  if (room.players.length >= this.opts.maxPlayers) { return err(conn, "full", "That room is full."); }
+  if (room.players.length >= this.opts.maxPlayers) { return err(conn, "full", "That room's full. Popular, aren't you?"); }
   var p = this.addPlayer(room, name);
   if (room.phase === "turn") { this.scheduleLatePlayer(room, p); }
   if (room.phase === "gameover") { p.sitOut = true; }
@@ -530,7 +530,7 @@ RoomManager.prototype.addRound = function (room, conn) {
   if (room.turn.round !== room.rounds) { return; }
   var extra = room.players.filter(function (p) { return !p.sitOut; }).length;
   if (this.unusedCount(room) < extra + SONG_BUFFER) {
-    return err(conn, "too_few_songs", "Not enough unplayed songs left in the chosen packs for another round.");
+    return err(conn, "too_few_songs", "We've run out of fresh songs for another round. Add more packs next time!");
   }
   room.rounds++;
   room.roundVotes = {};
@@ -594,12 +594,12 @@ RoomManager.prototype.start = function (room, conn) {
   if (room.phase !== "lobby") { return; }
   if (room.packMode === "room" && !room.packs.length) { room.packs = ["bangers"]; room.packWeight = { bangers: 1 }; }
   if (room.players.length < this.opts.minPlayers) {
-    return err(conn, "too_few", "You need at least " + this.opts.minPlayers + " players.");
+    return err(conn, "too_few", "You need at least " + this.opts.minPlayers + " players. Round up some friends!");
   }
-  if (!room.packs.length) { return err(conn, "no_packs", "Pick at least one song pack first."); }
+  if (!room.packs.length) { return err(conn, "no_packs", "Pick a song pack first!"); }
   var need = room.players.length * room.rounds + SONG_BUFFER;
   if (this.poolFor(room).length < need) {
-    return err(conn, "too_few_songs", "These packs only have " + this.poolFor(room).length + " songs, and this game needs about " + need + ". Tick more packs or lower the rounds.");
+    return err(conn, "too_few_songs", "These packs only have " + this.poolFor(room).length + " songs, and this game needs about " + need + ". Tick more packs or drop a round.");
   }
   room.players.forEach(function (p) { p.total = 0; p.prev = 0; p.last = null; p.turns = 0; });
   room.turns = [];
