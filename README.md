@@ -4,7 +4,7 @@ A living-room party game. Everyone uses their own phone. Take turns performing a
 
 ## How a game works
 
-The host taps Start lobby and shares the link, the 4 letter code, or the QR code (Scan to join, host only). Everyone else opens the link or taps Join a game.
+The host taps Start lobby and shares the link or the QR code (Scan to join, host only). Everyone else opens the link, scans the code, or taps a game in the Join a game list.
 
 Every player performs once per round. The performer picks easy, medium or hard, sees the song on their own phone, and the clock runs until someone guesses it. The performer then taps who got it first (more than one only if two people shouted together).
 

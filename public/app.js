@@ -525,7 +525,7 @@
           '<div class="field-group">' + nameField(name) + '<button id="hostBtn" class="btn" style="margin-top:12px">Start lobby</button>' +
           '<p class="small">Start a lobby and we\'ll copy a link to send to your friends.</p></div>' +
           '<div class="stack"><h2 class="label">Join a game</h2><div class="line-list" id="games">' + gamesHtml() + "</div>" +
-          '<div class="codejoin"><label class="label flab" for="codeIn">Got a code?</label><div class="codejoin__row"><input id="codeIn" class="input" maxlength="4" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD"><button id="codeGo" class="btn">Join</button></div></div></div>' +
+          '</div>' +
           '<div class="spacer"></div>' +
           '<div class="homefoot"><button id="helpBtn" class="txt">How to play</button>' + (hasStats() ? '<button id="statsBtn" class="txt">Your stats</button>' : "") +
           '<button id="adminDot" class="admindot" aria-label="Admin"></button></div>' +
@@ -541,13 +541,6 @@
       bind: function () {
         var go = function () { var n = readName(); if (n) { copyOnJoin = true; autoMic(); primeCopy(); send({ t: "create", name: n }); } };
         $("#hostBtn").onclick = go;
-        var codeJoin = function () {
-          var c = $("#codeIn").value.replace(/[^A-Za-z]/g, "").toUpperCase();
-          if (c.length !== 4) { toast("Room codes have 4 letters."); return; }
-          var n = readName(); if (n) { autoMic(); send({ t: "join", code: c, name: n }); }
-        };
-        $("#codeGo").onclick = codeJoin;
-        $("#codeIn").onkeydown = function (e) { if (e.key === "Enter") { codeJoin(); } };
         $("#name").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
         $("#helpBtn").onclick = function () { usage("howto", "home"); showHelp(); };
         var sb = $("#statsBtn"); if (sb) { sb.onclick = function () { showStats(readNameQuiet()); }; }
@@ -864,7 +857,7 @@
     try { var q = qrcode(0, "M"); q.addData(linkFor(code)); q.make(); svg = q.createSvgTag({ cellSize: 1, margin: 4, scalable: true }); } catch (e) { return; }
     var o = document.createElement("div");
     o.id = "qrfull"; o.className = "qrfull"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "QR code to join the game");
-    o.innerHTML = '<button class="qrx" aria-label="Close">X</button><div class="qrbox">' + svg + '</div><p class="qrcap">Room ' + esc(code) + "</p>";
+    o.innerHTML = '<button class="qrx" aria-label="Close">X</button><div class="qrbox">' + svg + '</div>';
     document.body.appendChild(o);
     function close() { if (o.parentNode) { o.parentNode.removeChild(o); } document.removeEventListener("keydown", onKey); }
     function onKey(ev) { if (ev.key === "Escape") { close(); } }
@@ -933,7 +926,6 @@
       html:
         '<div class="screen">' +
           '<div class="head"><h1 class="headline">' + esc(pname(s, s.hostId)) + "'s game</h1>" +
-            '<p class="title roomcode">Room code: ' + esc(s.code) + "</p>" +
             '<p class="small">' + s.players.length + " of " + s.maxPlayers + " players are in</p></div>" +
           '<div class="pgrid">' + cells + "</div>" + voteCtaHtml(s) +
           '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + inviteRowHtml(s, isHost) + "</div>" +

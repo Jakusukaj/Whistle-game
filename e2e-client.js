@@ -44,7 +44,7 @@ function phone(port, name) {
   await until(function () { return A.q(".pgrid"); }, 3000, "host lobby");
   [B, C].forEach(function (p) { p.type("#name", p.name); });
   await until(function () { return B.q(".gamebtn") && C.q(".gamebtn"); }, 6000, "open game listed on home");
-  check("home lists the open game by host name and has a room code box", /'s game/.test(B.q(".gamebtn").textContent) && !!B.q("#codeIn"));
+  check("home lists the open game by host name", /'s game/.test(B.q(".gamebtn").textContent) && !B.q("#codeIn"));
   [B, C].forEach(function (p) { p.click(".gamebtn"); });
   await until(function () { return B.q(".pgrid") && C.q(".pgrid"); }, 3000, "joiners in lobby");
   await until(function () { return /Cat/.test(A.text()) && /Bob/.test(A.text()); }, 3000, "host sees players");
