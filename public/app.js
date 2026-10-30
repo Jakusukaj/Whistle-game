@@ -933,6 +933,7 @@
       html:
         '<div class="screen">' +
           '<div class="head"><h1 class="headline">' + esc(pname(s, s.hostId)) + "'s game</h1>" +
+            '<p class="title roomcode">Room code: ' + esc(s.code) + "</p>" +
             '<p class="small">' + s.players.length + " of " + s.maxPlayers + " players are in</p></div>" +
           '<div class="pgrid">' + cells + "</div>" + voteCtaHtml(s) +
           '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + inviteRowHtml(s, isHost) + "</div>" +

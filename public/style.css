@@ -543,3 +543,5 @@ body.admin #sfxfab { top: 54px; }
 .codejoin__row { display: flex; gap: 10px; align-items: stretch; }
 .codejoin__row .input { flex: 1; text-transform: uppercase; letter-spacing: .3em; text-align: center; }
 .codejoin__row .btn { width: auto; min-width: 96px; margin: 0; }
+
+.roomcode { margin: 2px 0 4px; letter-spacing: .08em; }
