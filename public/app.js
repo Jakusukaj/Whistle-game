@@ -1243,7 +1243,7 @@
           '<div class="head"><h1 class="headline">Pick a song</h1>' +
           '<p class="small">Harder songs earn bonus points. Only you can see these! The 3, 2, 1 starts as soon as you pick.</p></div>' +
           '<div class="stack">' + offs + "</div>" +
-          (T.canRefresh ? '<button id="refreshBtn" class="btn btn--outline">Refresh options (' + (T.refreshesLeft || 0) + ' left)</button>' +
+          (T.canRefresh ? '<button id="refreshBtn" class="btn btn--outline">Refresh options</button>' +
             '<p class="small center">Don\'t know any of these? You can refresh up to 3 times.</p>' : "") +
           '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: function () {
@@ -1631,7 +1631,7 @@
   // What to do on this screen, for the ? button. It depends on the screen and on whether you are performing or guessing.
   function helpFor(key) {
     var host = st && st.hostId === st.me, T = st && st.turn, who = T && st.players ? pname(st, T.playerId) : "The performer";
-    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Harder ones earn bonus points! Don't know any? Refresh up to three times for new ones. Only you can see them."]; }
+    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Harder ones earn bonus points! Don't know any? Refresh as often as you like for new ones. Only you can see them."]; }
     if (/^ready-/.test(key)) { return ["Get ready", "Only you can see your song. Ready? Tap Ready and a 3, 2, 1 starts for everyone. Then whistle or kazoo the tune. No words!"]; }
     if (/^wait-/.test(key)) { return ["Get ready to guess", who + " is getting ready to perform. When they start, shout the song title. Mic off? Type it instead."]; }
     if (/^cd-/.test(key)) {

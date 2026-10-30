@@ -114,29 +114,22 @@ var tw = d.cs.filter(function (x) { return x.playerId === d.room.turn.playerId; 
 d.m.handle(tw, { t: "pickDifficulty", d: "hard" });
 check("picking by difficulty still works", d.room.turn.difficulty === d.room.turn.song.difficulty || d.room.turn.difficulty);
 
-// --- refresh options: once per turn, new songs, free
+// --- refresh options: unlimited, free, and songs already shown stay out while fresh ones remain
 var r = newGame(2);
 r.m.handle(r.cs[0], { t: "start" });
 var rw = r.cs.filter(function (x) { return x.playerId === r.room.turn.playerId; })[0];
 var ro = r.m.viewFor(r.room, rw.playerId).turn;
-var before = ro.options.map(function (o) { return o.title; });
+var seenAll = ro.options.map(function (o) { return o.title; });
 check("refresh offered at first", ro.canRefresh === true);
-r.m.handle(rw, { t: "refreshOptions" });
-var rn = r.m.viewFor(r.room, rw.playerId).turn;
-var after = rn.options.map(function (o) { return o.title; });
-check("refresh gives three new songs", after.length === 3 && after.every(function (t) { return before.indexOf(t) === -1; }));
-check("refresh can be used three times", rn.canRefresh === true && rn.refreshesLeft === 2);
-var seenAll = before.concat(after);
-r.m.handle(rw, { t: "refreshOptions" });
-var r2 = r.m.viewFor(r.room, rw.playerId).turn;
-var third = r2.options.map(function (o) { return o.title; });
-check("later refreshes never repeat songs already shown", third.every(function (t) { return seenAll.indexOf(t) === -1; }));
-r.m.handle(rw, { t: "refreshOptions" });
-var r3 = r.m.viewFor(r.room, rw.playerId).turn;
-check("no refreshes left after three", r3.canRefresh === false && r3.refreshesLeft === 0);
-var fin = r3.options.map(function (o) { return o.title; }).join();
-r.m.handle(rw, { t: "refreshOptions" });
-check("a fourth refresh does nothing", r.m.viewFor(r.room, rw.playerId).turn.options.map(function (o) { return o.title; }).join() === fin);
+var repeat = 0, still = true;
+for (var rf = 0; rf < 12; rf++) {
+  r.m.handle(rw, { t: "refreshOptions" });
+  var rv = r.m.viewFor(r.room, rw.playerId).turn;
+  still = still && rv.canRefresh === true && rv.options.length === 3;
+  rv.options.forEach(function (o) { if (seenAll.indexOf(o.title) !== -1) { repeat++; } seenAll.push(o.title); });
+}
+check("refreshing is unlimited", still);
+check("no song is shown twice while fresh ones remain", repeat === 0, repeat);
 var other = r.cs.filter(function (x) { return x !== rw; })[0];
 check("guessers never see the options", !r.m.viewFor(r.room, other.playerId).turn.options);
 

@@ -12,6 +12,8 @@ Scoring: a guess at 0 seconds is worth 1000 points, falling in a straight line t
 
 Rounds: until the host chooses their own number, the game suggests rounds for the head count, aiming for about 16 turns in all (2 to 3 players get 5 rounds, 4 get 4, 5 to 6 get 3, 7 to 10 get 2, 11 or more get 1). It updates as people join. Time per turn is 30 seconds to 2 minutes. Games of 4 or more rounds get a halfway scoreboard, and every game ends with awards for bonus points. Ties go to a sudden-death round.
 
+Performers can refresh their three song cards as often as they like, for free. A song that has been shown in a game is held back while fresh ones remain, and comes up last if the pack runs low.
+
 Stuck? Press the ? button on any screen.
 
 ## Run it on your computer (optional)

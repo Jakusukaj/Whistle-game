@@ -163,7 +163,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     var locked = t.lockUntil && t.lockUntil > this.now();
     if (locked) { tv.lockUntil = t.lockUntil; }
     if (isW && t.options && t.stage === "choose" && !t.difficulty) {
-      tv.canRefresh = (t.refreshes || 0) < 3; tv.refreshesLeft = 3 - (t.refreshes || 0);
+      tv.canRefresh = true;
       tv.options = t.options.map(function (o) {
         return { difficulty: o.difficulty, multiplier: self.opts.multipliers[o.difficulty], title: o.song.title, artist: o.song.artist };
       });
@@ -689,7 +689,7 @@ RoomManager.prototype.start = function (room, conn) {
       room.turns.push({ playerId: room.players[i].id, round: r, sd: false });
     }
   }
-  room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
+  room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.shown = {}; room.roundVotes = {};
   room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.micAtStart = room.players.reduce(function (m, p) { var k = p.mic || "unknown"; m[k] = (m[k] || 0) + 1; return m; }, {}); room.lobbyMs = this.now() - (room.lobbySince || room.createdAt); room.startedAt = this.now(); room.gamePlayers = room.players.filter(function (p) { return !p.sitOut; }).length; room.turnsDone = 0; room.interlude = null; room.interludeDone = false;
   room.players.forEach(function (p) { p.bonus = 0; p.late = false; });
   room.phase = "turn";
@@ -767,7 +767,7 @@ RoomManager.prototype.dealOptions = function (room, avoid) {
   var self = this, taken = avoid.slice(), out = [];
   ["easy", "medium", "hard"].forEach(function (d) {
     var song = self.drawFrom(room, d, taken);
-    if (song) { taken.push(song.title); out.push({ difficulty: song.difficulty, song: song }); }
+    if (song) { taken.push(song.title); out.push({ difficulty: song.difficulty, song: song }); room.shown = room.shown || {}; room.shown[song.title] = (room.shown[song.title] || 0) + 1; }
   });
   return out;
 };
@@ -775,9 +775,8 @@ RoomManager.prototype.dealOptions = function (room, avoid) {
 // Whistler does not know any of the three songs: new cards, once per turn, free.
 RoomManager.prototype.refreshOptions = function (room, me) {
   var t = this.currentTurnFor(room, me, ["choose"]);
-  if (!t || t.difficulty || !t.options || (t.refreshes || 0) >= 3) { return; }
-  t.seen = (t.seen || []).concat(t.options.map(function (o) { return o.song.title; }));
-  var fresh = this.dealOptions(room, t.seen);
+  if (!t || t.difficulty || !t.options) { return; }
+  var fresh = this.dealOptions(room, t.options.map(function (o) { return o.song.title; }));
   if (!fresh.length) { return; }
   t.options = fresh; t.refreshes = (t.refreshes || 0) + 1;
   this.broadcast(room);
@@ -794,6 +793,11 @@ RoomManager.prototype.drawFrom = function (room, difficulty, avoid) {
   var same = pool.filter(function (s) { return s.difficulty === difficulty; });
   var from = same.length ? same : pool;
   if (!from.length) { return null; }
+  // Songs already offered in this game come up last: only the least-shown ones stay in the draw, so a song
+  // that has been seen is not offered again while there are fresh ones, and rarely after that.
+  var shown = room.shown || {}, least = Infinity;
+  from.forEach(function (s) { var n = shown[s.title] || 0; if (n < least) { least = n; } });
+  from = from.filter(function (s) { return (shown[s.title] || 0) === least; });
   if (room.packMode === "room" && room.packWeight) {
     var w = room.packWeight, tot = 0;
     var ws = from.map(function (s) {
@@ -1202,7 +1206,7 @@ RoomManager.prototype.resetToLobby = function (room) {
   room.players.forEach(function (p) { p.total = 0; p.prev = 0; p.last = null; p.turns = 0; p.bonus = 0; p.sitOut = false; });
   room.stats = {}; room.endAwards = null; room.bonusCapped = false;
   room.phase = "lobby"; room.lobbySince = this.now(); room.turn = null; room.turns = []; room.turnPos = -1;
-  room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {};
+  room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.shown = {};
   this.promoteHost(room);
   this.broadcast(room);
 };
