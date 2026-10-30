@@ -5,7 +5,7 @@
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   var ws = null, connected = false, session = null, rejoining = false, pendingName = "";
-  var gameList = [], adminLogin = false, pickerOpen = false, packDraft = null, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
+  var gameList = [], adminLogin = false, adminAuthed = false, adminPw = "", adminData = null, pickerOpen = false, packDraft = null, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
   var lastMicSent = "";
   var invite = null, copyOnJoin = false, linkResolve = null;
   var st = null, offset = 0, lastKey = null, wakeLock = null, prevStage = null, prevTurnId = null;
@@ -106,6 +106,8 @@
       } else {
         toast(m.message || "Oops, something went wrong.");
       }
+    } else if (m.t === "adminStats") {
+      adminData = m.data; adminAuthed = true; lastKey = null; render();
     } else if (m.t === "guessFeedback") {
       toast("Nope! Try again."); sfx("nope"); buzz(40);
     }
@@ -532,18 +534,66 @@
       html:
         '<div class="screen">' +
           '<div class="brand"><h1 class="headline">Admin</h1>' +
-          '<p class="small">Test mode. Play a whole game on your own.</p></div>' +
+          '<p class="small">Stats and the demo game.</p></div>' +
           '<div class="field-group"><label class="label" for="apw">Password</label>' +
           '<input id="apw" class="input" type="password" autocomplete="off" placeholder="Password"></div>' +
-          '<button id="aGo" class="btn">Enter admin mode</button>' +
+          '<button id="aGo" class="btn">Sign in</button>' +
           '<div class="spacer"></div>' +
           '<button id="aBack" class="txt">Back</button>' +
         "</div>",
       bind: function () {
-        var go = function () { send({ t: "createAdmin", password: $("#apw").value }); };
+        var go = function () { adminPw = $("#apw").value; send({ t: "adminStats", password: adminPw }); };
         $("#aGo").onclick = go;
         $("#apw").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
         $("#aBack").onclick = function () { adminLogin = false; render(); };
+      }
+    };
+  }
+
+  function dash(v, unit) { return v === null || v === undefined ? "No data yet" : v + (unit || ""); }
+  function arow(label, value) { return '<div class="strow"><span class="small">' + esc(label) + '</span><b class="title">' + esc(value) + "</b></div>"; }
+  function viewAdminHub() {
+    var d = adminData || {}, L = d.live || {}, V = d.voice || {}, S = d.songs || {}, G = d.games || {};
+    var by = Object.keys(d.byPlayers || {}).map(function (k) { var b = d.byPlayers[k]; return arow(k + " players", b.avgGameMin + " min, " + b.avgSecPerTurn + "s a turn (" + b.games + (b.games === 1 ? " game)" : " games)")); }).join("");
+    var recent = (d.recentGames || []).map(function (g) {
+      var ago = Math.max(1, Math.round((Date.now() - g.at) / 60000));
+      return arow((g.finished ? "" : "Abandoned, ") + g.players + " players, " + g.rounds + " rounds", g.minutes + " min, " + (ago < 120 ? ago + " min ago" : Math.round(ago / 60) + " h ago"));
+    }).join("");
+    var songs = function (a, f) { return (a || []).map(function (x) { return arow(x.song, f(x)); }).join("") || '<p class="small">Needs songs played at least twice.</p>'; };
+    var src = V.correctBySource || {};
+    return {
+      key: "adminhub", field: "ground",
+      html: '<div class="screen">' +
+        '<div class="brand"><h1 class="headline">Admin</h1><p class="small">' + (L.rooms || 0) + " live " + (L.rooms === 1 ? "room" : "rooms") + ", " + (L.players || 0) + " players, " + (L.inGame || 0) + " in a game. Server up " + (d.serverUptimeMin || 0) + " min. " +
+          (d.library ? d.library.songs + " songs, " + d.library.packs + " packs." : "") + "</p></div>" +
+        '<button id="aDemo" class="btn">Launch demo game</button>' +
+        '<div class="stack"><div class="label">Game length</div>' +
+          arow("Games finished", dash(d.gamesFinished)) + arow("Abandoned", dash(d.gamesAbandoned)) +
+          arow("Average game", dash(d.avgGameMin, " min")) + arow("Median game", dash(d.medianGameMin, " min")) +
+          arow("Seconds per turn", dash(d.avgSecPerTurn, "s")) + arow("Lobby estimate vs real", d.estimateAccuracy && d.estimateAccuracy.avgActualOverEstimate !== null ? "x" + d.estimateAccuracy.avgActualOverEstimate : "No data yet") + by + "</div>" +
+        '<div class="stack"><div class="label">Guessing</div>' +
+          arow("Songs guessed", d.guessRate === null || d.guessRate === undefined ? "No data yet" : Math.round(d.guessRate * 100) + "% of turns") +
+          arow("Average guess time", dash(d.avgGuessSec, "s")) + arow("Median guess time", dash(d.medianGuessSec, "s")) +
+          arow("Hints per turn", dash(d.avgHintsPerTurn)) + arow("Shuffles per turn", dash(d.avgShufflesPerTurn)) + "</div>" +
+        '<div class="stack"><div class="label">Voice guessing</div>' +
+          arow("Guesses the game heard", dash(V.heardGuesses)) + arow("Rejected by performer", V.rejectRate === null || V.rejectRate === undefined ? "No data yet" : Math.round(V.rejectRate * 100) + "%") +
+          arow("Correct by voice", dash(src.voice)) + arow("Correct by typing", dash(src.typed)) + arow("Correct by Someone got it", dash(src.manual)) +
+          arow("Mics at game start", Object.keys(G.mics || {}).map(function (k) { return k + " " + G.mics[k]; }).join(", ") || "No data yet") + "</div>" +
+        '<div class="stack"><div class="label">Hardest songs</div>' + songs(S.hardest, function (x) { return x.guessed + " of " + x.plays + " guessed"; }) + "</div>" +
+        '<div class="stack"><div class="label">Quickest songs</div>' + songs(S.quickest, function (x) { return x.avgGuessSec + "s average"; }) + "</div>" +
+        '<div class="stack"><div class="label">Packs played</div>' + ((d.packsPlayed || []).map(function (p) { return arow(p.pack, p.turns + " turns"); }).join("") || '<p class="small">No data yet</p>') + "</div>" +
+        '<div class="stack"><div class="label">Recent games</div>' + (recent || '<p class="small">No games yet</p>') + "</div>" +
+        '<p class="small">' + (d.persistent ? "Stats are saved to a file on the server and printed to the server log." : "Stats are held in memory only.") + " A free Render disk is wiped on each deploy, so the log is the safer record.</p>" +
+        '<div class="rowc" style="gap:12px"><button id="aRefresh" class="btn btn--outline" style="flex:1">Refresh</button><button id="aCopy" class="btn btn--outline" style="flex:1">Copy JSON</button></div>' +
+        '<button id="aOut" class="txt" style="align-self:center">Sign out</button></div>',
+      bind: function () {
+        $("#aDemo").onclick = function () { send({ t: "createAdmin", password: adminPw }); };
+        $("#aRefresh").onclick = function () { send({ t: "adminStats", password: adminPw }); toast("Refreshed"); };
+        $("#aCopy").onclick = function () {
+          var txt = JSON.stringify(adminData, null, 2);
+          try { navigator.clipboard.writeText(txt).then(function () { toast("Copied"); }, function () { toast("Could not copy"); }); } catch (e) { toast("Could not copy"); }
+        };
+        $("#aOut").onclick = function () { adminAuthed = false; adminPw = ""; adminData = null; adminLogin = false; lastKey = null; render(); };
       }
     };
   }
@@ -568,7 +618,7 @@
     for (var i = 0; i < cs.length; i++) { cs[i].onclick = function () { send({ t: "adminAs", id: this.getAttribute("data-id") }); }; }
     var au = document.getElementById("aAuto"); if (au) { au.onclick = function () { send({ t: "adminAutoplay", on: !(st && st.admin && st.admin.autoplay) }); }; }
     var add = document.getElementById("aAdd"); if (add) { add.onclick = function () { send({ t: "adminAddBot" }); }; }
-    document.getElementById("aExit").onclick = function () { adminHtmlCache = ""; pickerOpen = false; leaveRoom(); };
+    document.getElementById("aExit").onclick = function () { adminHtmlCache = ""; pickerOpen = false; if (adminAuthed) { adminLogin = true; send({ t: "adminStats", password: adminPw }); } leaveRoom(); };
   }
 
   var LEN_LABEL = { 30000: "30 s", 60000: "1 min", 90000: "1 min 30", 120000: "2 min" };
@@ -1768,7 +1818,7 @@
     var view;
     if (st && st.phase !== "lobby") { pickerOpen = false; packDraft = null; }
     var pb = document.querySelector(".pbody"), pTop = pb ? pb.scrollTop : 0;
-    if (!st && adminLogin) { view = viewAdminLogin(); }
+    if (!st && adminLogin) { view = adminAuthed ? viewAdminHub() : viewAdminLogin(); }
     else if (!st) { view = viewHome(); }
     else if (st.phase === "lobby") { view = viewLobby(st); }
     else if (st.phase === "turn" && st.turn) { view = viewTurn(st); }

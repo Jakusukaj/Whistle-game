@@ -226,6 +226,27 @@ RoomManager.prototype.listRooms = function () {
   return out;
 };
 
+// The admin hub: timing and usage numbers plus a look at what is live right now.
+RoomManager.prototype.adminStats = function (conn, msg) {
+  var pw = String(msg.password == null ? "" : msg.password).trim().toLowerCase();
+  if (pw !== String(this.opts.adminPassword).toLowerCase()) { return err(conn, "bad_password", "Wrong password. Nice try!"); }
+  var self = this, live = { rooms: 0, players: 0, inGame: 0 };
+  Object.keys(this.rooms).forEach(function (c) {
+    var r = self.rooms[c]; if (r.admin) { return; }
+    live.rooms++; live.players += r.players.filter(function (p) { return p.connected && !p.bot; }).length;
+    if (r.phase === "turn") { live.inGame++; }
+  });
+  var data = analytics.summary();
+  data.live = live;
+  data.serverUptimeMin = Math.round(process.uptime() / 60);
+  data.library = { songs: SONGS.length, packs: PACKS.length };
+  data.packsPlayed = (data.packsPlayed || []).map(function (p) { var pk = PACKS.filter(function (x) { return x.id === p.pack; })[0]; return { pack: pk ? pk.name : p.pack, turns: p.turns }; });
+  data.recentGames = analytics.recentGames(8);
+  data.eventsStored = analytics._events.length;
+  data.persistent = analytics.persistent();
+  conn.send({ t: "adminStats", data: data });
+};
+
 // Admin / test mode: a room with test players, driven by one person.
 RoomManager.prototype.createAdmin = function (conn, msg) {
   var pw = String(msg.password == null ? "" : msg.password).trim().toLowerCase();
@@ -253,6 +274,7 @@ RoomManager.prototype.handle = function (conn, msg) {
   if (msg.t === "ping") { return conn.send({ t: "pong" }); }
   if (msg.t === "create") { return this.create(conn, msg); }
   if (msg.t === "createAdmin") { return this.createAdmin(conn, msg); }
+  if (msg.t === "adminStats") { return this.adminStats(conn, msg); }
   if (msg.t === "listRooms") { return conn.send({ t: "rooms", rooms: this.listRooms() }); }
   if (msg.t === "join") { return this.join(conn, msg); }
   if (msg.t === "peek") { return this.peek(conn, msg); }
@@ -609,7 +631,7 @@ RoomManager.prototype.start = function (room, conn) {
     }
   }
   room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
-  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.startedAt = this.now(); room.gamePlayers = room.players.filter(function (p) { return !p.sitOut; }).length; room.turnsDone = 0; room.interlude = null; room.interludeDone = false;
+  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.micAtStart = room.players.reduce(function (m, p) { var k = p.mic || "unknown"; m[k] = (m[k] || 0) + 1; return m; }, {}); room.startedAt = this.now(); room.gamePlayers = room.players.filter(function (p) { return !p.sitOut; }).length; room.turnsDone = 0; room.interlude = null; room.interludeDone = false;
   room.players.forEach(function (p) { p.bonus = 0; p.late = false; });
   room.phase = "turn";
   this.advance(room);
@@ -857,7 +879,8 @@ RoomManager.prototype.guess = function (room, me, conn, msg) {
   var self = this, id = t.id;
   this.pause(t);
   t.stage = "confirming";
-  t.pending = { heard: Matcher.heardPhrase(r.guess, t.song, { typed: typed }) || r.guess, from: me.id };
+  t.pending = { heard: Matcher.heardPhrase(r.guess, t.song, { typed: typed }) || r.guess, from: me.id, typed: typed };
+  t.detected = (t.detected || 0) + 1;
   var arm = function () {
     t.timers.confirm = setTimeout(function () {
       if (!room.turn || room.turn.id !== id || room.turn.stage !== "confirming") { return; }
@@ -880,6 +903,7 @@ RoomManager.prototype.confirmGuess = function (room, me, ok, byTimeout, who) {
     var ids = Array.isArray(who) ? who : (t.pending && t.pending.from ? [t.pending.from] : []);
     return this.finishTurn(room, "correct", ids);
   }
+  t.rejected = (t.rejected || 0) + 1;
   t.stage = "whistling";
   t.pending = null;
   t.runningSince = this.now();
@@ -945,10 +969,11 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
       awards.forEach(function (a) { if (a.role === "guesser") { var gs = statFor(room, a.id); gs.guessed++; if (timeMs < gs.guessBestMs) { gs.guessBestMs = timeMs; } } });
     } else { ws.streak = 0; }
   }
+  var src = !t.pending ? "none" : t.pending.manual ? "manual" : t.pending.typed ? "typed" : "voice";
   t.stage = "reveal";
   t.pending = null;
   if (!t.sd) { room.turnsDone = (room.turnsDone || 0) + 1; }
-  if (!room.admin) { analytics.record("turn", { outcome: outcome, difficulty: t.difficulty, limitMs: room.limitMs, performMs: timeMs, sinceStartMs: this.now() - t.startedAt, hints: t.hintsUsed || 0, shuffles: t.shuffles || 0, players: room.gamePlayers, sd: !!t.sd }); }
+  if (!room.admin) { analytics.record("turn", { outcome: outcome, difficulty: t.difficulty, limitMs: room.limitMs, performMs: timeMs, sinceStartMs: this.now() - t.startedAt, hints: t.hintsUsed || 0, shuffles: t.shuffles || 0, players: room.gamePlayers, sd: !!t.sd, song: t.song ? t.song.title : null, packs: t.song ? t.song.packs : [], source: outcome === "correct" ? src : "none", detected: t.detected || 0, rejected: t.rejected || 0, refreshes: t.refreshes || 0 }); }
   t.result = {
     outcome: outcome, timeMs: timeMs, limitMs: room.limitMs, multiplier: t.multiplier, difficulty: t.difficulty,
     shuffles: t.shuffles, shufflePts: shufflePts, lockedS: lockedS, hints: t.hintsUsed || 0, hintPts: hintPts, base: base, afterMult: afterMult, score: score, awards: awards,
@@ -1090,7 +1115,7 @@ RoomManager.prototype.gameSummary = function (room, pid) {
 
 RoomManager.prototype.logGame = function (room, finished) {
   if (room.admin || !room.startedAt || !room.turnsDone) { return; }
-  analytics.record("game", { finished: finished, durationMs: this.now() - room.startedAt, players: room.gamePlayers, rounds: room.rounds, limitMs: room.limitMs, turns: room.turnsDone, packMode: room.packMode });
+  analytics.record("game", { finished: finished, durationMs: this.now() - room.startedAt, players: room.gamePlayers, rounds: room.rounds, limitMs: room.limitMs, turns: room.turnsDone, packMode: room.packMode, lateJoiners: room.players.filter(function (p) { return p.late; }).length, mics: room.micAtStart || null });
   room.startedAt = null;
 };
 

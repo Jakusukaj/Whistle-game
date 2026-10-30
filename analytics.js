@@ -43,6 +43,36 @@ function estimateMin(players, rounds, limitMs) {
   return (30 + 0.3 * limitMs / 1000) * players * rounds / 60 + (rounds >= 4 ? 8 / 60 : 0);
 }
 
+function recentGames(n) {
+  return events.filter(function (e) { return e.type === "game"; }).slice(-n).reverse().map(function (g) {
+    return { at: g.at, finished: g.finished, players: g.players, rounds: g.rounds, limitMs: g.limitMs, turns: g.turns, minutes: r1(g.durationMs / 60000) };
+  });
+}
+
+// How well voice guessing is working: of the guesses the game heard, how many did the performer accept.
+function voiceStats(turns) {
+  var det = 0, rej = 0, bySrc = { voice: 0, typed: 0, manual: 0 };
+  turns.forEach(function (t) { det += t.detected || 0; rej += t.rejected || 0; if (bySrc[t.source] !== undefined) { bySrc[t.source]++; } });
+  return { heardGuesses: det, rejectedByPerformer: rej, rejectRate: det ? Math.round(100 * rej / det) / 100 : null, correctBySource: bySrc };
+}
+function packStats(turns) {
+  var c = {}; turns.forEach(function (t) { (t.packs || []).forEach(function (p) { c[p] = (c[p] || 0) + 1; }); });
+  return Object.keys(c).sort(function (x, y) { return c[y] - c[x]; }).slice(0, 8).map(function (p) { return { pack: p, turns: c[p] }; });
+}
+// Songs played at least twice: the ones nobody gets, and the quickest.
+function songStats(turns) {
+  var m = {};
+  turns.forEach(function (t) { if (!t.song) { return; } var x = m[t.song] = m[t.song] || { song: t.song, plays: 0, guessed: 0, secs: [] }; x.plays++; if (t.outcome === "correct") { x.guessed++; x.secs.push(t.performMs / 1000); } });
+  var list = Object.keys(m).map(function (k) { return m[k]; }).filter(function (x) { return x.plays >= 2; });
+  return {
+    hardest: list.slice().sort(function (a, b) { return a.guessed / a.plays - b.guessed / b.plays || b.plays - a.plays; }).slice(0, 5).map(function (x) { return { song: x.song, plays: x.plays, guessed: x.guessed }; }),
+    quickest: list.filter(function (x) { return x.guessed; }).sort(function (a, b) { return avg(a.secs) - avg(b.secs); }).slice(0, 5).map(function (x) { return { song: x.song, plays: x.plays, avgGuessSec: r1(avg(x.secs)) }; })
+  };
+}
+function micTotals(done) {
+  var t = {}; done.forEach(function (g) { Object.keys(g.mics || {}).forEach(function (k) { t[k] = (t[k] || 0) + g.mics[k]; }); }); return t;
+}
+
 function summary() {
   var games = events.filter(function (e) { return e.type === "game"; });
   var done = games.filter(function (g) { return g.finished && g.turns > 0; });
@@ -73,8 +103,11 @@ function summary() {
     avgHintsPerTurn: r1(avg(turns.map(function (t) { return t.hints || 0; }))),
     avgShufflesPerTurn: r1(avg(turns.map(function (t) { return t.shuffles || 0; }))),
     estimateAccuracy: { avgActualOverEstimate: r1(avg(ratio)), note: "1 means the lobby estimate was right, above 1 means games ran longer than shown" },
+    voice: voiceStats(turns), packsPlayed: packStats(turns), songs: songStats(turns),
+    games: { avgLateJoiners: r1(avg(done.map(function (g) { return g.lateJoiners || 0; }))), mics: micTotals(done) },
     byPlayers: byPlayers, byLimit: byLimit
   };
 }
 
-module.exports = { record: record, summary: summary, estimateMin: estimateMin, _events: events };
+function persistentNow() { return persist; }
+module.exports = { recentGames: recentGames, persistent: persistentNow, record: record, summary: summary, estimateMin: estimateMin, _events: events };
