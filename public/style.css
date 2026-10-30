@@ -531,3 +531,10 @@ body.admin #sfxfab { top: 54px; }
 .atabs::-webkit-scrollbar { display: none; }
 .atab { flex: none; border: 1.5px solid currentColor; background: transparent; color: inherit; border-radius: 999px; padding: 8px 14px; font: 600 14px/1 var(--font, "Inter Tight", sans-serif); cursor: pointer; }
 .atab.on { background: #111; color: #ECEAE4; border-color: #111; }
+
+/* Full screen QR code to join */
+.qrfull { position: fixed; inset: 0; z-index: 70; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); }
+.qrbox { background: #fff; border-radius: 16px; padding: 8px; width: min(calc(100vw - 32px), calc(100vh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); aspect-ratio: 1 / 1; display: flex; }
+.qrbox svg { width: 100%; height: 100%; display: block; }
+.qrcap { margin: 0; color: #ECEAE4; font: 600 13px/16px var(--font, "Inter Tight", sans-serif); letter-spacing: .14em; text-transform: uppercase; }
+.qrx { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; width: 44px; height: 44px; border-radius: 22px; border: 1.5px solid #ECEAE4; color: #ECEAE4; font: 600 18px/1 var(--font, "Inter Tight", sans-serif); display: flex; align-items: center; justify-content: center; z-index: 2; }

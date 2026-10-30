@@ -157,3 +157,14 @@ function client(port) {
   [A, B, C, D, L, X, Y, E, F, G, H, Z].forEach(function (c) { c.ws.close(); });
   s.server.close(); setTimeout(function () { process.exit(failed ? 1 : 0); }, 100);
 })();
+
+// Suggested rounds follow the head count until the host chooses their own.
+(function () {
+  var RM = require("./game.js").RoomManager;
+  var m = new RM({});
+  var want = { 2: 5, 3: 5, 4: 4, 5: 3, 6: 3, 7: 2, 9: 2, 10: 2, 11: 1, 14: 1 };
+  Object.keys(want).forEach(function (n) {
+    if (m.suggestedRounds(+n) === want[n]) { console.log("ok   suggested rounds for " + n + " players is " + want[n]); }
+    else { console.log("FAIL suggested rounds for " + n + " players: got " + m.suggestedRounds(+n) + ", wanted " + want[n]); process.exitCode = 1; }
+  });
+})();

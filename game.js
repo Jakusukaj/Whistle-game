@@ -49,7 +49,8 @@ var DEFAULTS = {
   minPlayers: 2,
   maxPlayers: 20,
   adminPassword: process.env.ADMIN_PASSWORD || "bean",
-  defaultRounds: 5,
+  defaultRounds: 5,      // the most the suggestion will ever give
+  targetTurns: 16,       // suggested rounds aim for about this many turns in all
   minRounds: 1,
   maxRounds: 10,
   roomIdleMs: 15 * 60 * 1000,
@@ -161,7 +162,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
   }
   return {
     code: room.code, phase: room.phase, hostId: room.hostId, me: pid,
-    rounds: room.rounds, limitMs: room.limitMs, limitOptions: LIMIT_OPTIONS_MS, minPlayers: this.opts.minPlayers, maxPlayers: this.opts.maxPlayers,
+    rounds: room.rounds, roundsAuto: !!room.roundsAuto, limitMs: room.limitMs, limitOptions: LIMIT_OPTIONS_MS, minPlayers: this.opts.minPlayers, maxPlayers: this.opts.maxPlayers,
     serverNow: this.now(),
     turnNumber: room.turnPos + 1, totalTurns: room.turns.length,
     suddenDeath: !!room.sd, sdRound: room.sd ? room.sd.round : 0,
@@ -188,8 +189,16 @@ RoomManager.prototype.viewFor = function (room, pid) {
   };
 };
 
+// Until the host sets rounds themselves, the suggestion follows the head count: about 16 turns in all,
+// so a small group plays more rounds and a big one fewer (2 to 3 players get 5, 4 get 4, 9 get 2, 11 or more get 1).
+RoomManager.prototype.suggestedRounds = function (players) {
+  var n = Math.max(1, players);
+  return Math.max(this.opts.minRounds, Math.min(this.opts.defaultRounds, Math.round(this.opts.targetTurns / n)));
+};
+
 RoomManager.prototype.broadcast = function (room) {
   room.lastActive = this.now();
+  if (room.phase === "lobby" && room.roundsAuto) { room.rounds = this.suggestedRounds(room.players.length); }
   for (var i = 0; i < room.players.length; i++) {
     var p = room.players[i];
     if (!p.conn) { continue; }
@@ -237,7 +246,7 @@ RoomManager.prototype.hello = function (conn, msg) {
     speech: !!msg.speech, vibrate: !!msg.vibrate, installed: !!msg.installed
   });
 };
-var USAGE_EVENTS = ["help", "howto", "mute", "unmute", "first_yes", "first_no"];
+var USAGE_EVENTS = ["help", "howto", "mute", "unmute", "first_yes", "first_no", "qr"];
 var USAGE_SCREENS = ["home", "lobby", "choose song", "ready", "waiting", "countdown", "performing", "guessing", "reveal", "awards", "game over", "other"];
 RoomManager.prototype.usage = function (conn, msg) {
   conn.usageCount = (conn.usageCount || 0) + 1;
@@ -384,7 +393,7 @@ RoomManager.prototype.create = function (conn, msg) {
   if (!name) { return err(conn, "bad_name", "Pop a name in first!"); }
   var room = {
     code: this.makeCode(), hostId: null, players: [], phase: "lobby",
-    rounds: this.opts.defaultRounds, limitMs: this.opts.limitMs, turns: [], turnPos: -1, turn: null, turnCounter: 0,
+    rounds: this.opts.defaultRounds, roundsAuto: true, limitMs: this.opts.limitMs, turns: [], turnPos: -1, turn: null, turnCounter: 0,
     packs: (this.opts.defaultPacks || []).slice(), used: {}, sd: null, winners: null, tieBreakWon: false,
     packMode: "host", packVotes: {}, roundVotes: {},
     createdAt: this.now(), lastActive: this.now()
@@ -540,6 +549,7 @@ RoomManager.prototype.setRounds = function (room, msg) {
   var n = parseInt(msg.rounds, 10);
   if (isNaN(n)) { return; }
   room.rounds = Math.max(this.opts.minRounds, Math.min(this.opts.maxRounds, n));
+  room.roundsAuto = false;
   this.broadcast(room);
 };
 

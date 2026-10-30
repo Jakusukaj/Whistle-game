@@ -845,8 +845,24 @@
     return '<div class="votecta"><button class="btn" id="voteBtn">' + (n ? "Change your picks" : "Pick song packs") + "</button>" +
       '<p class="small center">' + (n ? "You picked " + n + (n === 1 ? " pack." : " packs.") : "Pick up to " + (s.packPicks || 5) + ". Everyone's picks go into one mix.") + "</p></div>";
   }
-  function inviteRowHtml(s) {
-    return '<button class="lrow" id="copyLink" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Invite friends</span></span><span class="lrow__c label">Copy link</span></button>';
+  function inviteRowHtml(s, isHost) {
+    return '<button class="lrow" id="copyLink" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Invite friends</span></span><span class="lrow__c label">Copy link</span></button>' +
+      (isHost ? '<button class="lrow" id="showQr" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Scan to join</span></span><span class="lrow__c label">Show QR code</span></button>' : "");
+  }
+  // A full screen QR code that opens the join link, so friends in the room can just point their cameras at the host.
+  function showQr(code) {
+    if (document.getElementById("qrfull") || typeof qrcode !== "function") { return; }
+    var svg = "";
+    try { var q = qrcode(0, "M"); q.addData(linkFor(code)); q.make(); svg = q.createSvgTag({ cellSize: 1, margin: 4, scalable: true }); } catch (e) { return; }
+    var o = document.createElement("div");
+    o.id = "qrfull"; o.className = "qrfull"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "QR code to join the game");
+    o.innerHTML = '<button class="qrx" aria-label="Close">X</button><div class="qrbox">' + svg + '</div><p class="qrcap">Room ' + esc(code) + "</p>";
+    document.body.appendChild(o);
+    function close() { if (o.parentNode) { o.parentNode.removeChild(o); } document.removeEventListener("keydown", onKey); }
+    function onKey(ev) { if (ev.key === "Escape") { close(); } }
+    document.addEventListener("keydown", onKey);
+    o.querySelector(".qrx").onclick = close;
+    usage("qr", "lobby");
   }
   // A fair guess at game length. Most songs are guessed well inside the clock, so a turn is mostly the set-up
   // around it (splash, picking, countdown, reveal), plus about 30 percent of the clock on average (about 18 seconds on a minute clock).
@@ -868,7 +884,7 @@
   function settingsSheetHtml(s, turns) {
     var opts = s.limitOptions || [30000, 60000, 90000, 120000];
     return '<div class="sheetwrap"><div class="scrim" id="setScrim"></div><div class="sheet"><span class="label">Game settings</span>' +
-      '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all, about " + estMinutes(Math.max(2, s.players.length), s.rounds, s.limitMs) + " min</p></div>" +
+      '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all, about " + estMinutes(Math.max(2, s.players.length), s.rounds, s.limitMs) + " min</p>" + (s.roundsAuto ? '<p class="small">Set for ' + s.players.length + (s.players.length === 1 ? " player" : " players") + ". It updates as people join, until you change it.</p>" : "") + "</div>" +
       '<div class="stepper"><button id="minus" class="txt" aria-label="Fewer rounds">Less</button><span class="title val" id="roundsVal">' + s.rounds + '</span><button id="plus" class="txt" aria-label="More rounds">More</button></div></div>' +
       '<div class="stack"><div class="label">Max round length</div><p class="small">A round ends as soon as the song is guessed.</p><div class="seg">' + opts.map(function (ms) {
         return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" aria-pressed="' + (ms === s.limitMs) + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
@@ -911,7 +927,7 @@
           '<div class="head"><h1 class="headline">' + esc(pname(s, s.hostId)) + "'s game</h1>" +
             '<p class="small">' + s.players.length + " of " + s.maxPlayers + " players are in</p></div>" +
           '<div class="pgrid">' + cells + "</div>" + voteCtaHtml(s) +
-          '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + inviteRowHtml(s) + "</div>" +
+          '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + inviteRowHtml(s, isHost) + "</div>" +
           '<div class="spacer"></div>' +
           (isHost ? "" : '<p class="headline waiting">Waiting for ' + esc(pname(s, s.hostId)) + " to start</p><div class=\"spacer\"></div>") +
           '<div class="micline micst" data-mic="note"></div>' +
@@ -927,6 +943,7 @@
       bind: function () {
         $("#helpBtn").onclick = function () { usage("howto", "home"); showHelp(); };
         $("#copyLink").onclick = function () { copyText(linkFor(s.code), false); };
+        if ($("#showQr")) { $("#showQr").onclick = function () { showQr(s.code); }; }
         bindPill();
         var mons = document.querySelectorAll(".mon");
         for (var mi = 0; mi < mons.length; mi++) {
