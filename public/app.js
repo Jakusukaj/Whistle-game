@@ -575,10 +575,10 @@
   function lengthHtml(s, isHost) {
     var opts = s.limitOptions || [30000, 60000, 90000, 120000];
     if (!isHost) {
-      return '<div class="setrow"><div><div class="label">Round length</div><p class="small">Set by the host</p></div>' +
+      return '<div class="setrow"><div><div class="label">Max round length</div><p class="small">Set by the host. A round ends as soon as the song is guessed.</p></div>' +
         '<span class="title" id="limitVal">' + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + "</span></div>";
     }
-    return '<div class="stack"><div class="label">Round length</div><div class="seg">' + opts.map(function (ms) {
+    return '<div class="stack"><div class="label">Max round length</div><p class="small">A round ends as soon as the song is guessed.</p><div class="seg">' + opts.map(function (ms) {
       return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" aria-pressed="' + (ms === s.limitMs) + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
     }).join("") + "</div></div>";
   }
@@ -743,7 +743,7 @@
     return "About " + estMinutes(n, s.rounds, s.limitMs) + " min with " + n + (n === 1 ? " player" : " players");
   }
   function settingsText(s) {
-    return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
+    return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", up to " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
   }
   function settingsRowHtml(s, isHost) {
     if (!isHost) { return '<div class="lrow lrow--static" id="guestSettings"><span class="lrow__t"><span class="label">Game</span><span class="title">' + settingsText(s) + '</span><span class="small">' + estText(s) + "</span></span></div>"; }
@@ -754,7 +754,7 @@
     return '<div class="sheetwrap"><div class="scrim" id="setScrim"></div><div class="sheet"><span class="label">Game settings</span>' +
       '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all, about " + estMinutes(Math.max(2, s.players.length), s.rounds, s.limitMs) + " min</p></div>" +
       '<div class="stepper"><button id="minus" class="txt" aria-label="Fewer rounds">Less</button><span class="title val" id="roundsVal">' + s.rounds + '</span><button id="plus" class="txt" aria-label="More rounds">More</button></div></div>' +
-      '<div class="stack"><div class="label">Round length</div><div class="seg">' + opts.map(function (ms) {
+      '<div class="stack"><div class="label">Max round length</div><p class="small">A round ends as soon as the song is guessed.</p><div class="seg">' + opts.map(function (ms) {
         return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" aria-pressed="' + (ms === s.limitMs) + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
       }).join("") + "</div></div>" +
       '<button class="btn" id="setDone">Done</button></div></div>';
