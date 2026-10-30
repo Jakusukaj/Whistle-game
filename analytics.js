@@ -19,12 +19,65 @@ function load() {
 }
 if (persist) { load(); }
 
+// ---- Optional remote copy, so stats survive deploys and restarts. Set UPSTASH_REDIS_REST_URL and
+// UPSTASH_REDIS_REST_TOKEN (a free Upstash Redis database) and every event is also pushed to a list there.
+// On start the list is read back, so the numbers keep growing across deploys. Without those two settings
+// nothing changes.
+var remote = { url: null, token: null, key: "ttt:events", pending: [], timer: null, status: "off", loaded: 0, lastError: null, lastFlush: null };
+function configureRemote(url, token) {
+  remote.url = url ? String(url).replace(/\/+$/, "") : null; remote.token = token || null;
+  remote.status = remote.url && remote.token ? "connecting" : "off";
+  if (remote.status === "connecting") { loadRemote(); }
+}
+function call(cmds) {
+  return fetch(remote.url + "/pipeline", { method: "POST", headers: { Authorization: "Bearer " + remote.token, "Content-Type": "application/json" }, body: JSON.stringify(cmds) })
+    .then(function (r) { if (!r.ok) { throw new Error("HTTP " + r.status); } return r.json(); });
+}
+function loadRemote() {
+  var all = [], from = 0, step = 2000;
+  function next() {
+    return call([["LRANGE", remote.key, from, from + step - 1]]).then(function (res) {
+      var rows = (res[0] && res[0].result) || [];
+      rows.forEach(function (l) { try { all.push(JSON.parse(l)); } catch (e) {} });
+      if (rows.length === step) { from += step; return next(); }
+    });
+  }
+  return next().then(function () {
+    // Remote history first, then anything recorded locally since this process started.
+    var local = events.filter(function (e) { return e._local; });
+    events.length = 0; all.forEach(function (e) { events.push(e); });
+    local.forEach(function (e) { events.push(e); });
+    remote.loaded = all.length; remote.status = "connected"; remote.lastError = null;
+    flush();
+  }).catch(function (e) { remote.status = "error"; remote.lastError = String(e && e.message || e); });
+}
+function flush() {
+  if (remote.status !== "connected" || !remote.pending.length) { return Promise.resolve(); }
+  var batch = remote.pending.splice(0, remote.pending.length);
+  return call([["RPUSH", remote.key].concat(batch)]).then(function () { remote.lastFlush = Date.now(); remote.lastError = null; })
+    .catch(function (e) { remote.pending = batch.concat(remote.pending); remote.lastError = String(e && e.message || e); });
+}
+function queueRemote(line) {
+  if (!remote.url) { return; }
+  remote.pending.push(line);
+  if (remote.pending.length >= 50) { flush(); }
+  if (!remote.timer) { remote.timer = setInterval(flush, 15000); if (remote.timer.unref) { remote.timer.unref(); } }
+}
+function remoteStatus() { return { mode: remote.url ? "Upstash Redis" : "none", status: remote.status, loaded: remote.loaded, waiting: remote.pending.length, lastFlush: remote.lastFlush, lastError: remote.lastError }; }
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN && process.env.npm_lifecycle_event !== "test") {
+  configureRemote(process.env.UPSTASH_REDIS_REST_URL, process.env.UPSTASH_REDIS_REST_TOKEN);
+  // Render stops the old server with SIGTERM on every deploy: send what is waiting first.
+  process.on("SIGTERM", function () { flush().then(function () { process.exit(0); }, function () { process.exit(0); }); setTimeout(function () { process.exit(0); }, 4000).unref(); });
+}
+
 function record(type, data) {
   var ev = Object.assign({ type: type, at: Date.now() }, data);
+  var line = JSON.stringify(ev);
+  Object.defineProperty(ev, "_local", { value: true, enumerable: false });
   events.push(ev);
   if (events.length > MAX) { events.shift(); }
+  queueRemote(line);
   if (!persist) { return ev; }
-  var line = JSON.stringify(ev);
   console.log("[stats] " + line);
   try { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.appendFileSync(FILE, line + "\n"); } catch (e) {}
   return ev;
@@ -100,6 +153,24 @@ function funnelStats(games, done) {
   };
 }
 
+// Suggested tiers from real play. A song needs MIN_PLAYS plays before it is judged. The thresholds are a first guess
+// to tune once there is data. Performers choose their own song, and confident performers pick hard ones,
+// so treat the suggestions as a prompt to look, not a verdict.
+var MIN_PLAYS = 6;
+function songDifficulty() {
+  var m = {};
+  events.filter(function (e) { return e.type === "turn" && !e.sd && e.outcome !== "skipped" && e.song && e.difficulty; }).forEach(function (t) {
+    var x = m[t.song] = m[t.song] || { song: t.song, tier: t.difficulty, plays: 0, guessed: 0, secs: [], hints: 0 };
+    x.plays++; x.hints += t.hints || 0; if (t.outcome === "correct") { x.guessed++; x.secs.push(t.performMs / 1000); }
+  });
+  var rows = Object.keys(m).map(function (k) { return m[k]; }).filter(function (x) { return x.plays >= MIN_PLAYS; }).map(function (x) {
+    var rate = x.guessed / x.plays, med = median(x.secs), sug;
+    if (rate >= 0.9 && med !== null && med <= 15) { sug = "easy"; } else if (rate < 0.5 || (med !== null && med >= 35)) { sug = "hard"; } else { sug = "medium"; }
+    return { song: x.song, tier: x.tier, suggested: sug, plays: x.plays, guessedPct: Math.round(rate * 100), medianSec: r1(med), hintsPerPlay: r1(x.hints / x.plays) };
+  });
+  return { minPlays: MIN_PLAYS, judged: rows.length, differ: rows.filter(function (r) { return r.tier !== r.suggested; }).sort(function (a, b) { return b.plays - a.plays; }).slice(0, 40) };
+}
+
 function summary() {
   var games = events.filter(function (e) { return e.type === "game"; });
   var done = games.filter(function (g) { return g.finished && g.turns > 0; });
@@ -138,4 +209,4 @@ function summary() {
 }
 
 function persistentNow() { return persist; }
-module.exports = { recentGames: recentGames, persistent: persistentNow, record: record, summary: summary, estimateMin: estimateMin, _events: events };
+module.exports = { songDifficulty: songDifficulty, configureRemote: configureRemote, flush: flush, remoteStatus: remoteStatus, rawLines: function () { return events.map(function (e) { return JSON.stringify(e); }).join("\n"); }, recentGames: recentGames, persistent: persistentNow, record: record, summary: summary, estimateMin: estimateMin, _events: events };

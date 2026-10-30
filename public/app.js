@@ -572,8 +572,15 @@
 
   function dash(v, unit) { return v === null || v === undefined ? "No data yet" : v + (unit || ""); }
   function arow(label, value) { return '<div class="strow"><span class="small">' + esc(label) + '</span><b class="title">' + esc(value) + "</b></div>"; }
+  function backupLine(d) {
+    var r = d.remote || {};
+    if (r.mode === "none") { return "Not backed up. Stats are lost when the server restarts or you push a change. Add the Upstash settings on Render to keep them for good."; }
+    if (r.status === "connected") { return "Backed up to " + r.mode + ". " + r.loaded + " earlier events were loaded when the server started" + (r.waiting ? ", " + r.waiting + " waiting to save." : ".") + (r.lastError ? " Last error: " + r.lastError : ""); }
+    if (r.status === "error") { return "Backup problem: " + (r.lastError || "unknown") + ". New events are kept in memory and the server log."; }
+    return "Connecting to the backup...";
+  }
   var adminTab = "overview";
-  var ADMIN_TABS = [["overview", "Overview"], ["length", "Length"], ["guessing", "Guessing"], ["songs", "Songs"], ["help", "Help use"], ["devices", "Devices"]];
+  var ADMIN_TABS = [["overview", "Overview"], ["length", "Length"], ["guessing", "Guessing"], ["songs", "Songs"], ["difficulty", "Difficulty"], ["help", "Help use"], ["devices", "Devices"]];
   function pctTxt(v) { return v === null || v === undefined ? "No data yet" : v + "%"; }
   function adminTabHtml(tab, d) {
     var L = d.live || {}, V = d.voice || {}, S = d.songs || {}, G = d.games || {}, H = d.help || {}, D = d.devices || {}, F = d.funnel || {};
@@ -607,6 +614,12 @@
       return block("Hardest songs", songs(S.hardest, function (x) { return x.guessed + " of " + x.plays + " guessed"; })) + block("Quickest songs", songs(S.quickest, function (x) { return x.avgGuessSec + "s average"; })) +
         block("Packs played", (d.packsPlayed || []).map(function (p) { return arow(p.pack, p.turns + " turns"); }).join("") || '<p class="small">No data yet</p>');
     }
+    if (tab === "difficulty") {
+      var Df = d.difficulty || { differ: [], judged: 0, minPlays: 6 };
+      return block("How it works", '<p class="small">A song is judged once it has been played ' + Df.minPlays + ' times. Easy means guessed nearly every time, quickly. Hard means often missed or slow. Performers pick their own songs, so use this as a prompt to review, not a verdict.</p>') +
+        block("Songs judged so far", arow("Songs with enough plays", Df.judged) + arow("Where real play disagrees with the tier", Df.differ.length)) +
+        block("Suggested changes", Df.differ.map(function (r) { return arow(r.song, r.tier + " to " + r.suggested + ", " + r.guessedPct + "% guessed, " + (r.medianSec === null ? "no time" : r.medianSec + "s") + ", " + r.plays + " plays"); }).join("") || '<p class="small">Nothing yet. This fills in as games are played.</p>');
+    }
     if (tab === "help") {
       return block("? taps by screen", (H.byScreen || []).map(function (x) { return arow(x.screen, x.taps + (x.taps === 1 ? " tap, " : " taps, ") + x.share + "%"); }).join("") || '<p class="small">No taps yet</p>') +
         block("By screen and role", (H.byScreenAndRole || []).map(function (x) { return arow(x.screen, x.taps + (x.taps === 1 ? " tap" : " taps")); }).join("") || '<p class="small">No taps yet</p>') +
@@ -627,8 +640,9 @@
         '<button id="aDemo" class="btn">Launch demo game</button>' +
         '<div class="atabs" role="tablist">' + ADMIN_TABS.map(function (t) { return '<button class="atab' + (t[0] === adminTab ? " on" : "") + '" role="tab" aria-selected="' + (t[0] === adminTab) + '" data-t="' + t[0] + '">' + t[1] + "</button>"; }).join("") + "</div>" +
         adminTabHtml(adminTab, d) +
-        '<p class="small">' + (d.persistent ? "Stats are saved to a file on the server and printed to the server log." : "Stats are held in memory only.") + " A free Render disk is wiped on each deploy, so the log is the safer record.</p>" +
+        '<p class="small">' + backupLine(d) + "</p>" +
         '<div class="rowc" style="gap:12px"><button id="aRefresh" class="btn btn--outline" style="flex:1">Refresh</button><button id="aCopy" class="btn btn--outline" style="flex:1">Copy JSON</button></div>' +
+        '<button id="aRaw" class="btn btn--outline">Download all raw data</button>' +
         '<button id="aOut" class="txt" style="align-self:center">Sign out</button></div>',
       bind: function () {
         $("#aDemo").onclick = function () { send({ t: "createAdmin", password: adminPw }); };
@@ -636,6 +650,11 @@
         if (onTab && onTab.scrollIntoView) { try { onTab.scrollIntoView({ block: "nearest", inline: "center" }); } catch (e) {} }
         for (var i = 0; i < tabs.length; i++) { tabs[i].onclick = function () { adminTab = this.getAttribute("data-t"); lastKey = null; render(); window.scrollTo(0, 0); }; }
         $("#aRefresh").onclick = function () { send({ t: "adminStats", password: adminPw }); toast("Refreshed"); };
+        $("#aRaw").onclick = function () {
+          fetch("/stats/raw", { headers: { "x-admin-key": adminPw } }).then(function (r) { if (!r.ok) { throw new Error("no"); } return r.blob(); }).then(function (b) {
+            var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "tip-of-my-tongue-stats.jsonl"; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+          }).catch(function () { toast("Could not download"); });
+        };
         $("#aCopy").onclick = function () {
           var txt = JSON.stringify(adminData, null, 2);
           try { navigator.clipboard.writeText(txt).then(function () { toast("Copied"); }, function () { toast("Could not copy"); }); } catch (e) { toast("Could not copy"); }

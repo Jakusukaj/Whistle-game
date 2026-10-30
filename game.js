@@ -267,6 +267,8 @@ RoomManager.prototype.adminStats = function (conn, msg) {
   data.recentGames = analytics.recentGames(8);
   data.eventsStored = analytics._events.length;
   data.persistent = analytics.persistent();
+  data.remote = analytics.remoteStatus();
+  data.difficulty = analytics.songDifficulty();
   conn.send({ t: "adminStats", data: data });
 };
 

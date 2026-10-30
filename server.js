@@ -29,6 +29,12 @@ function createServer(options) {
       res.writeHead(200, { "Content-Type": "text/plain" });
       return res.end("ok");
     }
+    if (urlPath === "/stats/raw") {
+      var rk = String(req.headers["x-admin-key"] || "").trim().toLowerCase();
+      if (rk !== String(manager.opts.adminPassword).toLowerCase()) { res.writeHead(401, { "Content-Type": "text/plain" }); return res.end("Nope"); }
+      res.writeHead(200, { "Content-Type": "application/x-ndjson", "Content-Disposition": "attachment; filename=tip-of-my-tongue-stats.jsonl", "Cache-Control": "no-store" });
+      return res.end(require("./analytics.js").rawLines());
+    }
     if (urlPath === "/stats") {
       var q = (req.url.split("?")[1] || "").match(/(?:^|&)key=([^&]*)/), key = q ? decodeURIComponent(q[1]) : "";
       if (key.trim().toLowerCase() !== String(manager.opts.adminPassword).toLowerCase()) { res.writeHead(401, { "Content-Type": "text/plain" }); return res.end("Nope"); }

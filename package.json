@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "STATS_OFF=1 node test-game.js && node test-extras.js && node test-packs.js && node test-interlude.js && node test-stats.js"
+    "test": "STATS_OFF=1 node test-game.js && node test-extras.js && node test-packs.js && node test-interlude.js && node test-stats.js && node test-stats-remote.js"
   },
   "engines": {
     "node": ">=18"

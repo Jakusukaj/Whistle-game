@@ -37,4 +37,11 @@ m.handle(c3, { t: "hello", browser: "<script>", os: "Plan9" });
 check("unknown browsers and systems are stored as Other", A.summary().devices.browsers.Other === 1 && A.summary().devices.os.Other === 1);
 check("? taps are counted by screen, most used first", sm.help.helpTaps === 3 && sm.help.byScreen[0].screen === "performing" && sm.help.byScreen[0].taps === 2);
 check("unknown usage events are ignored", sm.help.helpTaps === 3 && sm.help.howToOpened.first === 1);
+for (var i = 0; i < 6; i++) { A.record("turn", { outcome: "correct", limitMs: 60000, performMs: 8000, players: 4, sd: false, song: "Test Song Easy", difficulty: "hard", hints: 0 }); }
+for (var j = 0; j < 6; j++) { A.record("turn", { outcome: j < 2 ? "correct" : "timeout", limitMs: 60000, performMs: j < 2 ? 40000 : 60000, players: 4, sd: false, song: "Test Song Hard", difficulty: "easy", hints: 1 }); }
+A.record("turn", { outcome: "correct", limitMs: 60000, performMs: 9000, players: 4, sd: false, song: "Rare Song", difficulty: "medium" });
+var df = A.songDifficulty();
+check("songs need enough plays before they are judged", df.judged === 2 && !df.differ.some(function (r) { return r.song === "Rare Song"; }));
+check("an easy-guessed song labelled hard is suggested easy", df.differ.some(function (r) { return r.song === "Test Song Easy" && r.suggested === "easy" && r.tier === "hard"; }));
+check("a rarely-guessed song labelled easy is suggested hard", df.differ.some(function (r) { return r.song === "Test Song Hard" && r.suggested === "hard"; }));
 console.log(failed ? failed + " FAILED" : "ALL PASSED"); process.exit(failed ? 1 : 0);
