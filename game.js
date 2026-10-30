@@ -1,4 +1,5 @@
 "use strict";
+var analytics = require("./analytics.js");
 // Game rules and rooms. No networking in here: server.js hands each message to
 // RoomManager.handle(conn, msg), and conn.send(obj) is how replies go back.
 //
@@ -608,7 +609,7 @@ RoomManager.prototype.start = function (room, conn) {
     }
   }
   room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
-  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.interlude = null; room.interludeDone = false;
+  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.startedAt = this.now(); room.gamePlayers = room.players.filter(function (p) { return !p.sitOut; }).length; room.turnsDone = 0; room.interlude = null; room.interludeDone = false;
   room.players.forEach(function (p) { p.bonus = 0; p.late = false; });
   room.phase = "turn";
   this.advance(room);
@@ -660,7 +661,7 @@ RoomManager.prototype.beginTurn = function (room, t) {
     id: room.turnCounter, playerId: t.playerId, round: t.round, sd: !!t.sd,
     stage: "choose", difficulty: null, multiplier: null, song: null, shuffles: 0,
     accumulatedMs: 0, runningSince: null, countdownEndsAt: null, pending: null, hints: 0, hintCost: 0, hintsUsed: 0,
-    cooldownUntil: 0, lockUntil: 0, hintAsks: [], options: null, result: null, timers: {}
+    startedAt: this.now(), cooldownUntil: 0, lockUntil: 0, hintAsks: [], options: null, result: null, timers: {}
   };
   room.turn = turn;
   if (t.sd) {
@@ -946,6 +947,8 @@ RoomManager.prototype.finishTurn = function (room, outcome, whoIds) {
   }
   t.stage = "reveal";
   t.pending = null;
+  if (!t.sd) { room.turnsDone = (room.turnsDone || 0) + 1; }
+  if (!room.admin) { analytics.record("turn", { outcome: outcome, difficulty: t.difficulty, limitMs: room.limitMs, performMs: timeMs, sinceStartMs: this.now() - t.startedAt, hints: t.hintsUsed || 0, shuffles: t.shuffles || 0, players: room.gamePlayers, sd: !!t.sd }); }
   t.result = {
     outcome: outcome, timeMs: timeMs, limitMs: room.limitMs, multiplier: t.multiplier, difficulty: t.difficulty,
     shuffles: t.shuffles, shufflePts: shufflePts, lockedS: lockedS, hints: t.hintsUsed || 0, hintPts: hintPts, base: base, afterMult: afterMult, score: score, awards: awards,
@@ -1085,7 +1088,14 @@ RoomManager.prototype.gameSummary = function (room, pid) {
   };
 };
 
+RoomManager.prototype.logGame = function (room, finished) {
+  if (room.admin || !room.startedAt || !room.turnsDone) { return; }
+  analytics.record("game", { finished: finished, durationMs: this.now() - room.startedAt, players: room.gamePlayers, rounds: room.rounds, limitMs: room.limitMs, turns: room.turnsDone, packMode: room.packMode });
+  room.startedAt = null;
+};
+
 RoomManager.prototype.gameOver = function (room, winnerIds, viaTieBreak) {
+  this.logGame(room, true);
   room.phase = "gameover";
   room.turn = null;
   room.winners = winnerIds;
@@ -1112,6 +1122,7 @@ RoomManager.prototype.playAgain = function (room) {
 // Host abandons a game in progress: everyone goes back to the lobby, same code.
 RoomManager.prototype.cancelGame = function (room) {
   if (room.phase === "lobby") { return; }
+  this.logGame(room, false);
   this.resetToLobby(room);
 };
 

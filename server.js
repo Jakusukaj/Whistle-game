@@ -29,6 +29,12 @@ function createServer(options) {
       res.writeHead(200, { "Content-Type": "text/plain" });
       return res.end("ok");
     }
+    if (urlPath === "/stats") {
+      var q = (req.url.split("?")[1] || "").match(/(?:^|&)key=([^&]*)/), key = q ? decodeURIComponent(q[1]) : "";
+      if (key !== String(manager.opts.adminPassword)) { res.writeHead(401, { "Content-Type": "text/plain" }); return res.end("Nope"); }
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(JSON.stringify(require("./analytics.js").summary(), null, 2));
+    }
     if (urlPath === "/") { urlPath = "/index.html"; }
     var file = path.normalize(path.join(PUBLIC_DIR, urlPath));
     if (file.indexOf(PUBLIC_DIR) !== 0) {

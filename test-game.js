@@ -231,6 +231,9 @@ async function mainScenario() {
   await A.waitFor(function (s) { return s.phase === "gameover"; }, "game over");
   check("game ends with one winner", A.state.winners.length === 1 && A.state.winners[0] === C.playerId, A.state.winners);
   check("no tie-break needed", A.state.tieBreakWon === false);
+  var an = require("./analytics.js")._events, lastGame = an.filter(function (e) { return e.type === "game"; }).pop();
+  check("a finished game is logged with its length and turn count", !!lastGame && lastGame.finished === true && lastGame.turns > 0 && lastGame.durationMs >= 0 && lastGame.players === 3, JSON.stringify(lastGame));
+  check("turns are logged without names", an.some(function (e) { return e.type === "turn"; }) && !an.some(function (e) { return e.name || e.code; }));
   var mg = A.state.myGame;
   check("a player gets a game summary for their lifetime stats", !!mg && typeof mg.points === "number" && mg.players === 3 && mg.rank >= 1, JSON.stringify(mg));
   check("the summary agrees with the winners list", mg.won === (A.state.winners.indexOf(A.playerId) !== -1), JSON.stringify(mg));
