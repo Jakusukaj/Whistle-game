@@ -73,6 +73,33 @@ function micTotals(done) {
   var t = {}; done.forEach(function (g) { Object.keys(g.mics || {}).forEach(function (k) { t[k] = (t[k] || 0) + g.mics[k]; }); }); return t;
 }
 
+function pct(n, d) { return d ? Math.round(100 * n / d) : null; }
+function tally(list, f) { var c = {}; list.forEach(function (e) { var k = f(e); c[k] = (c[k] || 0) + 1; }); return c; }
+function helpStats() {
+  var u = events.filter(function (e) { return e.type === "usage"; });
+  var taps = u.filter(function (e) { return e.ev === "help"; });
+  var by = tally(taps, function (e) { return e.screen + " (" + e.role + ")"; });
+  var list = Object.keys(by).sort(function (x, y) { return by[y] - by[x]; }).map(function (k) { return { screen: k, taps: by[k], share: pct(by[k], taps.length) }; });
+  var scr = tally(taps, function (e) { return e.screen; });
+  var screens = Object.keys(scr).sort(function (x, y) { return scr[y] - scr[x]; }).map(function (k) { return { screen: k, taps: scr[k], share: pct(scr[k], taps.length) }; });
+  var fp = tally(u.filter(function (e) { return e.ev === "first_yes" || e.ev === "first_no"; }), function (e) { return e.ev; });
+  return { helpTaps: taps.length, byScreen: screens, byScreenAndRole: list.slice(0, 12), howToOpened: tally(u.filter(function (e) { return e.ev === "howto"; }), function (e) { return e.from; }),
+    playedBefore: { yes: fp.first_yes || 0, no: fp.first_no || 0 }, mute: { muted: u.filter(function (e) { return e.ev === "mute"; }).length, unmuted: u.filter(function (e) { return e.ev === "unmute"; }).length } };
+}
+function deviceStats() {
+  var d = events.filter(function (e) { return e.type === "device"; });
+  return { visits: d.length, browsers: tally(d, function (e) { return e.browser; }), os: tally(d, function (e) { return e.os; }),
+    speechSupportPct: pct(d.filter(function (e) { return e.speech; }).length, d.length), vibrationSupportPct: pct(d.filter(function (e) { return e.vibrate; }).length, d.length), installedPct: pct(d.filter(function (e) { return e.installed; }).length, d.length) };
+}
+function funnelStats(games, done) {
+  var ab = games.filter(function (g) { return !g.finished && g.plannedTurns; });
+  return {
+    playAgainRate: done.length ? Math.round(100 * events.filter(function (e) { return e.type === "again"; }).length / done.length) / 100 : null,
+    avgLobbyMin: r1(avg(games.filter(function (g) { return g.lobbyMs; }).map(function (g) { return g.lobbyMs / 60000; }))),
+    abandonedAtPct: r1(avg(ab.map(function (g) { return 100 * g.turns / g.plannedTurns; })))
+  };
+}
+
 function summary() {
   var games = events.filter(function (e) { return e.type === "game"; });
   var done = games.filter(function (g) { return g.finished && g.turns > 0; });
@@ -103,6 +130,7 @@ function summary() {
     avgHintsPerTurn: r1(avg(turns.map(function (t) { return t.hints || 0; }))),
     avgShufflesPerTurn: r1(avg(turns.map(function (t) { return t.shuffles || 0; }))),
     estimateAccuracy: { avgActualOverEstimate: r1(avg(ratio)), note: "1 means the lobby estimate was right, above 1 means games ran longer than shown" },
+    help: helpStats(), devices: deviceStats(), funnel: funnelStats(games, done),
     voice: voiceStats(turns), packsPlayed: packStats(turns), songs: songStats(turns),
     games: { avgLateJoiners: r1(avg(done.map(function (g) { return g.lateJoiners || 0; }))), mics: micTotals(done) },
     byPlayers: byPlayers, byLimit: byLimit

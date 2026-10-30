@@ -58,6 +58,7 @@
     ws = new WebSocket(proto + "://" + location.host + "/ws");
     ws.onopen = function () {
       connected = true; setBanner(""); lastMicSent = "";
+      sendHello();
       send({ t: "listRooms" });
       if (invite && !session) { invite.loading = true; send({ t: "peek", code: invite.code }); }
       if (session) {
@@ -75,6 +76,25 @@
       setTimeout(connect, 1500);
     };
     ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  }
+
+  // Anonymous browser and device facts, so we know what people play on.
+  function sendHello() {
+    try {
+      var ua = navigator.userAgent || "", p = navigator.platform || "";
+      var browser = /SamsungBrowser/i.test(ua) ? "Samsung" : /Edg\//.test(ua) ? "Edge" : /Firefox|FxiOS/i.test(ua) ? "Firefox" : /Chrome|CriOS/i.test(ua) ? "Chrome" : /Safari/i.test(ua) ? "Safari" : "Other";
+      var os = /iPhone|iPad|iPod/i.test(ua) || (p === "MacIntel" && navigator.maxTouchPoints > 1) ? "iOS" : /Android/i.test(ua) ? "Android" : /Win/i.test(p) ? "Windows" : /Mac/i.test(p) ? "Mac" : /Linux/i.test(p) ? "Linux" : "Other";
+      send({ t: "hello", browser: browser, os: os, speech: !!(window.SpeechRecognition || window.webkitSpeechRecognition), vibrate: !!navigator.vibrate,
+        installed: !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || !!navigator.standalone });
+    } catch (e) {}
+  }
+  var SCREEN_OF = { lobby: "lobby", choose: "choose song", ready: "ready", wait: "waiting", cd: "countdown", w: "performing", g: "guessing", reveal: "reveal", awards: "awards", over: "game over" };
+  function usage(ev, from) {
+    try {
+      var k = String(lastKey || "").split("-")[0], role = "guest";
+      if (st) { role = st.hostId === st.me ? "host" : "guest"; if (st.turn) { role = st.turn.playerId === st.me ? "performer" : "guesser"; } }
+      send({ t: "usage", ev: ev, from: from, screen: !st ? "home" : (SCREEN_OF[k] || "other"), role: role });
+    } catch (e) {}
   }
 
   function onMessage(m) {
@@ -521,7 +541,7 @@
         var go = function () { var n = readName(); if (n) { copyOnJoin = true; autoMic(); primeCopy(); send({ t: "create", name: n }); } };
         $("#hostBtn").onclick = go;
         $("#name").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
-        $("#helpBtn").onclick = showHelp;
+        $("#helpBtn").onclick = function () { usage("howto", "home"); showHelp(); };
         var sb = $("#statsBtn"); if (sb) { sb.onclick = function () { showStats(readNameQuiet()); }; }
         $("#adminDot").onclick = function () { adminLogin = true; render(); };
       }
@@ -552,48 +572,75 @@
 
   function dash(v, unit) { return v === null || v === undefined ? "No data yet" : v + (unit || ""); }
   function arow(label, value) { return '<div class="strow"><span class="small">' + esc(label) + '</span><b class="title">' + esc(value) + "</b></div>"; }
-  function viewAdminHub() {
-    var d = adminData || {}, L = d.live || {}, V = d.voice || {}, S = d.songs || {}, G = d.games || {};
-    var by = Object.keys(d.byPlayers || {}).map(function (k) { var b = d.byPlayers[k]; return arow(k + " players", b.avgGameMin + " min, " + b.avgSecPerTurn + "s a turn (" + b.games + (b.games === 1 ? " game)" : " games)")); }).join("");
+  var adminTab = "overview";
+  var ADMIN_TABS = [["overview", "Overview"], ["length", "Length"], ["guessing", "Guessing"], ["songs", "Songs"], ["help", "Help use"], ["devices", "Devices"]];
+  function pctTxt(v) { return v === null || v === undefined ? "No data yet" : v + "%"; }
+  function adminTabHtml(tab, d) {
+    var L = d.live || {}, V = d.voice || {}, S = d.songs || {}, G = d.games || {}, H = d.help || {}, D = d.devices || {}, F = d.funnel || {};
+    var src = V.correctBySource || {};
+    var guessPct = d.guessRate === null || d.guessRate === undefined ? "No data yet" : Math.round(d.guessRate * 100) + "% of turns";
+    var rej = V.rejectRate === null || V.rejectRate === undefined ? "No data yet" : Math.round(V.rejectRate * 100) + "%";
     var recent = (d.recentGames || []).map(function (g) {
       var ago = Math.max(1, Math.round((Date.now() - g.at) / 60000));
       return arow((g.finished ? "" : "Abandoned, ") + g.players + " players, " + g.rounds + " rounds", g.minutes + " min, " + (ago < 120 ? ago + " min ago" : Math.round(ago / 60) + " h ago"));
     }).join("");
     var songs = function (a, f) { return (a || []).map(function (x) { return arow(x.song, f(x)); }).join("") || '<p class="small">Needs songs played at least twice.</p>'; };
-    var src = V.correctBySource || {};
+    var obj = function (o, fmt) { var k = Object.keys(o || {}).sort(function (x, y) { return o[y] - o[x]; }); return k.map(function (n) { return arow(n, fmt ? fmt(o[n]) : o[n]); }).join("") || '<p class="small">No data yet</p>'; };
+    var block = function (title, inner) { return '<div class="stack"><div class="label">' + title + "</div>" + inner + "</div>"; };
+    if (tab === "overview") {
+      return block("Right now", arow("Live rooms", L.rooms || 0) + arow("Players online", L.players || 0) + arow("Rooms in a game", L.inGame || 0) + arow("Server up", (d.serverUptimeMin || 0) + " min") + arow("Library", d.library ? d.library.songs + " songs, " + d.library.packs + " packs" : "")) +
+        block("Headlines", arow("Games finished", dash(d.gamesFinished)) + arow("Average game", dash(d.avgGameMin, " min")) + arow("Songs guessed", guessPct) + arow("Voice guesses rejected", rej) + arow("Play again rate", F.playAgainRate === null || F.playAgainRate === undefined ? "No data yet" : Math.round(F.playAgainRate * 100) + "%")) +
+        block("Recent games", recent || '<p class="small">No games yet</p>');
+    }
+    if (tab === "length") {
+      var by = Object.keys(d.byPlayers || {}).map(function (k) { var b = d.byPlayers[k]; return arow(k + " players", b.avgGameMin + " min, " + b.avgSecPerTurn + "s a turn (" + b.games + (b.games === 1 ? " game)" : " games)")); }).join("");
+      return block("Game length", arow("Finished", dash(d.gamesFinished)) + arow("Abandoned", dash(d.gamesAbandoned)) + arow("Average game", dash(d.avgGameMin, " min")) + arow("Median game", dash(d.medianGameMin, " min")) + arow("Seconds per turn", dash(d.avgSecPerTurn, "s")) + arow("Lobby estimate vs real", d.estimateAccuracy && d.estimateAccuracy.avgActualOverEstimate !== null ? "x" + d.estimateAccuracy.avgActualOverEstimate : "No data yet")) +
+        block("By player count", by || '<p class="small">No data yet</p>') +
+        block("Lobby and drop-off", arow("Average time in lobby", dash(F.avgLobbyMin, " min")) + arow("Abandoned games stop at", F.abandonedAtPct === null || F.abandonedAtPct === undefined ? "No data yet" : F.abandonedAtPct + "% of turns") + arow("Late joiners per game", dash(G.avgLateJoiners)));
+    }
+    if (tab === "guessing") {
+      return block("Guessing", arow("Songs guessed", guessPct) + arow("Average guess time", dash(d.avgGuessSec, "s")) + arow("Median guess time", dash(d.medianGuessSec, "s")) + arow("Hints per turn", dash(d.avgHintsPerTurn)) + arow("Shuffles per turn", dash(d.avgShufflesPerTurn))) +
+        block("Voice guessing", arow("Guesses the game heard", dash(V.heardGuesses)) + arow("Rejected by performer", rej) + arow("Correct by voice", dash(src.voice)) + arow("Correct by typing", dash(src.typed)) + arow("Correct by Someone got it", dash(src.manual))) +
+        block("By round limit", obj(Object.keys(d.byLimit || {}).reduce(function (o, k) { o[k] = d.byLimit[k].avgGuessSec; return o; }, {}), function (v) { return v + "s average guess"; }));
+    }
+    if (tab === "songs") {
+      return block("Hardest songs", songs(S.hardest, function (x) { return x.guessed + " of " + x.plays + " guessed"; })) + block("Quickest songs", songs(S.quickest, function (x) { return x.avgGuessSec + "s average"; })) +
+        block("Packs played", (d.packsPlayed || []).map(function (p) { return arow(p.pack, p.turns + " turns"); }).join("") || '<p class="small">No data yet</p>');
+    }
+    if (tab === "help") {
+      return block("? taps by screen", (H.byScreen || []).map(function (x) { return arow(x.screen, x.taps + (x.taps === 1 ? " tap, " : " taps, ") + x.share + "%"); }).join("") || '<p class="small">No taps yet</p>') +
+        block("By screen and role", (H.byScreenAndRole || []).map(function (x) { return arow(x.screen, x.taps + (x.taps === 1 ? " tap" : " taps")); }).join("") || '<p class="small">No taps yet</p>') +
+        block("How to play opened from", obj(H.howToOpened)) +
+        block("Played before?", arow("Yes", (H.playedBefore || {}).yes || 0) + arow("No", (H.playedBefore || {}).no || 0)) +
+        block("Sound", arow("Muted", (H.mute || {}).muted || 0) + arow("Unmuted", (H.mute || {}).unmuted || 0));
+    }
+    return block("Visits", arow("Page loads recorded", dash(D.visits))) + block("Browsers", obj(D.browsers)) + block("Systems", obj(D.os)) +
+      block("Support", arow("Voice recognition", pctTxt(D.speechSupportPct)) + arow("Vibration", pctTxt(D.vibrationSupportPct)) + arow("Installed to home screen", pctTxt(D.installedPct))) +
+      block("Mics at game start", obj(G.mics));
+  }
+  function viewAdminHub() {
+    var d = adminData || {};
     return {
-      key: "adminhub", field: "ground",
+      key: "adminhub-" + adminTab, field: "ground",
       html: '<div class="screen">' +
-        '<div class="brand"><h1 class="headline">Admin</h1><p class="small">' + (L.rooms || 0) + " live " + (L.rooms === 1 ? "room" : "rooms") + ", " + (L.players || 0) + " players, " + (L.inGame || 0) + " in a game. Server up " + (d.serverUptimeMin || 0) + " min. " +
-          (d.library ? d.library.songs + " songs, " + d.library.packs + " packs." : "") + "</p></div>" +
+        '<div class="brand"><h1 class="headline">Admin</h1></div>' +
         '<button id="aDemo" class="btn">Launch demo game</button>' +
-        '<div class="stack"><div class="label">Game length</div>' +
-          arow("Games finished", dash(d.gamesFinished)) + arow("Abandoned", dash(d.gamesAbandoned)) +
-          arow("Average game", dash(d.avgGameMin, " min")) + arow("Median game", dash(d.medianGameMin, " min")) +
-          arow("Seconds per turn", dash(d.avgSecPerTurn, "s")) + arow("Lobby estimate vs real", d.estimateAccuracy && d.estimateAccuracy.avgActualOverEstimate !== null ? "x" + d.estimateAccuracy.avgActualOverEstimate : "No data yet") + by + "</div>" +
-        '<div class="stack"><div class="label">Guessing</div>' +
-          arow("Songs guessed", d.guessRate === null || d.guessRate === undefined ? "No data yet" : Math.round(d.guessRate * 100) + "% of turns") +
-          arow("Average guess time", dash(d.avgGuessSec, "s")) + arow("Median guess time", dash(d.medianGuessSec, "s")) +
-          arow("Hints per turn", dash(d.avgHintsPerTurn)) + arow("Shuffles per turn", dash(d.avgShufflesPerTurn)) + "</div>" +
-        '<div class="stack"><div class="label">Voice guessing</div>' +
-          arow("Guesses the game heard", dash(V.heardGuesses)) + arow("Rejected by performer", V.rejectRate === null || V.rejectRate === undefined ? "No data yet" : Math.round(V.rejectRate * 100) + "%") +
-          arow("Correct by voice", dash(src.voice)) + arow("Correct by typing", dash(src.typed)) + arow("Correct by Someone got it", dash(src.manual)) +
-          arow("Mics at game start", Object.keys(G.mics || {}).map(function (k) { return k + " " + G.mics[k]; }).join(", ") || "No data yet") + "</div>" +
-        '<div class="stack"><div class="label">Hardest songs</div>' + songs(S.hardest, function (x) { return x.guessed + " of " + x.plays + " guessed"; }) + "</div>" +
-        '<div class="stack"><div class="label">Quickest songs</div>' + songs(S.quickest, function (x) { return x.avgGuessSec + "s average"; }) + "</div>" +
-        '<div class="stack"><div class="label">Packs played</div>' + ((d.packsPlayed || []).map(function (p) { return arow(p.pack, p.turns + " turns"); }).join("") || '<p class="small">No data yet</p>') + "</div>" +
-        '<div class="stack"><div class="label">Recent games</div>' + (recent || '<p class="small">No games yet</p>') + "</div>" +
+        '<div class="atabs" role="tablist">' + ADMIN_TABS.map(function (t) { return '<button class="atab' + (t[0] === adminTab ? " on" : "") + '" role="tab" aria-selected="' + (t[0] === adminTab) + '" data-t="' + t[0] + '">' + t[1] + "</button>"; }).join("") + "</div>" +
+        adminTabHtml(adminTab, d) +
         '<p class="small">' + (d.persistent ? "Stats are saved to a file on the server and printed to the server log." : "Stats are held in memory only.") + " A free Render disk is wiped on each deploy, so the log is the safer record.</p>" +
         '<div class="rowc" style="gap:12px"><button id="aRefresh" class="btn btn--outline" style="flex:1">Refresh</button><button id="aCopy" class="btn btn--outline" style="flex:1">Copy JSON</button></div>' +
         '<button id="aOut" class="txt" style="align-self:center">Sign out</button></div>',
       bind: function () {
         $("#aDemo").onclick = function () { send({ t: "createAdmin", password: adminPw }); };
+        var tabs = document.querySelectorAll(".atab"), onTab = document.querySelector(".atab.on");
+        if (onTab && onTab.scrollIntoView) { try { onTab.scrollIntoView({ block: "nearest", inline: "center" }); } catch (e) {} }
+        for (var i = 0; i < tabs.length; i++) { tabs[i].onclick = function () { adminTab = this.getAttribute("data-t"); lastKey = null; render(); window.scrollTo(0, 0); }; }
         $("#aRefresh").onclick = function () { send({ t: "adminStats", password: adminPw }); toast("Refreshed"); };
         $("#aCopy").onclick = function () {
           var txt = JSON.stringify(adminData, null, 2);
           try { navigator.clipboard.writeText(txt).then(function () { toast("Copied"); }, function () { toast("Could not copy"); }); } catch (e) { toast("Could not copy"); }
         };
-        $("#aOut").onclick = function () { adminAuthed = false; adminPw = ""; adminData = null; adminLogin = false; lastKey = null; render(); };
+        $("#aOut").onclick = function () { adminAuthed = false; adminPw = ""; adminData = null; adminLogin = false; adminTab = "overview"; lastKey = null; render(); };
       }
     };
   }
@@ -859,7 +906,7 @@
           (settingsOpen && isHost ? settingsSheetHtml(s, turns) : "") +
         "</div>",
       bind: function () {
-        $("#helpBtn").onclick = showHelp;
+        $("#helpBtn").onclick = function () { usage("howto", "home"); showHelp(); };
         $("#copyLink").onclick = function () { copyText(linkFor(s.code), false); };
         bindPill();
         var mons = document.querySelectorAll(".mon");
@@ -1569,6 +1616,7 @@
   }
   function showHelpSheet() {
     if (document.getElementById("helpsheet")) { return; }
+    usage("help");
     var h = helpFor(lastKey || "");
     var o = document.createElement("div");
     o.id = "helpsheet"; o.className = "sheetwrap";
@@ -1577,7 +1625,7 @@
     document.body.appendChild(o);
     var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
     $("#hsOk", o).onclick = close; $(".scrim", o).onclick = close;
-    $("#hsHow", o).onclick = function () { close(); showHelp(); };
+    $("#hsHow", o).onclick = function () { close(); usage("howto", "sheet"); showHelp(); };
   }
   // First time in a room: ask once. A first-timer gets a short line and the how-to-play walkthrough.
   function askPlayed() {
@@ -1589,9 +1637,10 @@
     document.body.appendChild(o);
     var done = function (v) {
       newbie = !v; try { localStorage.setItem("ttt_played", v ? "yes" : "no"); } catch (e) {}
+      usage(v ? "first_yes" : "first_no");
       if (v) { if (o.parentNode) { o.parentNode.removeChild(o); } return; }
       $("#apSheet", o).innerHTML = '<p class="headline">It\'s eaaaaaasy!</p><p class="title">Here\'s how to play.</p>';
-      setTimeout(function () { if (o.parentNode) { o.parentNode.removeChild(o); } showHelp(); }, 1400);
+      setTimeout(function () { if (o.parentNode) { o.parentNode.removeChild(o); } usage("howto", "first"); showHelp(); }, 1400);
     };
     $("#pYes", o).onclick = function () { done(true); };
     $("#pNo", o).onclick = function () { done(false); };
@@ -1698,6 +1747,7 @@
   function setSfx(on) {
     sfxOn = on; try { localStorage.setItem("ttt_sfx", on ? "on" : "off"); } catch (e) {}
     var b = document.getElementById("sfxfab"); if (b) { b.innerHTML = sfxIcon(); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", on ? "Sound and buzz on, tap to mute" : "Muted, tap to turn sound and buzz on"); }
+    usage(on ? "unmute" : "mute");
     if (on) { sfx("pop"); buzz(30); }
   }
   function sfxIcon() {

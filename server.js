@@ -31,7 +31,7 @@ function createServer(options) {
     }
     if (urlPath === "/stats") {
       var q = (req.url.split("?")[1] || "").match(/(?:^|&)key=([^&]*)/), key = q ? decodeURIComponent(q[1]) : "";
-      if (key !== String(manager.opts.adminPassword)) { res.writeHead(401, { "Content-Type": "text/plain" }); return res.end("Nope"); }
+      if (key.trim().toLowerCase() !== String(manager.opts.adminPassword).toLowerCase()) { res.writeHead(401, { "Content-Type": "text/plain" }); return res.end("Nope"); }
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       return res.end(JSON.stringify(require("./analytics.js").summary(), null, 2));
     }

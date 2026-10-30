@@ -226,6 +226,29 @@ RoomManager.prototype.listRooms = function () {
   return out;
 };
 
+// Anonymous device and usage notes from the client. Only values from fixed lists are kept.
+function pick(v, list, other) { v = String(v == null ? "" : v); return list.indexOf(v) !== -1 ? v : other; }
+RoomManager.prototype.hello = function (conn, msg) {
+  if (conn.helloDone) { return; }
+  conn.helloDone = true;
+  analytics.record("device", {
+    browser: pick(msg.browser, ["Chrome", "Safari", "Firefox", "Edge", "Samsung", "Other"], "Other"),
+    os: pick(msg.os, ["iOS", "Android", "Windows", "Mac", "Linux", "Other"], "Other"),
+    speech: !!msg.speech, vibrate: !!msg.vibrate, installed: !!msg.installed
+  });
+};
+var USAGE_EVENTS = ["help", "howto", "mute", "unmute", "first_yes", "first_no"];
+var USAGE_SCREENS = ["home", "lobby", "choose song", "ready", "waiting", "countdown", "performing", "guessing", "reveal", "awards", "game over", "other"];
+RoomManager.prototype.usage = function (conn, msg) {
+  conn.usageCount = (conn.usageCount || 0) + 1;
+  if (conn.usageCount > 300) { return; }
+  var ev = pick(msg.ev, USAGE_EVENTS, null);
+  if (!ev) { return; }
+  var room = conn.roomCode ? this.rooms[conn.roomCode] : null;
+  if (room && room.admin) { return; }
+  analytics.record("usage", { ev: ev, screen: pick(msg.screen, USAGE_SCREENS, "other"), role: pick(msg.role, ["host", "guest", "performer", "guesser"], "guest"), from: pick(msg.from, ["home", "lobby", "sheet", "first"], "other") });
+};
+
 // The admin hub: timing and usage numbers plus a look at what is live right now.
 RoomManager.prototype.adminStats = function (conn, msg) {
   var pw = String(msg.password == null ? "" : msg.password).trim().toLowerCase();
@@ -275,6 +298,8 @@ RoomManager.prototype.handle = function (conn, msg) {
   if (msg.t === "create") { return this.create(conn, msg); }
   if (msg.t === "createAdmin") { return this.createAdmin(conn, msg); }
   if (msg.t === "adminStats") { return this.adminStats(conn, msg); }
+  if (msg.t === "hello") { return this.hello(conn, msg); }
+  if (msg.t === "usage") { return this.usage(conn, msg); }
   if (msg.t === "listRooms") { return conn.send({ t: "rooms", rooms: this.listRooms() }); }
   if (msg.t === "join") { return this.join(conn, msg); }
   if (msg.t === "peek") { return this.peek(conn, msg); }
@@ -631,7 +656,7 @@ RoomManager.prototype.start = function (room, conn) {
     }
   }
   room.turnPos = -1; room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {}; room.roundVotes = {};
-  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.micAtStart = room.players.reduce(function (m, p) { var k = p.mic || "unknown"; m[k] = (m[k] || 0) + 1; return m; }, {}); room.startedAt = this.now(); room.gamePlayers = room.players.filter(function (p) { return !p.sitOut; }).length; room.turnsDone = 0; room.interlude = null; room.interludeDone = false;
+  room.stats = {}; room.endAwards = null; room.bonusCapped = false; room.gameNo = (room.gameNo || 0) + 1; room.micAtStart = room.players.reduce(function (m, p) { var k = p.mic || "unknown"; m[k] = (m[k] || 0) + 1; return m; }, {}); room.lobbyMs = this.now() - (room.lobbySince || room.createdAt); room.startedAt = this.now(); room.gamePlayers = room.players.filter(function (p) { return !p.sitOut; }).length; room.turnsDone = 0; room.interlude = null; room.interludeDone = false;
   room.players.forEach(function (p) { p.bonus = 0; p.late = false; });
   room.phase = "turn";
   this.advance(room);
@@ -1115,7 +1140,7 @@ RoomManager.prototype.gameSummary = function (room, pid) {
 
 RoomManager.prototype.logGame = function (room, finished) {
   if (room.admin || !room.startedAt || !room.turnsDone) { return; }
-  analytics.record("game", { finished: finished, durationMs: this.now() - room.startedAt, players: room.gamePlayers, rounds: room.rounds, limitMs: room.limitMs, turns: room.turnsDone, packMode: room.packMode, lateJoiners: room.players.filter(function (p) { return p.late; }).length, mics: room.micAtStart || null });
+  analytics.record("game", { finished: finished, durationMs: this.now() - room.startedAt, players: room.gamePlayers, rounds: room.rounds, limitMs: room.limitMs, turns: room.turnsDone, packMode: room.packMode, lateJoiners: room.players.filter(function (p) { return p.late; }).length, plannedTurns: room.turns.filter(function (x) { return !x.sd; }).length, lobbyMs: room.lobbyMs || null, mics: room.micAtStart || null });
   room.startedAt = null;
 };
 
@@ -1133,7 +1158,7 @@ RoomManager.prototype.resetToLobby = function (room) {
   room.players = room.players.filter(function (p) { return p.connected; });
   room.players.forEach(function (p) { p.total = 0; p.prev = 0; p.last = null; p.turns = 0; p.bonus = 0; p.sitOut = false; });
   room.stats = {}; room.endAwards = null; room.bonusCapped = false;
-  room.phase = "lobby"; room.turn = null; room.turns = []; room.turnPos = -1;
+  room.phase = "lobby"; room.lobbySince = this.now(); room.turn = null; room.turns = []; room.turnPos = -1;
   room.sd = null; room.winners = null; room.tieBreakWon = false; room.used = {};
   this.promoteHost(room);
   this.broadcast(room);
@@ -1141,6 +1166,7 @@ RoomManager.prototype.resetToLobby = function (room) {
 
 RoomManager.prototype.playAgain = function (room) {
   if (room.phase !== "gameover") { return; }
+  if (!room.admin) { analytics.record("again", { players: room.gamePlayers }); }
   this.resetToLobby(room);
 };
 
@@ -1217,6 +1243,7 @@ RoomManager.prototype.sweep = function () {
     var anyone = room.players.some(function (p) { return p.connected && !p.bot; });
     if ((!anyone && now - room.lastActive > this.opts.roomIdleMs) || now - room.createdAt > this.opts.roomMaxAgeMs) {
       this.clearTimers(room.turn);
+      if (room.phase === "turn") { this.logGame(room, false); }
       if (room.autoTimer) { clearInterval(room.autoTimer); }
       delete this.rooms[code];
     }
