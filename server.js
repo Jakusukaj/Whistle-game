@@ -24,7 +24,14 @@ function createServer(options) {
   var manager = new RoomManager(options);
 
   var server = http.createServer(function (req, res) {
-    var urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
+    try { handleRequest(req, res); }
+    catch (e) { try { res.writeHead(400, { "Content-Type": "text/plain" }); res.end("Bad request"); } catch (e2) {} }
+  });
+
+  function handleRequest(req, res) {
+    var urlPath;
+    try { urlPath = decodeURIComponent((req.url || "/").split("?")[0]); }
+    catch (e) { res.writeHead(400, { "Content-Type": "text/plain" }); return res.end("Bad request"); }
     if (urlPath === "/healthz") {
       res.writeHead(200, { "Content-Type": "text/plain" });
       return res.end("ok");
@@ -36,7 +43,7 @@ function createServer(options) {
       return res.end(require("./analytics.js").rawLines());
     }
     if (urlPath === "/stats") {
-      var q = (req.url.split("?")[1] || "").match(/(?:^|&)key=([^&]*)/), key = q ? decodeURIComponent(q[1]) : "";
+      var q = (req.url.split("?")[1] || "").match(/(?:^|&)key=([^&]*)/), key = ""; try { key = q ? decodeURIComponent(q[1]) : ""; } catch (e) { key = ""; }
       if (key.trim().toLowerCase() !== String(manager.opts.adminPassword).toLowerCase()) { res.writeHead(401, { "Content-Type": "text/plain" }); return res.end("Nope"); }
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       return res.end(JSON.stringify(require("./analytics.js").summary(), null, 2));
@@ -54,27 +61,53 @@ function createServer(options) {
       });
       res.end(data);
     });
-  });
+  }
 
   var wss = new WebSocketServer({ server: server, path: "/ws", maxPayload: 4096 });
 
-  wss.on("connection", function (ws) {
+  // Light protection against floods: a cap on connections and room creation per address, a message
+  // budget per connection, and a drop for phones that cannot keep up. A party on one wifi shares an address,
+  // so the caps are generous.
+  var perIp = {}, creates = {};
+  var MAX_CONN_PER_IP = 60, MAX_CREATES = 12, CREATE_WINDOW_MS = 10 * 60 * 1000;
+  var BURST = 60, REFILL_PER_S = 30, MAX_BUFFER = 1024 * 1024;
+  function addrOf(req) {
+    var xf = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+    return xf || (req.socket && req.socket.remoteAddress) || "unknown";
+  }
+
+  wss.on("connection", function (ws, req) {
+    var ip = addrOf(req);
+    if ((perIp[ip] || 0) >= MAX_CONN_PER_IP) { ws.close(1013, "busy"); return; }
+    perIp[ip] = (perIp[ip] || 0) + 1;
+    var tokens = BURST, lastFill = Date.now(), dropped = 0;
     var conn = {
       roomCode: null,
       playerId: null,
       send: function (obj) {
-        if (ws.readyState === 1) { ws.send(JSON.stringify(obj)); }
+        if (ws.readyState !== 1) { return; }
+        if (ws.bufferedAmount > MAX_BUFFER) { ws.terminate(); return; }
+        ws.send(JSON.stringify(obj));
       }
     };
     ws.isAlive = true;
     ws.on("pong", function () { ws.isAlive = true; });
     ws.on("message", function (data) {
+      var now = Date.now();
+      tokens = Math.min(BURST, tokens + (now - lastFill) / 1000 * REFILL_PER_S); lastFill = now;
+      if (tokens < 1) { if (++dropped > 300) { ws.terminate(); } return; }
+      tokens -= 1; dropped = 0;
       var msg;
       try { msg = JSON.parse(data.toString()); } catch (e) { return; }
+      if (msg && (msg.t === "create" || msg.t === "createAdmin")) {
+        var list = (creates[ip] = (creates[ip] || []).filter(function (x) { return now - x < CREATE_WINDOW_MS; }));
+        if (list.length >= MAX_CREATES) { return conn.send({ t: "error", code: "slow_down", message: "That's a lot of lobbies. Give it a few minutes." }); }
+        list.push(now);
+      }
       try { manager.handle(conn, msg); }
       catch (e) { console.error("handler error", e); conn.send({ t: "error", code: "server", message: "Something went wrong." }); }
     });
-    ws.on("close", function () { manager.disconnect(conn); });
+    ws.on("close", function () { perIp[ip] = Math.max(0, (perIp[ip] || 1) - 1); if (!perIp[ip]) { delete perIp[ip]; } manager.disconnect(conn); });
     ws.on("error", function () { /* close handler cleans up */ });
   });
 

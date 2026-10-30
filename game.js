@@ -80,6 +80,20 @@ function hintLines(song) {
 function round1(x) { return Math.round(x * 10) / 10; }
 function newId() { return crypto.randomBytes(8).toString("hex"); }
 
+// Constant-time check of a player's private reconnect token.
+function tokenMatches(have, given) {
+  if (typeof have !== "string" || typeof given !== "string" || have.length !== given.length) { return false; }
+  return crypto.timingSafeEqual(Buffer.from(have), Buffer.from(given));
+}
+
+// Someone who lost their token (cleared storage, new browser) can come back by name, but never as the host
+// or as the current performer, whose phone holds the secret song.
+function canRecoverByName(room, p) {
+  if (room.hostId === p.id) { return false; }
+  if (room.phase === "turn" && room.turn && room.turn.playerId === p.id && room.turn.stage !== "reveal") { return false; }
+  return true;
+}
+
 function cleanName(n) {
   return String(n == null ? "" : n).replace(/[<>&"]/g, "").replace(/\s+/g, " ").trim().slice(0, 14);
 }
@@ -376,6 +390,8 @@ RoomManager.prototype.handle = function (conn, msg) {
 
 // -------------------------------------------------------- create / join / leave
 RoomManager.prototype.attach = function (room, player, conn) {
+  // One membership per socket: moving to another room or player leaves the old one properly.
+  if (conn.roomCode && (conn.roomCode !== room.code || conn.playerId !== player.id)) { this.disconnect(conn); conn.roomCode = null; conn.playerId = null; }
   if (player.conn && player.conn !== conn) { player.conn.roomCode = null; player.conn.playerId = null; }
   player.conn = conn; player.connected = true;
   if (room.turn && room.turn.playerId === player.id && room.turn.timers && room.turn.timers.away) { clearTimeout(room.turn.timers.away); room.turn.timers.away = null; }
@@ -383,7 +399,7 @@ RoomManager.prototype.attach = function (room, player, conn) {
 };
 
 RoomManager.prototype.addPlayer = function (room, name) {
-  var p = { id: newId(), name: name, conn: null, connected: false, total: 0, prev: 0, last: null, turns: 0, ci: (room.colourSeq = (room.colourSeq || 0) + 1) - 1 };
+  var p = { id: newId(), token: crypto.randomBytes(12).toString("hex"), name: name, conn: null, connected: false, total: 0, prev: 0, last: null, turns: 0, ci: (room.colourSeq = (room.colourSeq || 0) + 1) - 1 };
   room.players.push(p);
   return p;
 };
@@ -402,7 +418,7 @@ RoomManager.prototype.create = function (conn, msg) {
   room.hostId = p.id;
   this.rooms[room.code] = room;
   this.attach(room, p, conn);
-  conn.send({ t: "joined", code: room.code, playerId: p.id });
+  conn.send({ t: "joined", code: room.code, playerId: p.id, token: p.token });
   this.broadcast(room);
 };
 
@@ -424,10 +440,12 @@ RoomManager.prototype.join = function (conn, msg) {
 
   if (msg.playerId) {
     var existing = findPlayer(room, msg.playerId);
+    // Player ids are public (every phone is told them), so coming back needs the private token as well.
+    if (existing && !tokenMatches(existing.token, msg.token)) { existing = null; }
     if (existing && existing.removed) { return err(conn, "removed", "The host removed you from this game."); }
     if (existing) {
       this.attach(room, existing, conn);
-      conn.send({ t: "joined", code: room.code, playerId: existing.id });
+      conn.send({ t: "joined", code: room.code, playerId: existing.id, token: existing.token });
       return this.broadcast(room);
     }
   }
@@ -440,9 +458,9 @@ RoomManager.prototype.join = function (conn, msg) {
     var same = room.players[i];
     if (same.removed || same.name.toLowerCase() !== name.toLowerCase()) { continue; }
     // Someone who dropped out and comes back under the same name takes their place again.
-    if (!same.connected && !same.bot) {
+    if (!same.connected && !same.bot && canRecoverByName(room, same)) {
       this.attach(room, same, conn);
-      conn.send({ t: "joined", code: room.code, playerId: same.id });
+      conn.send({ t: "joined", code: room.code, playerId: same.id, token: same.token });
       return this.broadcast(room);
     }
     return err(conn, "name_taken", "Someone's already using that name. Try another!");
@@ -452,7 +470,7 @@ RoomManager.prototype.join = function (conn, msg) {
   if (room.phase === "turn") { this.scheduleLatePlayer(room, p); }
   if (room.phase === "gameover") { p.sitOut = true; }
   this.attach(room, p, conn);
-  conn.send({ t: "joined", code: room.code, playerId: p.id });
+  conn.send({ t: "joined", code: room.code, playerId: p.id, token: p.token });
   this.broadcast(room);
 };
 
@@ -486,6 +504,19 @@ RoomManager.prototype.promoteHost = function (room) {
   }
 };
 
+// A performer who is not connected gets the grace period, then the turn is skipped.
+RoomManager.prototype.startAwayTimer = function (room, t, p) {
+  if (!t || !t.timers || t.timers.away) { return; }
+  var self = this, id = t.id;
+  t.timers.away = setTimeout(function () {
+    var cur = room.turn;
+    if (cur && cur.id === id && cur.stage !== "reveal" && !p.connected) {
+      if (cur.stage === "whistling") { self.pause(cur); }
+      self.finishTurn(room, "skipped");
+    }
+  }, this.opts.awayMs);
+};
+
 RoomManager.prototype.disconnect = function (conn) {
   var room = conn.roomCode ? this.rooms[conn.roomCode] : null;
   if (!room) { return; }
@@ -495,16 +526,7 @@ RoomManager.prototype.disconnect = function (conn) {
   conn.roomCode = null; conn.playerId = null;
   this.promoteHost(room);
   var t = room.turn;
-  if (room.phase === "turn" && t && t.playerId === p.id && t.stage !== "reveal" && t.timers && !t.timers.away) {
-    var self = this, id = t.id;
-    t.timers.away = setTimeout(function () {
-      var cur = room.turn;
-      if (cur && cur.id === id && cur.stage !== "reveal" && !p.connected) {
-        if (cur.stage === "whistling") { self.pause(cur); }
-        self.finishTurn(room, "skipped");
-      }
-    }, this.opts.awayMs);
-  }
+  if (room.phase === "turn" && t && t.playerId === p.id && t.stage !== "reveal") { this.startAwayTimer(room, t, p); }
   this.broadcast(room);
 };
 
@@ -723,6 +745,8 @@ RoomManager.prototype.beginTurn = function (room, t) {
     startedAt: this.now(), cooldownUntil: 0, lockUntil: 0, hintAsks: [], options: null, result: null, timers: {}
   };
   room.turn = turn;
+  var perf = findPlayer(room, t.playerId);
+  if (perf && !perf.connected && !perf.bot) { this.startAwayTimer(room, turn, perf); }
   if (t.sd) {
     turn.difficulty = this.opts.sdDifficulty;
     turn.multiplier = this.opts.multipliers[turn.difficulty];
@@ -1078,8 +1102,9 @@ RoomManager.prototype.applyEndBonuses = function (room) {
   pickBest("daredevil", "Daredevil", function (st) { return st.hardSolved; },
     function (st) { return st.hardSolved + " hard " + (st.hardSolved === 1 ? "song" : "songs") + " solved"; }, 2);
   // Desired bonus per player, capped.
-  var want = {};
+  var want = {}, wantRaw = {};
   defs.forEach(function (d) { d.winners.forEach(function (w) { want[w.id] = (want[w.id] || 0) + d.bonus; }); });
+  Object.keys(want).forEach(function (id) { wantRaw[id] = want[id]; });
   var maxB = Math.round(o.maxBonus * scale / 10) * 10, gap = Math.round(o.closeGap * scale);
   Object.keys(want).forEach(function (id) { if (want[id] > maxB) { want[id] = maxB; } });
   // Settle from the top down: nobody may finish above someone who led them by
@@ -1096,12 +1121,15 @@ RoomManager.prototype.applyEndBonuses = function (room) {
     if (b < w) { capped = true; }
     got[p.id] = b; final[p.id] = p.total + b;
   });
-  // Share each player's allowed bonus across their awards in proportion.
-  defs.forEach(function (d) {
-    d.winners.forEach(function (w) {
-      var wantP = want[w.id] || 0;
-      w.bonus = wantP ? Math.round(d.bonus * (got[w.id] || 0) / wantP) : 0;
-    });
+  // Share each player's credited bonus across their awards in proportion to what each was worth, so the
+  // breakdown always adds up to what they actually received (rounding leftovers go to the biggest awards).
+  pool.forEach(function (p) {
+    var mine = [];
+    defs.forEach(function (d) { d.winners.forEach(function (w) { if (w.id === p.id) { mine.push({ w: w, d: d }); } }); });
+    var total = got[p.id] || 0, raw = wantRaw[p.id] || 0, given = 0;
+    mine.forEach(function (m) { var exact = raw ? m.d.bonus * total / raw : 0; m.w.bonus = Math.floor(exact); m.frac = exact - m.w.bonus; given += m.w.bonus; });
+    mine.sort(function (a, b) { return b.frac - a.frac || b.d.bonus - a.d.bonus; });
+    for (var k = 0; given < total && mine.length; k = (k + 1) % mine.length) { mine[k].w.bonus++; given++; }
   });
   pool.forEach(function (p) { p.bonus = got[p.id] || 0; p.total += p.bonus; });
   room.bonusCapped = capped;
@@ -1114,6 +1142,9 @@ RoomManager.prototype.afterTurns = function (room) {
   if (room.sd) {
     var best = -Infinity;
     room.sd.contenders.forEach(function (id) { if (room.sd.scores[id] > best) { best = room.sd.scores[id]; } });
+    room.sd.contenders = room.sd.contenders.filter(function (id) { var cp = findPlayer(room, id); return cp && !cp.sitOut; });
+    best = -Infinity;
+    room.sd.contenders.forEach(function (id) { if (room.sd.scores[id] > best) { best = room.sd.scores[id]; } });
     var winners = room.sd.contenders.filter(function (id) { return room.sd.scores[id] === best; });
     if (winners.length === 1 || room.sd.round >= this.opts.sdMaxRounds) { return this.gameOver(room, winners, true); }
     room.sd.contenders = winners; room.sd.round++; room.sd.scores = {};
@@ -1121,8 +1152,8 @@ RoomManager.prototype.afterTurns = function (room) {
   }
   this.applyEndBonuses(room);
   var top = -Infinity;
-  room.players.forEach(function (p) { if (p.total > top) { top = p.total; } });
-  ids = room.players.filter(function (p) { return p.total === top; }).map(function (p) { return p.id; });
+  room.players.forEach(function (p) { if (!p.sitOut && p.total > top) { top = p.total; } });
+  ids = room.players.filter(function (p) { return !p.sitOut && p.total === top; }).map(function (p) { return p.id; });
   if (ids.length > 1) {
     room.sd = { contenders: ids, round: 1, scores: {} };
     return this.queueSuddenDeath(room);

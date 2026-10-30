@@ -29,7 +29,7 @@ function Client(port, label) {
         if (w.pred(self.state)) { clearTimeout(w.timer); w.resolve(self.state); return false; }
         return true;
       });
-    } else if (m.t === "joined") { self.playerId = m.playerId; self.code = m.code; }
+    } else if (m.t === "joined") { self.playerId = m.playerId; self.token = m.token; self.code = m.code; }
     else if (m.t === "error") { self.errors.push(m.code); }
     else if (m.t === "guessFeedback") { self.feedback.push(m); }
   });
@@ -286,14 +286,14 @@ async function reconnectScenario() {
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Ann", "Ben"]);
   var A = cs[0], B = cs[1];
-  var code = A.code, aId = A.playerId;
+  var code = A.code, aId = A.playerId, aToken = A.token;
   A.close();
   await B.waitFor(function (s) { return s.hostId === B.playerId; }, "host handed over");
   check("host passes to a connected player", B.state.hostId === B.playerId);
   check("dropped player shows as offline", B.state.players.filter(function (p) { return p.id === aId; })[0].connected === false);
 
   var A2 = new Client(port, "Ann again"); await A2.open;
-  A2.send({ t: "join", code: code, playerId: aId });
+  A2.send({ t: "join", code: code, playerId: aId, token: aToken });
   await A2.waitFor(function (s) { return s.phase === "lobby"; }, "rejoined");
   check("rejoin keeps the same player", A2.playerId === aId && A2.state.me === aId);
   await B.waitFor(function (s) { return s.players.every(function (p) { return p.connected; }); }, "back online");

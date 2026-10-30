@@ -10,7 +10,7 @@ Every player performs once per round. The performer picks easy, medium or hard, 
 
 Scoring: a guess at 0 seconds is worth 1000 points, falling in a straight line to 0 at the round limit. Easy, medium and hard multiply that by 1.0, 1.1 and 1.2. Each shuffle costs 100 points and each hint costs 50, 100 and 150. The performer scores the result and each person named scores half of it. A song nobody guesses scores nothing.
 
-Rounds: until the host chooses their own number, the game suggests rounds for the head count, aiming for about 16 turns in all (2 to 3 players get 5 rounds, 4 get 4, 5 to 6 get 3, 7 to 10 get 2, 11 or more get 1). It updates as people join. Max round length is 30 seconds to 2 minutes. Games of 4 or more rounds get a halfway scoreboard, and every game ends with awards for bonus points. Ties go to a sudden-death round.
+Rounds: until the host chooses their own number, the game suggests rounds for the head count, aiming for about 16 turns in all (2 to 3 players get 5 rounds, 4 get 4, 5 to 6 get 3, 7 to 10 get 2, 11 or more get 1). It updates as people join. Time per turn is 30 seconds to 2 minutes. Games of 4 or more rounds get a halfway scoreboard, and every game ends with awards for bonus points. Ties go to a sudden-death round.
 
 Stuck? Press the ? button on any screen.
 

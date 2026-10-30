@@ -5,7 +5,7 @@
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   var ws = null, connected = false, session = null, rejoining = false, pendingName = "";
-  var gameList = [], adminLogin = false, adminAuthed = false, adminPw = "", adminData = null, pickerOpen = false, packDraft = null, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
+  var gameList = [], gamesLoaded = false, adminLogin = false, adminAuthed = false, adminPw = "", adminData = null, pickerOpen = false, packDraft = null, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
   var lastMicSent = "";
   var invite = null, copyOnJoin = false, linkResolve = null;
   var st = null, offset = 0, lastKey = null, wakeLock = null, prevStage = null, prevTurnId = null;
@@ -63,7 +63,7 @@
       if (invite && !session) { invite.loading = true; send({ t: "peek", code: invite.code }); }
       if (session) {
         rejoining = true;
-        send({ t: "join", code: session.code, playerId: session.playerId, name: session.name });
+        send({ t: "join", code: session.code, playerId: session.playerId, token: session.token, name: session.name });
       }
     };
     ws.onmessage = function (e) {
@@ -108,12 +108,12 @@
       prevStage = T ? T.stage : null; prevTurnId = T ? T.id : null;
       render();
     } else if (m.t === "rooms") {
-      gameList = m.rooms || [];
+      gameList = m.rooms || []; gamesLoaded = true;
       if (!st && !adminLogin && lastKey === "home") { var v = viewHome(); if (v.update) { v.update(); } }
     } else if (m.t === "roomInfo") {
       if (invite && invite.code === m.code) { invite.info = m; invite.loading = false; if (!st) { lastKey = null; render(); } }
     } else if (m.t === "joined") {
-      session = { code: m.code, playerId: m.playerId, name: pendingName || (session && session.name) || "" };
+      session = { code: m.code, playerId: m.playerId, token: m.token, name: pendingName || (session && session.name) || "" };
       saveSession(); rejoining = false; keepAwake(); adminLogin = false; lastMicSent = "";
       if (invite) { invite = null; try { history.replaceState(null, "", location.pathname); } catch (e) {} }
       if (copyOnJoin) { copyOnJoin = false; deliverLink(m.code); }
@@ -397,7 +397,7 @@
 
   function gamesHtml() {
     if (!gameList.length) {
-      return '<div class="gamerow"><span class="gtxt"><span class="title">Nobody\'s hosting yet</span></span></div>';
+      return '<div class="gamerow"><span class="gtxt"><span class="title">' + (gamesLoaded ? "Nobody\'s hosting yet" : "Looking for games...") + "</span></span></div>";
     }
     return gameList.map(function (g) {
       var closed = g.inProgress, live = g.live;
@@ -524,7 +524,8 @@
           '<p class="title">One person performs a song. Everyone else guesses it. Quick guesses score big!</p></div>' +
           '<div class="field-group">' + nameField(name) + '<button id="hostBtn" class="btn" style="margin-top:12px">Start lobby</button>' +
           '<p class="small">Start a lobby and we\'ll copy a link to send to your friends.</p></div>' +
-          '<div class="stack"><h2 class="label">Join a game</h2><div class="line-list" id="games">' + gamesHtml() + "</div></div>" +
+          '<div class="stack"><h2 class="label">Join a game</h2><div class="line-list" id="games">' + gamesHtml() + "</div>" +
+          '<div class="codejoin"><label class="label flab" for="codeIn">Got a code?</label><div class="codejoin__row"><input id="codeIn" class="input" maxlength="4" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD"><button id="codeGo" class="btn">Join</button></div></div></div>' +
           '<div class="spacer"></div>' +
           '<div class="homefoot"><button id="helpBtn" class="txt">How to play</button>' + (hasStats() ? '<button id="statsBtn" class="txt">Your stats</button>' : "") +
           '<button id="adminDot" class="admindot" aria-label="Admin"></button></div>' +
@@ -540,6 +541,13 @@
       bind: function () {
         var go = function () { var n = readName(); if (n) { copyOnJoin = true; autoMic(); primeCopy(); send({ t: "create", name: n }); } };
         $("#hostBtn").onclick = go;
+        var codeJoin = function () {
+          var c = $("#codeIn").value.replace(/[^A-Za-z]/g, "").toUpperCase();
+          if (c.length !== 4) { toast("Room codes have 4 letters."); return; }
+          var n = readName(); if (n) { autoMic(); send({ t: "join", code: c, name: n }); }
+        };
+        $("#codeGo").onclick = codeJoin;
+        $("#codeIn").onkeydown = function (e) { if (e.key === "Enter") { codeJoin(); } };
         $("#name").onkeydown = function (e) { if (e.key === "Enter") { go(); } };
         $("#helpBtn").onclick = function () { usage("howto", "home"); showHelp(); };
         var sb = $("#statsBtn"); if (sb) { sb.onclick = function () { showStats(readNameQuiet()); }; }
@@ -691,10 +699,10 @@
   function lengthHtml(s, isHost) {
     var opts = s.limitOptions || [30000, 60000, 90000, 120000];
     if (!isHost) {
-      return '<div class="setrow"><div><div class="label">Max round length</div><p class="small">Set by the host. A round ends as soon as the song is guessed.</p></div>' +
+      return '<div class="setrow"><div><div class="label">Time per turn</div><p class="small">Set by the host. A turn ends as soon as the song is guessed.</p></div>' +
         '<span class="title" id="limitVal">' + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + "</span></div>";
     }
-    return '<div class="stack"><div class="label">Max round length</div><p class="small">A round ends as soon as the song is guessed.</p><div class="seg">' + opts.map(function (ms) {
+    return '<div class="stack"><div class="label">Time per turn</div><p class="small">A turn ends as soon as the song is guessed.</p><div class="seg">' + opts.map(function (ms) {
       return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" aria-pressed="' + (ms === s.limitMs) + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
     }).join("") + "</div></div>";
   }
@@ -886,7 +894,7 @@
     return '<div class="sheetwrap"><div class="scrim" id="setScrim"></div><div class="sheet"><span class="label">Game settings</span>' +
       '<div class="setrow"><div><div class="label">Rounds</div><p class="small">' + turns + " turns in all, about " + estMinutes(Math.max(2, s.players.length), s.rounds, s.limitMs) + " min</p>" + (s.roundsAuto ? '<p class="small">Set for ' + s.players.length + (s.players.length === 1 ? " player" : " players") + ". It updates as people join, until you change it.</p>" : "") + "</div>" +
       '<div class="stepper"><button id="minus" class="txt" aria-label="Fewer rounds">Less</button><span class="title val" id="roundsVal">' + s.rounds + '</span><button id="plus" class="txt" aria-label="More rounds">More</button></div></div>' +
-      '<div class="stack"><div class="label">Max round length</div><p class="small">A round ends as soon as the song is guessed.</p><div class="seg">' + opts.map(function (ms) {
+      '<div class="stack"><div class="label">Time per turn</div><p class="small">A turn ends as soon as the song is guessed.</p><div class="seg">' + opts.map(function (ms) {
         return '<button class="segb' + (ms === s.limitMs ? " on" : "") + '" aria-pressed="' + (ms === s.limitMs) + '" data-ms="' + ms + '">' + LEN_LABEL[ms] + "</button>";
       }).join("") + "</div></div>" +
       '<button class="btn" id="setDone">Done</button></div></div>';
@@ -1337,7 +1345,7 @@
           actionHtml("askHintBtn", "No hints yet", "Ask", "Ask for a hint", "Nudges the performer") +
           (mic.typeMode
             ? '<div class="typebox"><form id="gform" class="typebox">' +
-              '<input id="ginput" class="input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title">' +
+              '<input id="ginput" class="input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title" aria-label="Type the song title">' +
               '<button class="btn" type="submit">Send guess</button></form>' +
               (SR ? '<button id="toMic" class="txt" style="align-self:center">Use the mic</button>' : "") + "</div>"
             : '<div class="micwrap mid"><button class="orb off" id="orb" aria-label="Turn on mic"></button>' +
@@ -1630,7 +1638,7 @@
   // What to do on this screen, for the ? button. It depends on the screen and on whether you are performing or guessing.
   function helpFor(key) {
     var host = st && st.hostId === st.me, T = st && st.turn, who = T && st.players ? pname(st, T.playerId) : "The performer";
-    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Harder ones earn bonus points! Don't know any? Refresh once for new ones. Only you can see them."]; }
+    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Harder ones earn bonus points! Don't know any? Refresh up to three times for new ones. Only you can see them."]; }
     if (/^ready-/.test(key)) { return ["Get ready", "Only you can see your song. Ready? Tap Ready and a 3, 2, 1 starts for everyone. Then whistle or kazoo the tune. No words!"]; }
     if (/^wait-/.test(key)) { return ["Get ready to guess", who + " is getting ready to perform. When they start, shout the song title. Mic off? Type it instead."]; }
     if (/^cd-/.test(key)) {
