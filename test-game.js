@@ -188,7 +188,7 @@ async function mainScenario() {
   await B.waitFor(turnId(B.playerId), "turn 2 is Ben's");
   check("turn 2 stage resets to choose", B.stage() === "choose");
   await startTurnAs(cs, B, "hard");
-  check("hard multiplier is 1.2", B.state.turn.multiplier === 1.2);
+  check("hard multiplier is 2", B.state.turn.multiplier === 2);
   await B.waitFor(stageIs("reveal"), "timeout reveal", 6000);
   await A.waitFor(stageIs("reveal"), "timeout reveal for A", 6000);
   check("an unguessed turn times out", B.state.turn.result.outcome === "timeout");
@@ -219,13 +219,24 @@ async function mainScenario() {
   check("Someone got it pauses the clock and asks who", C.state.turn.runningSince === null && C.state.turn.pending.manual === true);
   var before = A.state.players.map(function (p) { return p.total; });
   C.send({ t: "confirm", ok: true, who: [A.playerId, B.playerId, C.playerId, "nobody"] });
+  // Nobody's phone heard a guess, so the people named have to tap to claim it.
+  await A.waitFor(stageIs("claiming"), "named players are asked to claim");
+  var cl = A.state.turn.claim;
+  check("only real players other than the whistler are asked to claim", cl.ids.length === 2 && cl.ids.indexOf(A.playerId) !== -1 && cl.ids.indexOf(B.playerId) !== -1, JSON.stringify(cl));
+  check("the clock stays paused whilst people claim", A.state.turn.runningSince === null);
+  C.send({ t: "claim" }); await sleep(80);
+  check("the whistler cannot claim for them", C.stage() === "claiming" && C.state.turn.claim.claimed.length === 0);
+  A.send({ t: "claim" });
+  await C.waitFor(function (st) { return st.turn.claim && st.turn.claim.claimed.length === 1; }, "first claim shown");
+  B.send({ t: "claim" });
   await C.waitFor(stageIs("reveal"), "naming reveal");
   var r3 = C.state.turn.result;
-  check("whistler names who got it", r3.outcome === "correct" && r3.multiplier === 1.1);
+  check("whistler names who got it", r3.outcome === "correct" && r3.multiplier === 1.5);
   check("each named guesser is awarded separately, never the whistler twice or a stranger", r3.awards.length === 3 && r3.awards.filter(function (a) { return a.role === "guesser"; }).length === 2, JSON.stringify(r3.awards));
-  check("each guesser earns half the whistler's points", r3.awards.filter(function (a) { return a.role === "guesser"; }).every(function (a) { return a.points === Math.round(r3.score / 2); }));
-  check("medium is worth 10% more than the same speed on easy", r3.afterMult === Math.round(r3.base * 1.1));
-  check("three hints cost 50 + 100 + 150 points", r3.hints === 3 && r3.hintPts === 300 && r3.score === Math.max(0, r3.afterMult - 300 - r3.shufflePts), r3.hintPts + " / " + r3.score);
+  check("the named guessers split one half share between them", r3.awards.filter(function (a) { return a.role === "guesser"; }).every(function (a) { return a.points === Math.round(r3.score / 4); }), JSON.stringify(r3.awards));
+  check("medium is worth half as much again as the same speed on easy", r3.afterMult === Math.round(r3.base * 1.5));
+  check("three hints cost 50 + 100 + 150 points, and a correct guess never scores under 100", r3.hints === 3 && r3.hintPts === 300 && r3.score === Math.max(100, r3.afterMult - 300 - r3.shufflePts), r3.hintPts + " / " + r3.score);
+  check("a win by Someone got it is recorded as such, with nobody's phone credited", r3.source === "manual" && r3.heardFrom === null);
 
   A.send({ t: "next" });
   await A.waitFor(function (s) { return s.phase === "gameover"; }, "game over");
@@ -281,15 +292,17 @@ async function skipAndLeaveScenario() {
 
 async function reconnectScenario() {
   console.log("\n--- Scenario 3: reconnect and host hand-over ---");
-  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300 });
+  var app = createServer({ defaultPacks: ["bangers"], revealMs: 0, limitMs: 1500, countdownMs: 100, confirmMs: 600, cooldownMs: 300, hostGraceMs: 250 });
   await new Promise(function (r) { app.server.listen(0, r); });
   var port = app.server.address().port;
   var cs = await newRoom(port, ["Ann", "Ben"]);
   var A = cs[0], B = cs[1];
   var code = A.code, aId = A.playerId, aToken = A.token;
   A.close();
+  await B.waitFor(function (s) { return s.players.some(function (p) { return !p.connected; }); }, "host seen offline");
+  check("a host who drops keeps the role for a grace period", B.state.hostId === aId);
   await B.waitFor(function (s) { return s.hostId === B.playerId; }, "host handed over");
-  check("host passes to a connected player", B.state.hostId === B.playerId);
+  check("after the grace period the role passes to a connected player", B.state.hostId === B.playerId);
   check("dropped player shows as offline", B.state.players.filter(function (p) { return p.id === aId; })[0].connected === false);
 
   var A2 = new Client(port, "Ann again"); await A2.open;
@@ -298,6 +311,7 @@ async function reconnectScenario() {
   check("rejoin keeps the same player", A2.playerId === aId && A2.state.me === aId);
   await B.waitFor(function (s) { return s.players.every(function (p) { return p.connected; }); }, "back online");
   check("rejoined player shows as online", true);
+  check("the original host gets the role back when they return", B.state.hostId === aId && A2.state.hostId === aId, B.state.hostId);
 
   A2.close(); B.close();
   app.server.close();
@@ -325,7 +339,8 @@ async function tieScenario() {
 
   X.send({ t: "ready" }); await X.waitFor(stageIs("whistling"), "x whistling");
   X.send({ t: "gotIt" }); await X.waitFor(stageIs("confirming"), "x asks who");
-  X.send({ t: "confirm", ok: true, who: [Y.playerId] }); await X.waitFor(stageIs("reveal"), "x sd reveal");
+  X.send({ t: "confirm", ok: true, who: [Y.playerId] }); await Y.waitFor(stageIs("claiming"), "y asked to claim");
+  Y.send({ t: "claim" }); await X.waitFor(stageIs("reveal"), "x sd reveal");
   check("tie-break guessers earn no points", X.state.turn.result.awards.length === 1);
   X.send({ t: "next" }); await Y.waitFor(turnId(Y.playerId), "y sd turn");
   Y.send({ t: "ready" }); await Y.waitFor(stageIs("whistling"), "y whistling");

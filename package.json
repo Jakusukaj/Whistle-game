@@ -2,11 +2,11 @@
   "name": "whistle-game",
   "version": "0.1.0",
   "private": true,
-  "description": "A Jackbox-style party game: whistle the song, the room guesses, lowest time wins.",
+  "description": "A Jackbox-style party game: whistle the song, the room guesses, quick guesses score more.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "STATS_OFF=1 node test-game.js && node test-extras.js && node test-packs.js && node test-interlude.js && node test-stats.js && node test-stats-remote.js && node test-audit.js"
+    "test": "STATS_OFF=1 node test-game.js && node test-review.js && node test-awards.js && node test-extras.js && node test-packs.js && node test-interlude.js && node test-stats.js && node test-stats-remote.js && node test-audit.js"
   },
   "engines": {
     "node": ">=18"

@@ -114,22 +114,32 @@ var tw = d.cs.filter(function (x) { return x.playerId === d.room.turn.playerId; 
 d.m.handle(tw, { t: "pickDifficulty", d: "hard" });
 check("picking by difficulty still works", d.room.turn.difficulty === d.room.turn.song.difficulty || d.room.turn.difficulty);
 
-// --- refresh options: unlimited, free, and songs already shown stay out while fresh ones remain
+// --- refresh options: one per turn, free, and songs already shown stay out while fresh ones remain
 var r = newGame(2);
 r.m.handle(r.cs[0], { t: "start" });
 var rw = r.cs.filter(function (x) { return x.playerId === r.room.turn.playerId; })[0];
 var ro = r.m.viewFor(r.room, rw.playerId).turn;
 var seenAll = ro.options.map(function (o) { return o.title; });
 check("refresh offered at first", ro.canRefresh === true);
-var repeat = 0, still = true;
+var repeat = 0;
+r.m.handle(rw, { t: "refreshOptions" });
+var rv = r.m.viewFor(r.room, rw.playerId).turn;
+rv.options.forEach(function (o) { if (seenAll.indexOf(o.title) !== -1) { repeat++; } seenAll.push(o.title); });
+check("one refresh gives three new songs", rv.options.length === 3 && repeat === 0, repeat);
+check("after that refresh no more are offered", rv.canRefresh === false);
+var afterOne = rv.options.map(function (o) { return o.title; }).join("|");
+r.m.handle(rw, { t: "refreshOptions" });
+check("a second refresh in the same turn is refused", r.m.viewFor(r.room, rw.playerId).turn.options.map(function (o) { return o.title; }).join("|") === afterOne);
+// Over several turns, cards that have been shown stay out whilst fresh ones remain.
+var unlimited = new RoomManager({ refreshLimit: 99, chooseMs: 0 });
+var ur = (function () { var cs = [0, 1].map(function () { return { sent: [], send: function (o) { this.sent.push(o); } }; }); unlimited.handle(cs[0], { t: "create", name: "P0" }); var code = cs[0].roomCode; unlimited.handle(cs[1], { t: "join", code: code, name: "P1" }); unlimited.handle(cs[0], { t: "setPacks", packs: ["bangers"] }); unlimited.handle(cs[0], { t: "start" }); return { m: unlimited, cs: cs, room: unlimited.rooms[code] }; })();
+var uw = ur.cs.filter(function (x) { return x.playerId === ur.room.turn.playerId; })[0];
+var useen = ur.m.viewFor(ur.room, uw.playerId).turn.options.map(function (o) { return o.title; }), urepeat = 0;
 for (var rf = 0; rf < 12; rf++) {
-  r.m.handle(rw, { t: "refreshOptions" });
-  var rv = r.m.viewFor(r.room, rw.playerId).turn;
-  still = still && rv.canRefresh === true && rv.options.length === 3;
-  rv.options.forEach(function (o) { if (seenAll.indexOf(o.title) !== -1) { repeat++; } seenAll.push(o.title); });
+  ur.m.handle(uw, { t: "refreshOptions" });
+  ur.m.viewFor(ur.room, uw.playerId).turn.options.forEach(function (o) { if (useen.indexOf(o.title) !== -1) { urepeat++; } useen.push(o.title); });
 }
-check("refreshing is unlimited", still);
-check("no song is shown twice while fresh ones remain", repeat === 0, repeat);
+check("no song is shown twice while fresh ones remain", urepeat === 0, urepeat);
 var other = r.cs.filter(function (x) { return x !== rw; })[0];
 check("guessers never see the options", !r.m.viewFor(r.room, other.playerId).turn.options);
 
