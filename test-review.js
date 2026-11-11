@@ -214,6 +214,25 @@ function total(g, c) { return g.room.players.filter(function (p) { return p.id =
     check("and Yellow Submarine still counts for Yellow Submarine", g.room.turn.stage === "confirming");
   } else { check("Yellow and Yellow Submarine are both in the library", false); }
 
+  // ---------------------------------------------------------------- hints in an artist-only game
+  var abbaSong = SONGS.filter(function (s) { return s.packs.indexOf("abba") !== -1 && s.hints.some(function (h) { return /abba/i.test(h); }); })[0];
+  if (abbaSong) {
+    g = newGame(3); g.m.handle(g.cs[0], { t: "setPacks", packs: ["abba"] });
+    w = whistling(g); gs = others(g, w);
+    g.room.turn.song = abbaSong;
+    g.m.handle(w, { t: "hint" }); g.m.handle(w, { t: "hint" }); g.m.handle(w, { t: "hint" });
+    var lines = gs[0].state.turn.hintLines;
+    check("in an ABBA-only game no hint just names ABBA", lines.length === 3 && lines.every(function (l) { return !/abba/i.test(l); }), JSON.stringify(lines));
+    check("the swapped hint is the year or the title length", lines.some(function (l) { return /^Released in \d{4}$|^The title has \d+ words?$/.test(l); }), JSON.stringify(lines));
+    g.room.packs = ["abba", "bangers"]; g.m.broadcast(g.room);
+    check("with other packs in play the artist hint stays", gs[0].state.turn.hintLines.some(function (l) { return /abba/i.test(l); }));
+  }
+  check("no hint contains its own title", SONGS.every(function (s) { var t = " " + require("./matcher.js").tokens(s.title).join(" ") + " "; return t.length < 4 || (s.hints || []).every(function (h) { return (" " + require("./matcher.js").tokens(h).join(" ") + " ").indexOf(t) === -1; }); }));
+  ["Song 2|song two", "22|twenty two", "1999|nineteen ninety nine", "Do What U Want|do what you want"].forEach(function (pair) {
+    var bits = pair.split("|"), song = SONGS.filter(function (s) { return s.title === bits[0]; })[0];
+    check("\"" + bits[1] + "\" is heard as " + bits[0], !!song && require("./matcher.js").matchAny([bits[1]], song, { typed: false }).matched);
+  });
+
   console.log(failed ? "\n" + failed + " FAILED" : "\nALL PASSED");
   process.exit(failed ? 1 : 0);
 })();

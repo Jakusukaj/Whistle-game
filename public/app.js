@@ -799,8 +799,6 @@
     if (!p.connected) { return "Away"; }
     return p.mic === "on" ? "Mic on" : p.mic === "typing" ? "Buzzer" : "Mic off";
   }
-  function micStrip() { return ""; }
-  function syncMicStrip() {}
 
   function packCard(p, on, ro, voters) {
     var vh = "";
@@ -829,34 +827,8 @@
   }
 
   // The lobby shows one short line about the chosen packs. The picker opens on top.
-  function packsSummaryHtml(s, isHost) {
-    var room = s.packMode === "room";
-    var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
-    var need = s.rounds * s.players.length + 5, short = s.songsInPlay < need;
-    var note = !on.length ? (room ? "Everyone picks up to " + (s.packPicks || 3) + " packs" : isHost ? "Pick a pack to get going" : "Waiting for the host to pick packs")
-      : short ? "Not enough songs for that many turns. Add more packs or drop a round"
-      : room ? "Every pack picked goes in the mix. Popular ones come up more." : "No song is played twice in a game.";
-    var mode = isHost
-      ? '<div class="seg packmode"><button class="pmode" data-m="host" aria-pressed="' + !room + '">Host picks</button><button class="pmode" data-m="room" aria-pressed="' + room + '">Room picks</button></div>'
-      : "";
-    var btn = room ? (s.myPackVotes.length ? "Change your picks" : "Pick song packs") : (isHost ? "Select song packs" : "See packs");
-    var r = rankingList(s).slice(0, 3);
-    var body = room
-      ? (r.length ? r.map(function (x) { return '<p class="small">' + esc(x.p.name) + ", " + x.n + (x.n === 1 ? " pick" : " picks") + "</p>"; }).join("") : '<p class="small">No picks yet</p>')
-      : '<p class="title">' + esc(packSummaryLine(on)) + "</p>";
-    return '<div class="stack"><div class="label">Songs</div>' + mode + '<div class="packline">' + body + '<p class="small">' + esc(note) + "</p></div>" +
-      '<button class="btn btn--outline" id="openPacks">' + btn + "</button></div>";
-  }
 
   // Guests see one quiet line about the songs and, in room mode, a way to vote.
-  function guestSongsHtml(s) {
-    var room = s.packMode === "room";
-    var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
-    var line = room ? (rankingList(s).length ? "In the mix: " + packSummaryLine(on) : "No picks yet") : packSummaryLine(on);
-    return '<div class="stack"><div class="label">Songs</div><p class="title">' + esc(line) + "</p>" +
-      (room ? '<button class="btn btn--outline" id="openPacks">' + (s.myPackVotes.length ? "Change your picks" : "Pick song packs") + "</button>"
-            : '<div><button class="txt" id="openPacks">See packs</button></div>') + "</div>";
-  }
 
   function pickerHtml(s, isHost) {
     var room = s.packMode === "room", votes = s.packVotes || {};
@@ -927,7 +899,6 @@
     return '<button class="lrow" id="openPacks"><span class="lrow__t"><span class="label">Songs' + (room ? ", everyone picks " + (s.packPicks || 3) : "") + '</span>' +
       '<span class="title">' + esc(songsTitle(s)) + '</span></span><span class="lrow__c label">' + cue + "</span></button>";
   }
-  function voteCtaHtml() { return ""; }
   // One row to invite people: the link for the group chat, and the QR code for people in the room.
   function inviteRowHtml(s, isHost) {
     return '<div class="lrow lrow--static"><span class="lrow__t"><span class="label">Invite</span></span>' +
@@ -953,10 +924,6 @@
   function estMinutes(players, rounds, limitMs) {
     var perTurn = 20 + 0.3 * limitMs / 1000, total = perTurn * players * rounds + (rounds >= 4 ? 8 : 0);
     return Math.max(5, Math.round(total / 60 / 5) * 5);
-  }
-  function estText(s) {
-    var n = Math.max(2, s.players.length);
-    return "About " + estMinutes(n, s.rounds, s.limitMs) + " min with " + n + (n === 1 ? " player" : " players");
   }
   function settingsText(s) {
     return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", up to " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
@@ -985,7 +952,6 @@
     var text = !short ? lab : on ? "On" : bz ? "Buzz" : lab === "Mic off" ? "Off" : lab === "Starting" ? "Wait" : lab;
     return '<i class="mdot' + (on ? " on" : bz ? " kb" : "") + '"></i><span class="label">' + text + "</span>";
   }
-  function bindPill() {}
   function viewLobby(s) {
     var isHost = s.hostId === s.me;
     var turns = s.rounds * s.players.length;

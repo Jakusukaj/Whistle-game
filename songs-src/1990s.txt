@@ -9,7 +9,7 @@ Common People | Pulp | m | 1995 | R
 Disco 2000 | Pulp | m | 1995 | P
 Parklife | Blur | m | 1994 | R
 Girls and Boys | Blur | m | 1994 | P
-Song 2 | Blur | m | 1997 | PR
+Song 2 | Blur | m | 1997 | PR | Song Two
 Country House | Blur | m | 1995 | R
 Beetlebum | Blur | m | 1997 | R
 Girlfriend in a Coma | Smiths | m | 1987 | R

@@ -63,11 +63,25 @@ var DEFAULTS = {
   roomMaxAgeMs: 12 * 60 * 60 * 1000
 };
 
+// In a game made only of artist packs (just ABBA, say) everyone already knows who sings every song, so a
+// hint that names the artist tells them nothing and still costs points. It is swapped for a fact that helps:
+// the year first, then the length of the title.
+function artistBlind(song, lines, room) {
+  var ids = (room && room.packs) || [];
+  var only = ids.length > 0 && ids.every(function (id) { var p = PACKS.filter(function (x) { return x.id === id; })[0]; return !!p && p.group === "Artists"; });
+  var a = String(song.artist || "").toLowerCase();
+  if (!only || a.length < 2) { return lines; }
+  var words = String(song.title).replace(/\(.*?\)/g, "").split(/\s+/).filter(Boolean).length;
+  var yearSaid = song.year && lines.some(function (l) { return String(l).indexOf(String(song.year)) !== -1; });
+  var spare = [song.year && !yearSaid ? "Released in " + song.year : null, "The title has " + words + (words === 1 ? " word" : " words")].filter(Boolean);
+  return lines.map(function (line) { return String(line).toLowerCase().indexOf(a) !== -1 && spare.length ? spare.shift() : line; });
+}
+
 // The three hints, in order, from a gentle nudge to nearly obvious. Most songs have their own, written in
 // songs-src/hints-*.txt. A song without them falls back to: how long the title is, the year, then who it is by.
 // They are built from facts about the song, never its lyrics, and never give away the title.
-function hintLines(song) {
-  if (song.hints && song.hints.length === 3) { return song.hints.slice(); }
+function hintLines(song, room) {
+  if (song.hints && song.hints.length === 3) { return artistBlind(song, song.hints.slice(), room); }
   var words = String(song.title).replace(/\(.*?\)/g, "").split(/\s+/).filter(Boolean).length;
   var packs = song.packs || [], a = song.artist;
   var h3;
@@ -227,7 +241,7 @@ RoomManager.prototype.viewFor = function (room, pid) {
     }
     if (isW && t.song && t.stage !== "reveal" && !locked) { tv.song = { title: t.song.title, artist: t.song.artist }; }
     // Hints go to every phone: they are for the guessers too.
-    if (t.song && t.hints && t.stage !== "reveal" && !locked) { tv.hintLines = hintLines(t.song).slice(0, t.hints); }
+    if (t.song && t.hints && t.stage !== "reveal" && !locked) { tv.hintLines = hintLines(t.song, room).slice(0, t.hints); }
     if (isW && t.stage === "confirming" && t.pending) { tv.pending = { heard: t.pending.heard, from: t.pending.from || null, manual: !!t.pending.manual, buzz: !!t.pending.buzz }; }
     if (t.stage === "reveal") { tv.result = t.result; }
   }
