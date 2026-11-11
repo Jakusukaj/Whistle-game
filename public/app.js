@@ -247,9 +247,16 @@
     refreshMic();
   }
   function micFresh() {
+    var had = !!mic.rec;
     micAbort();
     mic.want = true;
-    try { micLaunch(); } catch (e) { mic.state = "stopped"; refreshMic(); }
+    var go = function () {
+      if (!mic.want || mic.rec) { return; }
+      try { micLaunch(); } catch (e) { mic.state = "stopped"; refreshMic(); }
+    };
+    // Safari will not start a new session in the same breath as stopping the old one, so give it a moment.
+    // With nothing to stop, start at once: the first start has to happen inside the player's tap.
+    if (had) { mic.state = "starting"; setTimeout(go, 250); } else { go(); }
   }
   // Called on every state change: start a fresh session for a new turn, park it when the turn is over.
   function micSync() {
