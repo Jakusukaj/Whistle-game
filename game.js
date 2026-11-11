@@ -38,6 +38,7 @@ var DEFAULTS = {
   claimMs: 8000,         // after "Someone got it" with no guess heard, the named players have this long to tap and claim (0 turns it off)
   buzzLockMs: 5000,      // a wrong buzz locks that player out for this long
   confirmMs: 10000,      // whistler has this long to confirm a detected guess
+  confirmMaxMs: 45000,   // and even a whistler who is there cannot leave the sheet open longer than this
   cooldownMs: 4000,      // ignore guesses this long after the whistler says "no"
   shufflePoints: 100,    // each shuffle costs this many points, taken off after the multiplier
   hintPoints: [50, 100, 150], // the 1st, 2nd and 3rd hint on a song cost this many points
@@ -1084,15 +1085,17 @@ RoomManager.prototype.guess = function (room, me, conn, msg) {
   this.broadcast(room);
 };
 
-// The whistler has confirmMs to answer a detected guess or a buzz. A present human whistler may take as long
-// as they like; the timer only gives up for someone who has gone.
+// The whistler has confirmMs to answer a detected guess, a buzz or their own "Someone got it". A human
+// whistler who is there may take longer, up to confirmMaxMs, so a sheet left open can never hold the game
+// up for good. Giving up counts as "not yet": the clock carries on.
 RoomManager.prototype.armConfirm = function (room, t) {
-  var self = this, id = t.id;
+  var self = this, id = t.id, since = this.now();
+  if (t.timers.confirm) { clearTimeout(t.timers.confirm); }
   var arm = function () {
     t.timers.confirm = setTimeout(safely(function () {
       if (!room.turn || room.turn.id !== id || room.turn.stage !== "confirming") { return; }
       var w = findPlayer(room, room.turn.playerId);
-      if (w && w.connected && !w.bot) { return arm(); }
+      if (w && w.connected && !w.bot && self.now() - since < self.opts.confirmMaxMs) { return arm(); }
       self.confirmGuess(room, null, false, true);
     }), self.opts.confirmMs);
     if (t.timers.confirm.unref) { t.timers.confirm.unref(); }
@@ -1191,10 +1194,11 @@ RoomManager.prototype.dropFromClaim = function (room, pid) {
 RoomManager.prototype.gotIt = function (room, me) {
   var t = this.currentTurnFor(room, me, ["whistling", "confirming"]);
   if (!t || t.stage !== "whistling") { return; }
-  // Pause the clock and ask the whistler who got it. No timeout: they take their time.
+  // Pause the clock and ask the whistler who got it.
   this.pause(t);
   t.stage = "confirming";
   t.pending = { heard: "", from: null, manual: true };
+  this.armConfirm(room, t);
   this.broadcast(room);
 };
 
