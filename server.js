@@ -84,6 +84,7 @@ function createServer(options) {
     var conn = {
       roomCode: null,
       playerId: null,
+      ip: ip,
       send: function (obj) {
         if (ws.readyState !== 1) { return; }
         if (ws.bufferedAmount > MAX_BUFFER) { ws.terminate(); return; }
@@ -129,6 +130,9 @@ function createServer(options) {
 module.exports = { createServer: createServer };
 
 if (require.main === module) {
+  // One stray error must not end every game in progress. Log it and carry on.
+  process.on("uncaughtException", function (e) { console.error("uncaught error", e); });
+  process.on("unhandledRejection", function (e) { console.error("unhandled rejection", e); });
   var port = parseInt(process.env.PORT, 10) || 3000;
   createServer().server.listen(port, function () {
     console.log("Whistle is running on port " + port);

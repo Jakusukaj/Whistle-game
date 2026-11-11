@@ -4,7 +4,11 @@
   var app = document.getElementById("app");
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  var ws = null, connected = false, session = null, rejoining = false, pendingName = "";
+  var ws = null, connected = false, session = null, rejoining = false, pendingName = "", reconnectTimer = null, lastMsgAt = 0;
+  var UA = navigator.userAgent || "";
+  var IOS = /iPhone|iPad|iPod/i.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  // In-app browsers (Instagram, Facebook, TikTok and friends) show the speech API and never start it.
+  var IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Snapchat|TikTok|musical_ly|Line\/|GSA\/|MicroMessenger/i.test(UA) || (IOS && /AppleWebKit/i.test(UA) && !/Safari\//i.test(UA) && !navigator.standalone);
   var gameList = [], gamesLoaded = false, adminLogin = false, adminAuthed = false, adminPw = "", adminData = null, pickerOpen = false, packDraft = null, settingsOpen = false, pickerTab = "All", keepPickerScroll = true;
   var lastMicSent = "";
   var invite = null, copyOnJoin = false, linkResolve = null;
@@ -54,10 +58,13 @@
   }
 
   function connect() {
+    if (ws && ws.readyState < 2) { return; }
+    clearTimeout(reconnectTimer);
     var proto = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(proto + "://" + location.host + "/ws");
-    ws.onopen = function () {
-      connected = true; setBanner(""); lastMicSent = "";
+    var sock = ws = new WebSocket(proto + "://" + location.host + "/ws");
+    sock.onopen = function () {
+      if (ws !== sock) { return; }
+      connected = true; setBanner(""); lastMicSent = ""; lastMsgAt = Date.now();
       sendHello();
       send({ t: "listRooms" });
       if (invite && !session) { invite.loading = true; send({ t: "peek", code: invite.code }); }
@@ -66,16 +73,39 @@
         send({ t: "join", code: session.code, playerId: session.playerId, token: session.token, name: session.name });
       }
     };
-    ws.onmessage = function (e) {
+    sock.onmessage = function (e) {
+      if (ws !== sock) { return; }
+      lastMsgAt = Date.now();
       var m; try { m = JSON.parse(e.data); } catch (err) { return; }
       onMessage(m);
     };
-    ws.onclose = function () {
+    sock.onclose = function () {
+      if (ws !== sock) { return; }
       connected = false;
       setBanner("Hang on, reconnecting...");
-      setTimeout(connect, 1500);
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connect, 1500);
     };
-    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+    sock.onerror = function () { try { sock.close(); } catch (e) {} };
+  }
+
+  // Back from the lock screen, a notification or another app. Phones freeze a hidden page, so the socket
+  // may be dead without knowing it and the mic session is stale. Reconnect or resync, then listen afresh.
+  function comeBack() {
+    keepAwake();
+    if (!ws || ws.readyState > 1) { clearTimeout(reconnectTimer); connect(); return; }
+    if (ws.readyState !== 1) { return; }
+    var sock = ws, asked = Date.now();
+    if (session) { rejoining = true; send({ t: "join", code: session.code, playerId: session.playerId, token: session.token, name: session.name }); }
+    else { send({ t: "ping" }); }
+    setTimeout(function () {
+      if (ws !== sock || lastMsgAt >= asked) { return; }
+      // No answer: the socket only looks open. Drop it and start again.
+      sock.onclose = null; try { sock.close(); } catch (e) {}
+      ws = null; connected = false; setBanner("Hang on, reconnecting...");
+      connect();
+    }, 3000);
+    mic.key = null; micSync();
   }
 
   // Anonymous browser and device facts, so we know what people play on.
@@ -128,24 +158,26 @@
       }
     } else if (m.t === "adminStats") {
       adminData = m.data; adminAuthed = true; lastKey = null; render();
-    } else if (m.t === "guessFeedback") {
-      toast("Nope! Try again."); sfx("nope"); buzz(40);
     }
   }
 
+  var wakeFail = !navigator.wakeLock;
   function keepAwake() {
     try {
       if (navigator.wakeLock && !wakeLock) {
         navigator.wakeLock.request("screen").then(function (l) {
-          wakeLock = l;
+          wakeLock = l; wakeFail = false;
           l.addEventListener("release", function () { wakeLock = null; });
-        }).catch(function () {});
+        }).catch(function () { if (!wakeFail) { wakeFail = true; refreshMic(); } });
       }
-    } catch (e) {}
+    } catch (e) { wakeFail = true; }
   }
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible" && session) { keepAwake(); }
+    if (document.visibilityState === "visible") { comeBack(); }
+    else { micPark(); }
   });
+  // Safari restores a frozen page without a visibility change now and then.
+  window.addEventListener("pageshow", function (e) { if (e.persisted) { comeBack(); } });
 
   function linkFor(code) { return location.origin + "/?join=" + code; }
   // Copy the join link. The host's tap on Start lobby starts the copy; the link is filled in once the room exists.
@@ -183,44 +215,105 @@
   }
 
   // ------------------------------------------------------------------- mic
-  var mic = { state: SR ? "off" : "unsupported", rec: null, want: false, lastSent: "", heard: "", level: 0, typeMode: !SR };
+  // The phone listens only whilst there is something to hear: in the lobby, so players can see it works, and
+  // from each countdown to the end of that turn. Every turn gets a fresh recognition session, because a
+  // long-lived one can stop returning results without saying so. A phone that cannot listen buzzes in instead.
+  var mic = { state: !SR || IN_APP ? "unsupported" : "off", why: IN_APP ? "inapp" : "", rec: null, want: false, enabled: false, pre: false, key: null, ok: false, fails: 0,
+    lastSent: "", heard: "", level: 0, buzzMode: !SR || IN_APP };
 
   function isGuessing() {
     return !!(st && st.phase === "turn" && st.turn && st.turn.stage === "whistling" && st.turn.playerId !== st.me);
   }
+  function liveStage(T) { return !!T && (T.stage === "countdown" || T.stage === "whistling" || T.stage === "confirming" || T.stage === "claiming"); }
 
+  // Should a session be running right now?
+  function micShould() {
+    if (!SR || mic.buzzMode || !mic.enabled || !st || document.visibilityState === "hidden") { return false; }
+    if (st.phase === "lobby") { return true; }
+    var T = st.turn;
+    return st.phase === "turn" && !!T && T.playerId !== st.me && liveStage(T);
+  }
+
+  function micAbort() {
+    var r = mic.rec; mic.rec = null;
+    try { if (r) { r.onend = null; r.onresult = null; r.onerror = null; r.onstart = null; r.abort(); } } catch (e) {}
+  }
+  // Stop listening without turning the mic off: between turns, or whilst the page is hidden.
+  function micPark() {
+    if (!SR) { return; }
+    mic.want = false; mic.pre = false; mic.key = null;
+    micAbort();
+    if (mic.state === "on" || mic.state === "starting" || mic.state === "stopped") { mic.state = mic.ok && mic.enabled ? "ready" : "off"; }
+    refreshMic();
+  }
+  function micFresh() {
+    var had = !!mic.rec;
+    micAbort();
+    mic.want = true;
+    var go = function () {
+      if (!mic.want || mic.rec) { return; }
+      try { micLaunch(); } catch (e) { mic.state = "stopped"; refreshMic(); }
+    };
+    // Safari will not start a new session in the same breath as stopping the old one, so give it a moment.
+    // With nothing to stop, start at once: the first start has to happen inside the player's tap.
+    if (had) { mic.state = "starting"; setTimeout(go, 250); } else { go(); }
+  }
+  // Called on every state change: start a fresh session for a new turn, park it when the turn is over.
+  function micSync() {
+    if (!SR) { return; }
+    if (!micShould()) {
+      if (mic.pre && !st) { return; } // started by the tap; the lobby has not arrived yet
+      if (mic.rec || mic.want) { micPark(); }
+      return;
+    }
+    var key = st.phase === "lobby" ? "lobby" : "t" + st.turn.id;
+    if (mic.pre) { mic.pre = false; mic.key = key; return; } // keep the session the tap started
+    if (mic.key !== key) { mic.key = key; micFresh(); }
+  }
+
+  // A tap on the mic control, the orb or "Use the mic".
   function micStart() {
     if (!SR) { return; }
-    mic.want = true;
-    micLaunch();
+    mic.enabled = true; mic.buzzMode = false; mic.fails = 0;
+    mic.key = st ? (st.phase === "lobby" ? "lobby" : st.turn ? "t" + st.turn.id : null) : null;
+    if (st && !micShould()) { mic.state = mic.ok ? "ready" : "off"; refreshMic(); return; }
+    micFresh();
   }
 
-  // Called from the tap on Start lobby or Join lobby, the one moment the browser lets the mic start.
+  // Called from the tap on Start lobby or Join lobby, the one moment the browser will ask for the microphone.
   function autoMic() {
-    if (SR && !mic.typeMode && mic.state !== "on" && mic.state !== "starting" && mic.state !== "blocked") { try { micStart(); } catch (e) {} }
+    if (!SR || mic.buzzMode || mic.state === "on" || mic.state === "starting" || mic.state === "blocked") { return; }
+    mic.enabled = true; mic.pre = true;
+    micFresh();
   }
 
-  // Some in-app and privacy browsers (DuckDuckGo on iPhone, for one) expose speech recognition but never start it.
-  // After two starts that go nowhere, stop trying and let the player type.
-  function micGiveUp() {
-    if (mic.fails >= 2) {
-      mic.want = false; mic.typeMode = true; mic.state = "stopped";
-      try { if (mic.rec) { mic.rec.onend = null; mic.rec.abort(); } } catch (e) {}
-      mic.rec = null;
-      toast("This browser can't hear guesses. Type them instead.");
-      if (st) { render(); }
-    }
+  // A session that would not start. The turn carries on with the buzzer, and the next turn tries again.
+  // A browser that has never once started (an in-app browser, mostly) goes to the buzzer for good.
+  function micFail(rec) {
+    if (mic.rec !== rec) { return; }
+    mic.fails = (mic.fails || 0) + 1;
+    mic.want = false; mic.pre = false; micAbort(); mic.state = "stopped";
+    if (!mic.ok && mic.fails >= 2) { mic.buzzMode = true; mic.why = "nostart"; mic.state = "unsupported"; toast("This browser can't hear guesses. Buzz in instead."); }
+    refreshMic();
+    if (st) { render(); }
   }
 
   function micLaunch() {
     var rec = new SR();
     rec.lang = "en-GB"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 5;
-    mic.rec = rec; mic.state = "starting";
+    mic.rec = rec; mic.state = "starting"; mic.base = 0; mic.total = 0;
     var startTimer = setTimeout(function () {
-      if (mic.rec === rec && mic.state === "starting") { mic.fails = (mic.fails || 0) + 1; mic.state = "stopped"; micGiveUp(); refreshMic(); }
-    }, mic.everStarted ? 3500 : 12000);
+      if (mic.rec === rec && mic.state === "starting") { micFail(rec); }
+    }, mic.ok ? 3500 : 5000);
     rec.onsoundstart = rec.onspeechstart = function () { mic.level = Math.max(mic.level, 0.7); };
-    rec.onstart = function () { mic.everStarted = true; mic.fails = 0; mic.base = 0; mic.total = 0; clearTimeout(startTimer); if (mic.rec === rec) { mic.state = "on"; refreshMic(); } };
+    rec.onstart = function () {
+      clearTimeout(startTimer);
+      if (mic.rec !== rec) { return; }
+      var first = !mic.ok;
+      mic.ok = true; mic.fails = 0; mic.state = "on";
+      refreshMic();
+      if (first && st) { render(); }
+    };
     rec.onresult = function (e) {
       var text = "", i, k;
       mic.total = e.results.length;
@@ -249,23 +342,28 @@
       }
     };
     rec.onerror = function (e) {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture" || e.error === "language-not-supported") {
-        mic.want = false; mic.state = "blocked"; mic.typeMode = true; refreshMic(); if (st) { render(); }
-      }
+      // "service-not-allowed" on an iPhone means Siri and Dictation are switched off, which is a different
+      // fix from a blocked microphone, so it gets its own message.
+      var why = e.error === "service-not-allowed" ? "dictation" : e.error === "not-allowed" ? "perm" : e.error === "audio-capture" ? "nomic" : e.error === "language-not-supported" ? "lang" : "";
+      if (!why) { return; }
+      clearTimeout(startTimer);
+      mic.want = false; mic.pre = false; mic.enabled = false; mic.state = "blocked"; mic.why = why; mic.buzzMode = true;
+      if (mic.rec === rec) { micAbort(); }
+      refreshMic(); if (st) { render(); }
     };
     rec.onend = function () {
       clearTimeout(startTimer);
-      if (mic.want && mic.rec === rec && mic.state === "starting") { mic.fails = (mic.fails || 0) + 1; micGiveUp(); if (!mic.want) { refreshMic(); return; } }
-      if (mic.want && mic.rec === rec) {
-        mic.state = "starting"; refreshMic();
-        setTimeout(function () {
-          if (mic.want && mic.rec === rec) {
-            try { micLaunch(); } catch (err) { mic.state = "stopped"; refreshMic(); }
-          }
-        }, 60);
-      }
+      if (!mic.want || mic.rec !== rec) { return; }
+      // Ended before it ever started: one more try, then give up for this turn.
+      if (mic.state === "starting") { mic.fails = (mic.fails || 0) + 1; if (mic.fails >= 2) { mic.fails--; micFail(rec); return; } }
+      mic.state = "starting"; refreshMic();
+      setTimeout(function () {
+        if (mic.want && mic.rec === rec) {
+          try { micLaunch(); } catch (err) { mic.state = "stopped"; refreshMic(); }
+        }
+      }, 60);
     };
-    try { rec.start(); } catch (err) { mic.state = "stopped"; refreshMic(); }
+    try { rec.start(); } catch (err) { clearTimeout(startTimer); mic.rec = null; mic.want = false; mic.state = "stopped"; refreshMic(); }
   }
 
   function ico(n, c) {
@@ -275,30 +373,45 @@
   function cap(s) { s = String(s); return s.charAt(0).toUpperCase() + s.slice(1); }
   function pad2(n) { n = Math.max(0, Math.floor(n)); return n < 10 ? "0" + n : String(n); }
 
+  // Why this phone is on the buzzer, in words the player can act on.
+  function micWhy() {
+    if (mic.why === "dictation") { return "This phone has Dictation switched off, so it can't hear guesses. Turn on Settings, General, Keyboard, Enable Dictation, then reload. Until then you buzz in."; }
+    if (mic.why === "perm") { return "Mic blocked. Allow the microphone for this site in your browser settings, then reload. Until then you buzz in."; }
+    if (mic.why === "nomic") { return "No microphone found on this device. You buzz in."; }
+    if (mic.why === "inapp") { return "This in-app browser can't hear guesses. Open the link in Safari or Chrome to use your voice. Until then you buzz in."; }
+    if (mic.state === "unsupported" || mic.why === "nostart" || mic.why === "lang") { return "This browser can't hear guesses, so you buzz in."; }
+    return "";
+  }
+
   function micHtml() {
     switch (mic.state) {
       case "unsupported":
-        return '<span class="small">Typing only on this phone</span>';
-      case "off":
-        return '<button id="micBtn" class="txt">Turn on mic</button>';
+        return '<span class="small">Buzzer only on this phone</span>';
       case "starting":
         return '<span class="label">Starting mic</span>';
       case "on":
         return '<span class="label">Mic on</span>';
+      case "ready":
+        return '<span class="label">Mic ready</span>';
       case "blocked":
-        return '<span class="label">Mic blocked</span><p class="small">Allow the microphone for this site in your browser settings, then reload. You can still type guesses.</p>';
+        return '<p class="small">' + esc(micWhy()) + "</p>";
       default:
-        return '<button id="micBtn" class="txt">Mic stopped, tap to restart</button>';
+        return mic.buzzMode ? '<span class="small">You are on the buzzer</span>' : '<button id="micBtn" class="txt">Turn on mic</button>';
     }
   }
 
+  // The one line of notes above the lobby's main button.
   function micRowHtml() {
-    return mic.state === "blocked" ? '<p class="small">Mic blocked. Allow the microphone for this site in your browser settings, then reload. You can still type guesses.</p>' : "";
+    var notes = [];
+    if (micWhy()) { notes.push(micWhy()); }
+    if (wakeFail) { notes.push("This phone may dim its screen during the game. Give it a tap now and then."); }
+    return notes.length ? '<p class="small">' + esc(notes.join(" ")) + "</p>" : "";
   }
+  // The player turns the mic off themselves.
   function micStop() {
-    mic.want = false;
-    try { if (mic.rec) { mic.rec.onend = null; mic.rec.stop(); } } catch (e) {}
-    mic.rec = null; mic.state = "off"; refreshMic();
+    mic.enabled = false;
+    micPark();
+    mic.state = "off"; refreshMic();
   }
 
   var lobbyMicSig = "";
@@ -306,17 +419,16 @@
     var mineBox = $('.mstat[data-mine]');
     if (st && mineBox) {
       var me = null; st.players.forEach(function (q) { if (q.id === st.me) { me = q; } });
-      if (me) { var h = lobbyStat(st, me, st.hostId === st.me); if (mineBox.innerHTML !== h) { mineBox.innerHTML = h; bindPill(); } }
+      if (me) { var h = lobbyStat(st, me, st.hostId === st.me); if (mineBox.innerHTML !== h) { mineBox.innerHTML = h; } }
     }
     var boxes = document.querySelectorAll("[data-mic]");
     for (var i = 0; i < boxes.length; i++) {
-      boxes[i].innerHTML = boxes[i].getAttribute("data-mic") === "note" ? micRowHtml() : micHtml();
+      var want = boxes[i].getAttribute("data-mic") === "note" ? micRowHtml() : micHtml();
+      if (boxes[i].innerHTML !== want) { boxes[i].innerHTML = want; }
       var b = $("#micBtn", boxes[i]);
       if (b) { b.onclick = micStart; }
-      var o = $("#micOffBtn", boxes[i]);
-      if (o) { o.onclick = micStop; }
     }
-    var ms = mic.typeMode || mic.state === "unsupported" ? "typing" : (mic.state === "on" ? "on" : "off");
+    var ms = mic.buzzMode || mic.state === "unsupported" || mic.state === "blocked" ? "typing" : (mic.state === "on" || mic.state === "ready" || (mic.state === "starting" && mic.ok) ? "on" : "off");
     if (st && !st.admin && ms !== lastMicSent) { lastMicSent = ms; send({ t: "mic", state: ms }); }
     var orb = $("#orb");
     if (orb) {
@@ -327,29 +439,18 @@
     }
     var hd = $("#listenHead");
     if (hd) {
-      hd.textContent = mic.state === "on" ? "Listening" : mic.state === "blocked" ? "Mic is blocked" : mic.state === "starting" ? "Starting mic" : "Mic is off, tap to turn on";
+      var ht = mic.state === "on" ? "Listening" : mic.state === "starting" ? "Starting mic" : "Mic is off, tap to turn on";
+      if (hd.textContent !== ht) { hd.textContent = ht; }
     }
   }
 
   // ----------------------------------------------------------------- views
-  var PACK_GROUPS = [
-    { name: "Vibe", ids: ["bangers", "diva", "party", "soul", "tv", "film", "disney"] },
-    { name: "Eras", ids: ["sixties", "seventies", "eighties", "nineties", "noughties", "tens", "today"] },
-    { name: "Artists", ids: ["beatles", "bowie", "gaga", "talkingheads", "abba"] },
-    { name: "Special events", ids: ["halloween", "xmas"] }
-  ];
-  // Pack colour tokens from the design system. "l" means light text, "i" ink text.
-  var PACK_COL = {
-    bangers: ["#00B86B", "i"], diva: ["#FF3D81", "i"], party: ["#3DDC84", "i"], soul: ["#FF9A1F", "i"], tv: ["#0FB5C8", "i"], film: ["#A66BFF", "i"], disney: ["#FFD21F", "i"],
-    sixties: ["#2EE6D6", "i"], seventies: ["#F68675", "i"], eighties: ["#9BE23A", "i"], nineties: ["#FF4FA3", "i"], noughties: ["#4D7CFF", "i"], tens: ["#FF6A3D", "i"], today: ["#C77DFF", "i"],
-    beatles: ["#6F8DFF", "i"], bowie: ["#00D1FF", "i"], gaga: ["#E040FB", "i"], talkingheads: ["#B09CFF", "i"], abba: ["#FFE14D", "i"],
-    halloween: ["#FF5252", "i"], xmas: ["#FFC9A3", "i"]
-  };
-  var openGroups = { Vibe: true };
+  // Pack groups, colours and text colours all come from the server (packs.js). The first group starts open.
+  var openGroups = {}, openGroupsSet = false;
 
   function avatarHtml(s, p, cls) {
     var ch = (String(p.name).trim().charAt(0) || "?").toUpperCase();
-    return '<span class="avatar pc pc' + ((p.ci || 0) % 20) + (cls ? " " + cls : "") + '">' + esc(ch) + "</span>";
+    return '<span class="avatar pc pc' + ((p.ci || 0) % 8) + (cls ? " " + cls : "") + '">' + esc(ch) + "</span>";
   }
 
   function pts(n) { return Math.round(n).toLocaleString("en-GB"); }
@@ -382,28 +483,28 @@
       if (me && top.indexOf(me) === -1) { top[top.length - 1] = me; }
       rows = top;
     }
-    var final = !!opt.bonus;
+    var final = !!opt.final;
     var html = rows.map(function (r) {
       var p = r.p, me = p.id === s.me, win = winners && winners.indexOf(p.id) !== -1;
-      var chg = r.chg === undefined ? "" : (r.chg > 0 ? "+" + r.chg : String(r.chg));
-      var g = gained[p.id] !== undefined && gained[p.id] > 0 && final ? "+" + pts(gained[p.id]) : "";
+      var chg = !r.chg ? "" : (r.chg > 0 ? "+" + r.chg : String(r.chg)); // places moved since the last turn; nothing when nothing moved
       return '<div class="' + (final ? "finalrow" : "stand" + (me ? " me" : "")) + '"><span class="label">' + r.rank + "</span>" +
         '<span class="title pn">' + avatarHtml(s, p) + '<span class="nmtx">' + esc(p.name) + (p.late ? '<small class="late">joined late</small>' : "") + "</span>" + (win ? '<span class="tag">Winner</span>' : "") + "</span>" +
         '<span class="title">' + pts(p.total) + "</span>" +
-        (final ? '<span class="bn">' + g + "</span>" : '<span class="ch">' + chg + "</span>") + "</div>";
+        (final ? "" : '<span class="ch">' + chg + "</span>") + "</div>";
     }).join("");
-    return '<div class="board" style="border-bottom:1.5px solid currentColor">' + html + "</div>";
+    return '<div class="board board--lined">' + html + "</div>";
   }
 
   function gamesHtml() {
     if (!gameList.length) {
-      return '<div class="gamerow"><span class="gtxt"><span class="title">' + (gamesLoaded ? "Nobody\'s hosting yet" : "Looking for games...") + "</span></span></div>";
+      return '<div class="gamerow"><span class="gtxt"><span class="title">' + (gamesLoaded ? "Nobody\'s hosting on this wifi yet" : "Looking for games...") + "</span>" +
+        (gamesLoaded ? '<span class="small">Games on your own wifi show here. Anywhere else, ask the host for the link or the QR code.</span>' : "") + "</span></div>";
     }
     return gameList.map(function (g) {
       var closed = g.inProgress, live = g.live;
       return (closed ? '<div class="gamerow dead">' : '<button class="gamebtn" data-code="' + esc(g.code) + '">') +
         '<span class="gtxt"><span class="title">' + esc(g.host) + "'s game</span>" +
-        '<span class="small">' + (closed ? g.players + (g.players === 1 ? " player" : " players") + ", in a tie-break" : g.players + " of " + (g.max || 20) + " players" + (live ? ", game under way" : "")) + "</span></span>" +
+        '<span class="small">' + (closed ? g.players + (g.players === 1 ? " player" : " players") + ", in a tie-break" : g.players + " of " + (g.max || 8) + " players" + (live ? ", game under way" : "")) + "</span></span>" +
         '<span class="label">' + (closed ? "Tie-break" : "Join") + "</span>" + (closed ? "</div>" : "</button>");
     }).join("");
   }
@@ -417,7 +518,7 @@
   }
   function nameField(val) {
     return '<div><label class="label flab" for="name">Your name</label><input id="name" class="input" maxlength="14" autocomplete="off" autocapitalize="words" placeholder="Type a name" value="' + esc(val) + '">' +
-      '<p class="small" id="nameHint" style="margin-top:8px">Up to 14 characters</p></div>';
+      '<p class="small" id="nameHint">Up to 14 characters</p></div>';
   }
 
   // A shared link opens straight on a name field and a Join lobby button.
@@ -441,7 +542,7 @@
       key: "invite", field: "orange",
       html: '<div class="screen"><div class="brand"><h1 class="headline">' + esc(info.host) + "'s game</h1>" +
         '<p class="title">' + info.players + " of " + info.max + " players are in</p></div>" +
-        '<div class="field-group">' + nameField(name) + '<button id="joinBtn" class="btn" style="margin-top:12px">' + (info.state === "live" ? "Join game" : "Join lobby") + "</button>" +
+        '<div class="field-group">' + nameField(name) + '<button id="joinBtn" class="btn">' + (info.state === "live" ? "Join game" : "Join lobby") + "</button>" +
           (info.state === "live" ? '<p class="small">The game\'s under way. You\'ll guess for the rest of this round, then perform from the next one.</p>' : "") + "</div>" +
         '<div class="spacer"></div>' + goHome + "</div>",
       bind: function () {
@@ -522,7 +623,7 @@
         '<div class="screen">' +
           '<div class="brand"><h1 class="headline">Tip of My Tongue</h1>' +
           '<p class="title">One person performs a song. Everyone else guesses it. Quick guesses score big!</p></div>' +
-          '<div class="field-group">' + nameField(name) + '<button id="hostBtn" class="btn" style="margin-top:12px">Start lobby</button>' +
+          '<div class="field-group">' + nameField(name) + '<button id="hostBtn" class="btn">Start lobby</button>' +
           '<p class="small">Start a lobby and we\'ll copy a link to send to your friends.</p></div>' +
           '<div class="stack"><h2 class="label">Join a game</h2><div class="line-list" id="games">' + gamesHtml() + "</div>" +
           '</div>' +
@@ -608,7 +709,8 @@
     }
     if (tab === "guessing") {
       return block("Guessing", arow("Songs guessed", guessPct) + arow("Average guess time", dash(d.avgGuessSec, "s")) + arow("Median guess time", dash(d.medianGuessSec, "s")) + arow("Hints per turn", dash(d.avgHintsPerTurn)) + arow("Shuffles per turn", dash(d.avgShufflesPerTurn))) +
-        block("Voice guessing", arow("Guesses the game heard", dash(V.heardGuesses)) + arow("Rejected by performer", rej) + arow("Correct by voice", dash(src.voice)) + arow("Correct by typing", dash(src.typed)) + arow("Correct by Someone got it", dash(src.manual))) +
+        block("Voice guessing", arow("Guesses the game heard", dash(V.heardGuesses)) + arow("Rejected by performer", rej) + arow("Correct by voice", dash(src.voice)) + arow("Correct by buzzer", dash(src.buzz)) + arow("Correct by Someone got it", dash(src.manual)) + (src.typed ? arow("Correct by typing (old games)", dash(src.typed)) : "")) +
+        block("By difficulty", ["easy", "medium", "hard"].map(function (k) { var x = (V.byDifficulty || {})[k]; return arow(cap(k), !x || !x.turns ? "No data yet" : x.turns + (x.turns === 1 ? " turn, " : " turns, ") + x.guessedPct + "% guessed" + (x.avgGuessSec === null ? "" : ", " + x.avgGuessSec + "s average")); }).join("")) +
         block("By round limit", obj(Object.keys(d.byLimit || {}).reduce(function (o, k) { o[k] = d.byLimit[k].avgGuessSec; return o; }, {}), function (v) { return v + "s average guess"; }));
     }
     if (tab === "songs") {
@@ -642,9 +744,9 @@
         '<div class="atabs" role="tablist">' + ADMIN_TABS.map(function (t) { return '<button class="atab' + (t[0] === adminTab ? " on" : "") + '" role="tab" aria-selected="' + (t[0] === adminTab) + '" data-t="' + t[0] + '">' + t[1] + "</button>"; }).join("") + "</div>" +
         adminTabHtml(adminTab, d) +
         '<p class="small">' + backupLine(d) + "</p>" +
-        '<div class="rowc" style="gap:12px"><button id="aRefresh" class="btn btn--outline" style="flex:1">Refresh</button><button id="aCopy" class="btn btn--outline" style="flex:1">Copy JSON</button></div>' +
+        '<div class="btnrow"><button id="aRefresh" class="btn btn--outline">Refresh</button><button id="aCopy" class="btn btn--outline">Copy JSON</button></div>' +
         '<button id="aRaw" class="btn btn--outline">Download all raw data</button>' +
-        '<button id="aOut" class="txt" style="align-self:center">Sign out</button></div>',
+        '<button id="aOut" class="txt txt--c">Sign out</button></div>',
       bind: function () {
         $("#aDemo").onclick = function () { send({ t: "createAdmin", password: adminPw }); };
         var tabs = document.querySelectorAll(".atab"), onTab = document.querySelector(".atab.on");
@@ -702,20 +804,16 @@
 
   function micLabel(p) {
     if (!p.connected) { return "Away"; }
-    return p.mic === "on" ? "Mic on" : p.mic === "typing" ? "Keyboard" : "Mic off";
+    return p.mic === "on" ? "Mic on" : p.mic === "typing" ? "Buzzer" : "Mic off";
   }
-  function micStrip() { return ""; }
-  function syncMicStrip() {}
 
   function packCard(p, on, ro, voters) {
-    var col = PACK_COL[p.id] || ["#225A31", "l"];
-    var pt = col[1] === "l" ? "#ECEAE4" : "#111111";
     var vh = "";
     if (voters && voters.length) {
       vh = '<span class="voters">' + voters.slice(0, 2).join("") + '</span><span class="title">' + voters.length + "</span>";
     }
     return '<button class="pcard pack' + (on ? " on" : "") + (ro ? " ro" : "") + '" data-id="' + p.id + '" aria-pressed="' + on + '"' + (ro ? " disabled" : "") +
-      ' style="--pc:' + col[0] + ";--pt:" + pt + '"><span class="pcard__in"><span class="pcard__txt"><span class="title">' + esc(p.name) + "</span>" +
+      ' style="--pc:' + esc(p.colour || "#111111") + ";--pt:" + esc(p.ink || "#ECEAE4") + '"><span class="pcard__in"><span class="pcard__txt"><span class="title">' + esc(p.name) + "</span>" +
       '<span class="small">' + esc(p.blurb) + '</span></span><span class="pcard__cl">' + vh +
       '<span class="tickc">' + ico("tick") + "</span></span></span></button>";
   }
@@ -736,70 +834,41 @@
   }
 
   // The lobby shows one short line about the chosen packs. The picker opens on top.
-  function packsSummaryHtml(s, isHost) {
-    var room = s.packMode === "room";
-    var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
-    var need = s.rounds * s.players.length + 5, short = s.songsInPlay < need;
-    var note = !on.length ? (room ? "Everyone picks up to " + (s.packPicks || 5) + " packs" : isHost ? "Pick a pack to get going" : "Waiting for the host to pick packs")
-      : short ? "Not enough songs for that many turns. Add more packs or drop a round"
-      : room ? "Every pack picked goes in the mix. Popular ones come up more." : "No song is played twice in a game.";
-    var mode = isHost
-      ? '<div class="seg packmode"><button class="pmode" data-m="host" aria-pressed="' + !room + '">Host picks</button><button class="pmode" data-m="room" aria-pressed="' + room + '">Room picks</button></div>'
-      : "";
-    var btn = room ? (s.myPackVotes.length ? "Change your picks" : "Pick song packs") : (isHost ? "Select song packs" : "See packs");
-    var r = rankingList(s).slice(0, 3);
-    var body = room
-      ? (r.length ? r.map(function (x) { return '<p class="small">' + esc(x.p.name) + ", " + x.n + (x.n === 1 ? " pick" : " picks") + "</p>"; }).join("") : '<p class="small">No picks yet</p>')
-      : '<p class="title">' + esc(packSummaryLine(on)) + "</p>";
-    return '<div class="stack"><div class="label">Songs</div>' + mode + '<div class="packline">' + body + '<p class="small">' + esc(note) + "</p></div>" +
-      '<button class="btn btn--outline" id="openPacks">' + btn + "</button></div>";
-  }
 
   // Guests see one quiet line about the songs and, in room mode, a way to vote.
-  function guestSongsHtml(s) {
-    var room = s.packMode === "room";
-    var on = s.packs.filter(function (p) { return s.selectedPacks.indexOf(p.id) !== -1; });
-    var line = room ? (rankingList(s).length ? "In the mix: " + packSummaryLine(on) : "No picks yet") : packSummaryLine(on);
-    return '<div class="stack"><div class="label">Songs</div><p class="title">' + esc(line) + "</p>" +
-      (room ? '<button class="btn btn--outline" id="openPacks">' + (s.myPackVotes.length ? "Change your picks" : "Pick song packs") + "</button>"
-            : '<div><button class="txt" id="openPacks">See packs</button></div>') + "</div>";
-  }
 
   function pickerHtml(s, isHost) {
     var room = s.packMode === "room", votes = s.packVotes || {};
     var all = s.packs.length === s.selectedPacks.length;
-    var cap = s.packPicks || 5;
+    var cap = s.packPicks || 3;
     var mine = room ? (packDraft || s.myPackVotes || []) : [];
-    var byId = {}, used = {};
-    s.packs.forEach(function (p) { byId[p.id] = p; });
-    var groups = PACK_GROUPS.map(function (g) {
-      var ps = g.ids.map(function (id) { used[id] = 1; return byId[id]; }).filter(Boolean);
-      return { name: g.name, packs: ps };
+    var groups = [], at = {};
+    s.packs.forEach(function (p) {
+      var n = p.group || "More";
+      if (at[n] === undefined) { at[n] = groups.length; groups.push({ name: n, packs: [] }); }
+      groups[at[n]].packs.push(p);
     });
-    var rest = s.packs.filter(function (p) { return !used[p.id]; });
-    if (rest.length) { groups.push({ name: "More", packs: rest }); }
+    if (!openGroupsSet && groups.length) { openGroups[groups[0].name] = true; openGroupsSet = true; }
     var isOn = function (p) { return room ? mine.indexOf(p.id) !== -1 : s.selectedPacks.indexOf(p.id) !== -1; };
     var html = groups.map(function (g) {
       var open = !!openGroups[g.name], cnt = g.packs.filter(isOn).length;
       var cards = g.packs.map(function (p) {
         var voters = room ? (votes[p.id] || []).map(function (id) { var pl = player(s, id); return pl ? avatarHtml(s, pl) : ""; }) : [];
-        var n = room ? (votes[p.id] || []).length : 0;
-        if (n) { voters.count = n; }
         return packCard(p, isOn(p), !room && !isHost, voters);
       }).join("");
       return '<div class="pgroup' + (open ? " open" : "") + '"><button class="pgroup__row" data-g="' + esc(g.name) + '" aria-expanded="' + open + '">' +
         '<span class="pgroup__name"><span class="label">' + esc(g.name) + "</span>" +
-        (!open && cnt ? '<span class="pgroup__sel">' + cnt + (cnt === 1 ? " pack selected" : " packs selected") + "</span>" : "") + "</span>" +
-        ico("chevron", "chev") + '</button><div class="pdeck">' + cards + "</div></div>";
+        (cnt ? '<span class="pgroup__sel">' + cnt + " picked</span>" : "") + "</span>" +
+        '<span class="label lrow__c">' + (open ? "Close" : "Open") + '</span></button><div class="pdeck">' + cards + "</div></div>";
     }).join("");
     var intro = room ? "Pick up to " + cap + ". Every pack anyone picks goes into one mix, and the popular ones come up more." : isHost ? "Pick as many as you like. They decide which songs come up." : "The host picks the packs.";
     var count = room ? mine.length + " of " + cap + " picks used" : s.selectedPacks.length + " of " + s.packs.length + " packs picked";
     return '<div class="picker" id="picker"><div class="pwrap">' +
       '<div class="phead"><div class="toprow"><span class="label">Song packs</span><button class="txt" id="pkDone">' + (room ? "Close" : "Done") + '</button></div>' +
       '<h1 class="headline">' + (room ? "Pick the packs you want" : isHost ? "Choose the packs to play" : "The packs in play") + "</h1>" +
-      '<div class="stack" style="gap:2px"><p class="small">' + intro + '</p><p class="small">' + count + "</p></div>" +
+      '<div class="stack stack--4"><p class="small">' + intro + '</p><p class="small">' + count + "</p></div>" +
       (isHost ? '<div class="seg packmode"><button class="pmode" data-m="host" aria-pressed="' + !room + '">Host picks</button><button class="pmode" data-m="room" aria-pressed="' + room + '">Room picks</button></div>' : "") +
-      (isHost && !room ? '<div><button class="txt" id="packAll" style="padding-left:0">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") + "</div>" +
+      (isHost && !room ? '<div><button class="txt" id="packAll">' + (all ? "Clear all" : "Select all packs") + "</button></div>" : "") + "</div>" +
       '<div class="pbody"><div>' + html + "</div></div>" +
     "</div>" + (room ? '<div class="pfloat"><button class="btn" id="pkSubmit">' + ((s.myPackVotes || []).length ? "Update my picks" : "Submit picks") + "</button></div>" : "") + "</div>";
   }
@@ -809,7 +878,7 @@
     if (!s.selectedPacks.length) { return s.packMode === "room" ? "Waiting for someone to pick some song packs" : "Pick a song pack to get going"; }
     if (s.songsInPlay < turns + 5) { return "Not enough songs for that many turns. Add more packs or drop a round."; }
     var off = s.players.filter(function (p) { return p.mic === "off"; }).map(function (p) { return p.name; });
-    if (off.length) { return (off.length > 1 ? off.slice(0, -1).join(", ") + " and " + off[off.length - 1] : off[0]) + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can still type guesses, no worries."; }
+    if (off.length) { return (off.length > 1 ? off.slice(0, -1).join(", ") + " and " + off[off.length - 1] : off[0]) + (off.length > 1 ? " have their mics off" : " has their mic off") + ". They can buzz in instead."; }
     return "";
   }
 
@@ -830,25 +899,17 @@
     if (s.packMode === "room") { var r = rankingList(s).length; return r ? r + (r === 1 ? " pack in the mix" : " packs in the mix") : "No picks yet"; }
     return n ? n + (n === 1 ? " pack" : " packs") : "No packs chosen yet";
   }
+  // One row for the songs. In room-picks mode the same row is where every player goes to pick.
   function songsRowHtml(s, isHost) {
-    var room = s.packMode === "room";
-    var cue = room ? "Change" : isHost ? "Choose" : "See";
-    var d = songsDetail(s);
-    var inner = '<span class="lrow__t"><span class="label">Songs' + (room ? ", everyone's picks" : "") + '</span><span class="title">' + esc(songsTitle(s)) + "</span>" +
-      (d ? '<span class="small lrow__list">' + esc(d) + "</span>" : "") + "</span>";
-    if (room && !isHost) { return '<div class="lrow lrow--top lrow--static">' + inner + "</div>"; }
-    return '<button class="lrow lrow--top" id="openPacks">' + inner + '<span class="lrow__c label">' + cue + "</span>" + ico("chevron", "chev") + "</button>";
+    var room = s.packMode === "room", n = (s.myPackVotes || []).length;
+    var cue = room ? (n ? "Change" : "Pick") : isHost ? "Choose" : "See";
+    return '<button class="lrow" id="openPacks"><span class="lrow__t"><span class="label">Songs' + (room ? ", everyone picks " + (s.packPicks || 3) : "") + '</span>' +
+      '<span class="title">' + esc(songsTitle(s)) + '</span></span><span class="lrow__c label">' + cue + "</span></button>";
   }
-  // Room-picks mode: a clear primary action for every player, kept apart from the settings rows.
-  function voteCtaHtml(s) {
-    if (s.packMode !== "room") { return ""; }
-    var n = (s.myPackVotes || []).length;
-    return '<div class="votecta"><button class="btn" id="voteBtn">' + (n ? "Change your picks" : "Pick song packs") + "</button>" +
-      '<p class="small center">' + (n ? "You picked " + n + (n === 1 ? " pack." : " packs.") : "Pick up to " + (s.packPicks || 5) + ". Everyone's picks go into one mix.") + "</p></div>";
-  }
+  // One row to invite people: the link for the group chat, and the QR code for people in the room.
   function inviteRowHtml(s, isHost) {
-    return '<button class="lrow" id="copyLink" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Invite friends</span></span><span class="lrow__c label">Copy link</span></button>' +
-      (isHost ? '<button class="lrow" id="showQr" style="min-height:56px;align-items:center"><span class="lrow__t"><span class="label">Scan to join</span></span><span class="lrow__c label">Show QR code</span></button>' : "");
+    return '<div class="lrow lrow--static"><span class="lrow__t"><span class="label">Invite</span></span>' +
+      '<button class="txt" id="copyLink">Copy link</button>' + (isHost ? '<button class="txt" id="showQr">QR code</button>' : "") + "</div>";
   }
   // A full screen QR code that opens the join link, so friends in the room can just point their cameras at the host.
   function showQr(code) {
@@ -857,7 +918,7 @@
     try { var q = qrcode(0, "M"); q.addData(linkFor(code)); q.make(); svg = q.createSvgTag({ cellSize: 1, margin: 4, scalable: true }); } catch (e) { return; }
     var o = document.createElement("div");
     o.id = "qrfull"; o.className = "qrfull"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "QR code to join the game");
-    o.innerHTML = '<button class="qrx" aria-label="Close">X</button><div class="qrbox">' + svg + '</div>';
+    o.innerHTML = '<button class="txt qrx">Close</button><div class="qrbox">' + svg + '</div>';
     document.body.appendChild(o);
     function close() { if (o.parentNode) { o.parentNode.removeChild(o); } document.removeEventListener("keydown", onKey); }
     function onKey(ev) { if (ev.key === "Escape") { close(); } }
@@ -866,21 +927,17 @@
     usage("qr", "lobby");
   }
   // A fair guess at game length. Most songs are guessed well inside the clock, so a turn is mostly the set-up
-  // around it (splash, picking, countdown, reveal), plus about 30 percent of the clock on average (about 18 seconds on a minute clock).
+  // around it (picking, countdown, reveal: about 20 seconds), plus about 30 percent of the clock on average.
   function estMinutes(players, rounds, limitMs) {
-    var perTurn = 30 + 0.3 * limitMs / 1000, total = perTurn * players * rounds + (rounds >= 4 ? 8 : 0);
+    var perTurn = 20 + 0.3 * limitMs / 1000, total = perTurn * players * rounds + (rounds >= 4 ? 8 : 0);
     return Math.max(5, Math.round(total / 60 / 5) * 5);
-  }
-  function estText(s) {
-    var n = Math.max(2, s.players.length);
-    return "About " + estMinutes(n, s.rounds, s.limitMs) + " min with " + n + (n === 1 ? " player" : " players");
   }
   function settingsText(s) {
     return s.rounds + (s.rounds === 1 ? " round" : " rounds") + ", up to " + (LEN_LABEL[s.limitMs] || s.limitMs / 1000 + " s") + " each";
   }
   function settingsRowHtml(s, isHost) {
-    if (!isHost) { return '<div class="lrow lrow--static" id="guestSettings"><span class="lrow__t"><span class="label">Game</span><span class="title">' + settingsText(s) + '</span><span class="small">' + estText(s) + "</span></span></div>"; }
-    return '<button class="lrow" id="openSettings"><span class="lrow__t"><span class="label">Game settings</span><span class="title" id="settingsLine">' + settingsText(s) + '</span><span class="small">' + estText(s) + '</span></span><span class="lrow__c label">Change</span>' + ico("chevron", "chev") + "</button>";
+    if (!isHost) { return '<div class="lrow lrow--static" id="guestSettings"><span class="lrow__t"><span class="label">Game</span><span class="title">' + settingsText(s) + "</span></span></div>"; }
+    return '<button class="lrow" id="openSettings"><span class="lrow__t"><span class="label">Game</span><span class="title" id="settingsLine">' + settingsText(s) + '</span></span><span class="lrow__c label">Change</span></button>';
   }
   function settingsSheetHtml(s, turns) {
     var opts = s.limitOptions || [30000, 60000, 90000, 120000];
@@ -893,64 +950,65 @@
       '<button class="btn" id="setDone">Done</button></div></div>';
   }
 
-  function lobbyStat(s, p, isHost) {
+  // The mic line on a player's tile. `short` is for the four-across grid, where there is room for one word.
+  function lobbyStat(s, p, isHost, short) {
     var mine = p.id === s.me, away = !p.connected;
-      var lab = away ? "Away" : mine ? (mic.state === "on" ? "Mic on" : mic.state === "starting" ? "Starting" : mic.state === "blocked" || mic.state === "unsupported" ? "Keyboard" : "Mic off") : micLabel(p);
-      var on = lab === "Mic on", kb = lab === "Keyboard";
-      var dot = '<i class="mdot' + (on ? " on" : kb ? " kb" : "") + '"></i>';
-      var stat;
-      if (mine && !s.admin && SR && !away && mic.state !== "blocked" && mic.state !== "starting") {
-        stat = '<button class="mpill" data-act="mictoggle" aria-label="' + (on ? "Turn mic off" : "Turn mic on") + '">' + dot + '<span class="label">' + lab + "</span></button>";
-      } else {
-        stat = dot + '<span class="label">' + lab + "</span>" + (isHost && away ? '<button class="mon" data-act="rm" data-id="' + esc(p.id) + '">Remove</button>' : "");
-      }
-    return stat;
-  }
-  function bindPill() {
-    var mps = document.querySelectorAll(".mpill");
-    for (var pi = 0; pi < mps.length; pi++) {
-      mps[pi].onclick = function () { if (mic.state === "on") { micStop(); } else { mic.typeMode = false; micStart(); } };
-    }
+    if (short === undefined) { short = s.players.length > 4; }
+    var lab = away ? "Away" : mine ? (mic.buzzMode || mic.state === "blocked" || mic.state === "unsupported" ? "Buzzer" : mic.state === "on" || mic.state === "ready" ? "Mic on" : mic.state === "starting" ? "Starting" : "Mic off") : micLabel(p);
+    var on = lab === "Mic on", bz = lab === "Buzzer";
+    var text = !short ? lab : on ? "On" : bz ? "Buzz" : lab === "Mic off" ? "Off" : lab === "Starting" ? "Wait" : lab;
+    return '<i class="mdot' + (on ? " on" : bz ? " kb" : "") + '"></i><span class="label">' + text + "</span>";
   }
   function viewLobby(s) {
     var isHost = s.hostId === s.me;
     var turns = s.rounds * s.players.length;
+    var many = s.players.length > 4;
     var cells = s.players.map(function (p) {
       var mine = p.id === s.me, away = !p.connected;
-      var stat = lobbyStat(s, p, isHost);
-      return '<div class="pcell">' + avatarHtml(s, p, "avatar--md") + '<span class="pn"><span class="title">' + esc(p.name) +
-        (p.id === s.hostId ? '<span class="tag">Host</span>' : "") + '</span><span class="mstat"' + (mine ? ' data-mine="1"' : "") + '>' + stat + "</span></span></div>";
+      // Your own tile is the mic switch. For the host, the tile of someone who has gone is how to remove them.
+      // The headline already says whose game it is, so no tile needs a host badge.
+      var canMic = mine && !s.admin && SR && !IN_APP && !away && mic.state !== "blocked" && mic.state !== "unsupported";
+      var canRm = isHost && away && !mine;
+      var tag = canMic || canRm ? "button" : "div";
+      var act = canMic ? ' data-act="mic" aria-label="Your microphone. Tap to turn it on or off"' : canRm ? ' data-act="rm" data-id="' + esc(p.id) + '" aria-label="' + esc(p.name) + ' is away. Tap to remove them"' : "";
+      return "<" + tag + ' class="pcell' + (canMic || canRm ? " pcell--tap" : "") + '"' + act + ">" + avatarHtml(s, p, "avatar--md") +
+        '<span class="pn"><span class="pname">' + esc(p.name) + "</span>" +
+        '<span class="mstat"' + (mine ? ' data-mine="1"' : "") + ">" + lobbyStat(s, p, isHost, many) + "</span></span></" + tag + ">";
     }).join("");
+    var note = isHost ? startNote(s, turns) : "";
     return {
       key: "lobby", field: "pink",
       html:
         '<div class="screen">' +
           '<div class="head"><h1 class="headline">' + esc(pname(s, s.hostId)) + "'s game</h1>" +
             '<p class="small">' + s.players.length + " of " + s.maxPlayers + " players are in</p></div>" +
-          '<div class="pgrid">' + cells + "</div>" + voteCtaHtml(s) +
+          '<div class="pgrid' + (many ? " pgrid--4" : "") + '">' + cells + "</div>" +
           '<div class="lrows">' + songsRowHtml(s, isHost) + settingsRowHtml(s, isHost) + inviteRowHtml(s, isHost) + "</div>" +
           '<div class="spacer"></div>' +
-          (isHost ? "" : '<p class="headline waiting">Waiting for ' + esc(pname(s, s.hostId)) + " to start</p><div class=\"spacer\"></div>") +
-          '<div class="micline micst" data-mic="note"></div>' +
+          (isHost ? "" : '<p class="' + (many ? "title center" : "headline") + ' waiting">Waiting for ' + esc(pname(s, s.hostId)) + ' to start</p><div class="spacer"></div>') +
+          '<div class="micst" data-mic="note"></div>' +
           (isHost
             ? '<button id="startBtn" class="btn"' + (s.players.length < s.minPlayers || !s.selectedPacks.length || s.songsInPlay < turns + 5 ? " disabled" : "") + ">Start game</button>" +
-              (startNote(s, turns) ? '<p class="small center startnote">' + esc(startNote(s, turns)) + "</p>" : "")
+              (note ? '<p class="small center startnote">' + esc(note) + "</p>" : "")
             : "") +
           '<div class="rowc"><button id="helpBtn" class="txt">How to play</button>' +
+          '<button id="sfxBtn" class="txt">' + (sfxOn ? "Sound on" : "Sound off") + "</button>" +
           '<button id="leaveBtn" class="txt">Leave game</button></div>' +
           (pickerOpen ? pickerHtml(s, isHost) : "") +
           (settingsOpen && isHost ? settingsSheetHtml(s, turns) : "") +
         "</div>",
       bind: function () {
-        $("#helpBtn").onclick = function () { usage("howto", "home"); showHelp(); };
+        $("#helpBtn").onclick = function () { usage("howto", "lobby"); showHelp(); };
+        $("#sfxBtn").onclick = function () { setSfx(!sfxOn); this.textContent = sfxOn ? "Sound on" : "Sound off"; };
         $("#copyLink").onclick = function () { copyText(linkFor(s.code), false); };
         if ($("#showQr")) { $("#showQr").onclick = function () { showQr(s.code); }; }
-        bindPill();
-        var mons = document.querySelectorAll(".mon");
-        for (var mi = 0; mi < mons.length; mi++) {
-          mons[mi].onclick = function () {
-            if (this.getAttribute("data-act") === "mic") { mic.typeMode = false; micStart(); return; }
-            if (this.getAttribute("data-act") === "micoff") { micStop(); render(); return; }
+        var taps = document.querySelectorAll(".pcell--tap");
+        for (var mi = 0; mi < taps.length; mi++) {
+          taps[mi].onclick = function () {
+            if (this.getAttribute("data-act") === "mic") {
+              if (mic.state === "on" || mic.state === "starting" || mic.state === "ready") { micStop(); } else { micStart(); }
+              return;
+            }
             var id = this.getAttribute("data-id");
             confirmDialog("Remove " + pname(s, id) + "?", "They are taken out of the game. They can join again from the link.", "Remove", true, function () { send({ t: "removePlayer", id: id }); });
           };
@@ -963,7 +1021,6 @@
         }
         var openP = function () { pickerOpen = true; if (s.packMode === "room") { packDraft = (s.myPackVotes || []).slice(); } keepPickerScroll = false; render(); };
         var op = $("#openPacks"); if (op) { op.onclick = openP; }
-        var vb = $("#voteBtn"); if (vb) { vb.onclick = openP; }
         if (pickerOpen) {
           $("#pkDone").onclick = function () { pickerOpen = false; packDraft = null; render(); };
           var rows = document.querySelectorAll(".pgroup__row");
@@ -972,7 +1029,7 @@
           }
           var cardsEl = document.querySelectorAll(".pack");
           if (s.packMode === "room") {
-            var cap = s.packPicks || 5;
+            var cap = s.packPicks || 3;
             if (!packDraft) { packDraft = (s.myPackVotes || []).slice(); }
             for (var c2 = 0; c2 < cardsEl.length; c2++) {
               cardsEl[c2].onclick = function () {
@@ -1025,27 +1082,33 @@
     };
   }
 
+  function listNames(a) {
+    return a.length > 1 ? a.slice(0, -1).join(", ") + " and " + a[a.length - 1] : (a[0] || "");
+  }
   function topLabel(s) {
-    var T = s.turn;
+    var T = s.turn, wp = player(s, T.playerId);
+    // A whistler whose phone has dropped gets a grace period, and everyone can see why the game has paused.
+    if (wp && !wp.connected && T.stage !== "reveal" && T.playerId !== s.me) { return "Waiting for " + wp.name; }
     if (T.sd) { return "Tie-break round " + s.sdRound; }
-    var base = "Round " + T.round + " of " + s.rounds;
-    if (T.stage === "whistling" || T.stage === "confirming") {
-      return base + ", " + (T.playerId === s.me ? "you are performing" : pname(s, T.playerId) + " is performing");
-    }
-    return base + ", turn " + s.turnNumber + " of " + s.totalTurns;
+    return "Round " + T.round + " of " + s.rounds;
   }
 
+  // The top row: where you are in the game and, away from a live turn, one word for help.
+  // Whilst the clock is running the row is the label alone, so the timed screens stay clean.
   function topBar(s) {
-    return '<div class="label" id="topLabel">' + esc(topLabel(s)) + '</div><div id="lastRound"></div>';
+    return '<div class="tbar"><span class="label" id="topLabel">' + esc(topLabel(s)) + "</span>" +
+      (liveStage(s.turn) ? "" : '<button class="txt" id="helpTop">Help</button>') + '</div><div id="lastRound"></div>';
   }
 
   // Kept up to date on every state change, even when the screen itself is not redrawn.
   function refreshTop() {
     if (!st || !st.turn) { return; }
-    var l = $("#topLabel"); if (l) { l.textContent = topLabel(st); }
+    var l = $("#topLabel"); if (l) { var tl = topLabel(st); if (l.textContent !== tl) { l.textContent = tl; } }
+    var hb = $("#helpTop"); if (hb) { hb.onclick = showHelpSheet; }
     var b = $("#lastRound"); if (!b) { return; }
     var T = st.turn, isHost = st.hostId === st.me;
-    var show = !T.sd && !st.suddenDeath && T.round === st.rounds;
+    // The last-round banner belongs on the choose and score screens, never on a timed one.
+    var show = !T.sd && !st.suddenDeath && T.round === st.rounds && !liveStage(T);
     var html = "";
     if (show && isHost) {
       var n = T.roundVotes || 0;
@@ -1062,8 +1125,9 @@
   }
 
   function skipHtml(s) {
-    if (s.hostId !== s.me) { return ""; }
-    return '<div class="rowc" style="justify-content:center"><button id="hostMenuBtn" class="txt">Host controls</button></div>';
+    // Not on a timed screen. No stage can hang for long (see the timers in game.js), so the host never needs it there.
+    if (s.hostId !== s.me || liveStage(s.turn)) { return ""; }
+    return '<div class="rowc rowc--c"><button id="hostMenuBtn" class="txt">Host controls</button></div>';
   }
 
   function confirmDialog(title, text, okLabel, danger, fn) {
@@ -1085,7 +1149,7 @@
       (canSkip ? '<button id="skipBtn" class="btn btn--outline">Skip this turn</button>' : "") +
       (st && st.players.length > 1 ? '<button id="rmBtn" class="btn btn--outline">Remove player</button>' : "") +
       '<button id="endBtn" class="btn btn--outline">End game</button>' +
-      '<button class="txt" id="hmClose" style="align-self:center">Close</button></div>';
+      '<button class="txt txt--c" id="hmClose">Close</button></div>';
     document.body.appendChild(o);
     var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
     $("#hmClose", o).onclick = close; $("#hmScrim", o).onclick = close;
@@ -1095,7 +1159,7 @@
         o.querySelector(".sheet").innerHTML = '<span class="label">Remove a player</span>' +
           st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
             return '<button class="btn btn--outline rmp" data-id="' + esc(p.id) + '">' + esc(p.name) + (p.connected ? "" : " (away)") + "</button>";
-          }).join("") + '<button class="txt" id="rmBack" style="align-self:center">Back</button>';
+          }).join("") + '<button class="txt txt--c" id="rmBack">Back</button>';
         $("#rmBack", o).onclick = function () { close(); openHostMenu(); };
         var rms = o.querySelectorAll(".rmp");
         for (var ri = 0; ri < rms.length; ri++) {
@@ -1122,7 +1186,7 @@
   function songBlock(T, eyebrow) {
     var d = T.difficulty;
     return '<div class="songband">' + (eyebrow ? '<span class="label">' + eyebrow + "</span>" : "") +
-      (d ? '<span class="tag" style="align-self:flex-start">' + esc(cap(d)) + " x" + T.multiplier + "</span>" : "") +
+      (d ? '<span class="tag">' + esc(cap(d)) + " x" + T.multiplier + "</span>" : "") +
       '<h1 class="headline" id="songTitle">' + esc(T.song ? T.song.title : "") + "</h1>" +
       '<p class="title" id="songArtist">' + esc(T.song ? T.song.artist : "") + "</p></div>";
   }
@@ -1130,7 +1194,7 @@
   // ---- action buttons (Shuffle, Give hint, Ask for a hint)
   function actionHtml(id, cue, tag, label, small) {
     return '<button id="' + id + '" class="action"><span class="action__top"><span class="label" data-cue>' + cue + '</span><span class="tag" data-tag' + (tag ? "" : " hidden") + ">" + tag + "</span></span>" +
-      '<span class="stack" style="gap:2px"><span class="title" data-label>' + label + '</span><span class="small" data-small>' + small + "</span></span></button>";
+      '<span class="stack stack--4"><span class="title" data-label>' + label + '</span><span class="small" data-small>' + small + "</span></span></button>";
   }
   function setAction(id, cue, tag, label, small, off) {
     var b = $("#" + id); if (!b) { return; }
@@ -1149,16 +1213,15 @@
     $("#hintBtn").disabled = conf || none;
     $("#gotBtn").disabled = conf;
   }
+  // Ask for a hint: one plain button. It says what it does, then that it has been done.
   function syncAskBtn(t) {
     var b = $("#askHintBtn"); if (!b) { return; }
     var done = t.hints >= 3, asked = !!t.iAsked;
     b.hidden = done;
     if (done) { return; }
-    var cue = t.hints ? "Hint " + t.hints + " of 3" : "No hints yet";
-    setAction("askHintBtn", cue, done ? "Asked" : asked ? "Asked" : "Ask",
-      done ? "No more hints" : asked ? "Hint asked" : "Ask for a hint",
-      done ? "All three hints given" : "Nudges the performer", done || asked);
-    b.disabled = done || asked || t.stage === "confirming";
+    var text = asked ? "Hint asked" : t.hints ? "Ask for another hint" : "Ask for a hint";
+    if (b.textContent !== text) { b.textContent = text; }
+    b.disabled = asked || t.stage !== "whistling";
   }
 
   // The newest hint on the whistler's phone: one quiet line that animates in.
@@ -1180,7 +1243,6 @@
     showHintLine(t);
     var hb = $("#hintBox"); if (!hb) { return; }
     var lines = t.hintLines || [];
-    if (mic.typeMode) { lines = lines.slice(-1); }
     if (!lines.length) { hb.hidden = true; hb.removeAttribute("data-h"); hb.removeAttribute("data-n"); return; }
     var offset = (t.hintLines || []).length - lines.length;
     var n = lines.length;
@@ -1196,21 +1258,42 @@
     if (prevN && (t.hintLines || []).length > prevN) { var nw = hb.querySelector(".hcard--new"); if (nw) { nw.classList.add("deal"); } }
   }
 
-  // "Who got it?" sheet on the whistler's phone. Picks survive state updates for the same turn.
+  // The sheet on the whistler's phone whilst the clock is stopped. Three cases: someone buzzed (Right or Wrong),
+  // a guess was heard or the whistler tapped Someone got it (pick who), or the people named are being asked
+  // to claim. Picks survive state updates for the same sheet.
   var whoState = { built: null, picks: [] };
   function buildWho(t) {
-    if (whoState.built === t.id) { return; }
-    whoState.built = t.id;
-    whoState.picks = t.pending && t.pending.from ? [t.pending.from] : [];
-    var sub = (t.pending && t.pending.heard ? "Heard “" + t.pending.heard + "”. " : "") + "You can select more than one, in case two people shouted at once.";
-    $("#confSub").textContent = sub;
-    var grid = $("#whoGrid");
-    grid.innerHTML = st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
-      return '<button class="who" data-id="' + esc(p.id) + '" aria-pressed="' + (whoState.picks.indexOf(p.id) !== -1) + '">' + avatarHtml(st, p, "avatar--md") +
-        '<span class="title">' + esc(p.name) + '</span><span class="tag tagon" style="background:var(--light);color:var(--ink)">Got it</span></button>';
-    }).join("");
+    var pend = t.pending || {}, claim = t.stage === "claiming" ? t.claim : null;
+    var key = t.id + "|" + t.stage + "|" + (pend.buzz ? "b" + pend.from : pend.manual ? "m" : "h" + (pend.heard || "")) + "|" + (claim ? claim.ids.join() + "/" + claim.claimed.join() : "");
+    if (whoState.built === key) { return; }
+    var fresh = String(whoState.built || "").split("|")[0] !== String(t.id) || String(whoState.built || "").split("|")[1] !== t.stage;
+    whoState.built = key;
+    var sheet = $("#confSheet");
+    if (claim) {
+      var waiting = claim.ids.filter(function (id) { return claim.claimed.indexOf(id) === -1; }).map(function (id) { return pname(st, id); });
+      sheet.innerHTML = '<span class="label">Checking</span><h2 class="headline">Waiting for ' + esc(listNames(waiting)) + ' to tap</h2>' +
+        '<p class="small">They tap to claim it. If nobody does, the clock carries on.</p>';
+      return;
+    }
+    if (pend.buzz) {
+      sheet.innerHTML = '<span class="label">Buzzed in</span><h2 class="headline">' + esc(pname(st, pend.from)) + '</h2><p class="small">Did they say the title?</p>' +
+        '<div class="btnrow"><button id="noBtn" class="btn btn--outline">Wrong</button><button id="yesBtn" class="btn">Right</button></div>';
+      $("#yesBtn").onclick = function () { send({ t: "confirm", ok: true }); };
+      $("#noBtn").onclick = function () { send({ t: "confirm", ok: false }); };
+      return;
+    }
+    // Nobody is ticked to begin with. The phone that heard the answer is named in words, because it is
+    // often not the person who said it.
+    if (fresh) { whoState.picks = []; }
+    var heard = pend.heard ? "Heard “" + pend.heard + "”" + (pend.from ? " on " + pname(st, pend.from) + "'s phone" : "") + ". " : "";
+    sheet.innerHTML = '<span class="label">Who got it first?</span>' +
+      '<p class="small">' + esc(heard + "Tap everyone who got it. They share the points.") + '</p><div class="whogrid" id="whoGrid">' +
+      st.players.filter(function (p) { return p.id !== st.me; }).map(function (p) {
+        return '<button class="who" data-id="' + esc(p.id) + '" aria-pressed="' + (whoState.picks.indexOf(p.id) !== -1) + '">' + avatarHtml(st, p) +
+          '<span class="title">' + esc(p.name) + "</span></button>";
+      }).join("") + '</div><button id="yesBtn" class="btn" disabled>Confirm</button><button id="noBtn" class="txt txt--c">Not yet, keep going</button>';
     var sync = function () { $("#yesBtn").disabled = !whoState.picks.length; };
-    var bs = grid.querySelectorAll(".who");
+    var bs = sheet.querySelectorAll(".who");
     for (var i = 0; i < bs.length; i++) {
       bs[i].onclick = function () {
         var id = this.getAttribute("data-id"), at = whoState.picks.indexOf(id);
@@ -1219,32 +1302,59 @@
         sync();
       };
     }
+    $("#yesBtn").onclick = function () { if (whoState.picks.length) { send({ t: "confirm", ok: true, who: whoState.picks.slice() }); } };
+    $("#noBtn").onclick = function () { send({ t: "confirm", ok: false }); };
     sync();
   }
 
-  function timerHtml(small) {
-    return '<div class="timer grow"><div class="numeral' + (small ? " numeral--80" : "") + '" id="bigtime">00</div><div class="label">Seconds left</div></div>';
+  // What a guesser sees whilst the clock is stopped.
+  function checkingHtml(s) {
+    var T = s.turn, w = pname(s, T.playerId);
+    if (T.stage === "claiming" && T.claim) {
+      var mineC = T.claim.ids.indexOf(s.me) !== -1, done = T.claim.claimed.indexOf(s.me) !== -1;
+      if (mineC && !done) { return '<h2 class="headline">' + esc(w) + ' says you got it</h2><p class="small">Tap to claim your points.</p><button id="claimBtn" class="btn">That was me</button>'; }
+      if (mineC) { return '<h2 class="headline">Claimed</h2><p class="small">Waiting for the others.</p>'; }
+      var names = T.claim.ids.map(function (id) { return pname(s, id); });
+      return '<h2 class="headline pulse">Checking</h2><p class="small">' + esc(w + " says " + listNames(names) + " got it. Waiting for " + (names.length > 1 ? "them" : names[0]) + " to claim it.") + "</p>";
+    }
+    if (T.buzzer) {
+      if (T.buzzer === s.me) { return '<h2 class="headline">You buzzed. Say it out loud</h2><p class="small">' + esc(w + " decides if you got it.") + "</p>"; }
+      return '<h2 class="headline">' + esc(pname(s, T.buzzer)) + ' buzzed in</h2><p class="small">' + esc("Waiting for " + w + " to say right or wrong.") + "</p>";
+    }
+    return '<h2 class="headline pulse">Checking</h2><p class="small">' + esc("Someone might've got it. Waiting for " + w + " to confirm.") + "</p>";
   }
 
+  // The line under the countdown for everyone who is about to guess. The same line on every phone.
+  function showLine(turnId, name) {
+    var t = esc(SPLASH_LINES[turnId % SPLASH_LINES.length]);
+    return t.replace("{n}", esc(name));
+  }
+
+  function timerHtml(small) {
+    return '<div class="timer grow"><div class="numeral' + (small ? " numeral--80" : "") + '" id="bigtime">00</div><div class="label" id="timeLab">Seconds left</div></div>';
+  }
+
+  var shuffleSeen = { id: null, n: 0 }, newSongTimer = null;
   function viewTurn(s) {
     var T = s.turn, isW = T.playerId === s.me, who = pname(s, T.playerId);
+    var wp = player(s, T.playerId), away = !!wp && !wp.connected && !isW;
 
     // 1. Whistler choosing one of three songs
     if (T.stage === "choose" && isW && !T.difficulty) {
       var offs = (T.options || []).map(function (o, i) {
-        var bonus = Math.round((o.multiplier - 1) * 100);
-        return '<button class="action opt" data-i="' + i + '" data-d="' + o.difficulty + '" style="min-height:88px"><span class="action__top"><span class="label">' + esc(cap(o.difficulty)) + "</span>" +
-          '<span class="small">' + (bonus ? "+" + bonus + " per cent points" : "Standard points") + "</span></span>" +
-          '<span class="stack" style="gap:2px"><span class="title">' + esc(o.title) + '</span><span class="small">' + esc(o.artist) + "</span></span></button>";
+        return '<button class="action opt" data-i="' + i + '" data-d="' + o.difficulty + '"><span class="action__top"><span class="label">' + esc(cap(o.difficulty)) + "</span>" +
+          '<span class="small">' + (o.multiplier === 1 ? "Standard points" : o.multiplier === 2 ? "Double points" : "Points x" + o.multiplier) + "</span></span>" +
+          '<span class="stack stack--4"><span class="title">' + esc(o.title) + '</span><span class="small">' + esc(o.artist) + "</span></span></button>";
       }).join("");
       return {
-        key: "choose-" + T.id, field: "ground",
+        key: "choose-" + T.id + (T.canRefresh ? "" : "-r"), field: "ground",
         html: '<div class="screen">' + topBar(s) +
           '<div class="head"><h1 class="headline">Pick a song</h1>' +
-          '<p class="small">Harder songs earn bonus points. Only you can see these! The 3, 2, 1 starts as soon as you pick.</p></div>' +
+          '<p class="title">The 3, 2, 1 starts as soon as you pick.</p>' +
+          '<p class="small">Only you can see these. Harder songs score more.</p></div>' +
           '<div class="stack">' + offs + "</div>" +
-          (T.canRefresh ? '<button id="refreshBtn" class="btn btn--outline">Refresh options</button>' +
-            '<p class="small center">Don\'t know any of these? You can refresh up to 3 times.</p>' : "") +
+          (T.canRefresh ? '<button id="refreshBtn" class="btn btn--outline">Refresh options</button>' : "") +
+          '<p class="label center" id="chooseIn"></p>' +
           '<div class="spacer"></div>' + skipHtml(s) + "</div>",
         bind: function () {
           var rf = $("#refreshBtn"); if (rf) { rf.onclick = function () { send({ t: "refreshOptions" }); }; }
@@ -1257,7 +1367,7 @@
       };
     }
 
-    // 2. Whistler has picked and is getting ready
+    // 2. Whistler has picked and is getting ready (only when the automatic countdown is switched off)
     if (T.stage === "choose" && isW) {
       return {
         key: "ready-" + T.id, field: "ground",
@@ -1275,100 +1385,103 @@
     // 3. Everyone else while the whistler chooses
     if (T.stage === "choose") {
       return {
-        key: "wait-" + T.id, field: "ground",
+        key: "wait-" + T.id + (away ? "-a" : "") + (T.difficulty ? "-d" : ""), field: "ground",
         html: '<div class="screen">' + topBar(s) +
-          '<div class="mid"><h1 class="headline">' + esc(who) + (T.difficulty ? " is getting ready" : " is choosing a song") + "</h1>" +
-          '<p class="small">' + (T.difficulty ? "The 3, 2, 1 starts as soon as they tap Ready. No performing till it ends!" : "Get ready to guess! Shout the title or type it.") + "</p>" +
+          '<div class="mid"><h1 class="headline">' + esc(away ? "Waiting for " + who + " to come back" : who + (T.difficulty ? " is getting ready" : " is choosing a song")) + "</h1>" +
+          '<p class="small">' + (away ? "If they are not back in half a minute, the turn is skipped." : "Get ready to guess. Shout the title, or buzz in and say it.") + "</p>" +
           '<div class="micline" data-mic></div></div>' + skipHtml(s) + "</div>",
         bind: bindSkip
       };
     }
 
-    // 4. Countdown for everyone. The whistler sees the song they picked.
+    // 4. One beat before the turn: the name and the 3, 2, 1 together. The whistler sees the song they picked.
     if (T.stage === "countdown") {
       return {
         key: "cd-" + T.id, field: "green",
         html: '<div class="screen">' + topBar(s) +
-          (isW && T.song ? songBlock(T, "Your song to perform") : "") +
+          (isW && T.song ? songBlock(T, "Your song to perform")
+            : '<div class="cdhead">' + avatarHtml(s, wp || { name: "?" }, "avatar--md") + '<h1 class="headline">' + showLine(T.id, who) + "</h1></div>") +
           '<div class="cdwrap"><div class="cdcircle"><div class="numeral" id="cd">3</div></div></div>' +
-          '<h1 class="headline center">' + (isW ? "Perform when it ends" : "Get ready to guess " + esc(who)) + "</h1>" +
-          skipHtml(s) + "</div>",
-        bind: bindSkip
+          '<p class="title center">' + (isW ? "Perform when it ends" : "Get ready to guess") + "</p></div>",
+        bind: function () {}
       };
     }
 
-    // 5. Whistling or confirming, whistler's phone
-    if ((T.stage === "whistling" || T.stage === "confirming") && isW) {
+    // 5. Whistling, confirming or waiting for a claim: the whistler's phone
+    if (liveStage(T) && isW) {
       return {
         key: "w-" + T.id, field: "time",
         html: '<div class="screen">' + topBar(s) + songBlock({ song: T.song, multiplier: T.multiplier }, "Your song to perform").replace("</p></div>", '</p><p class="hintline" id="hintLine" hidden></p></div>') +
           timerHtml(false) +
           '<div class="actions2">' + actionHtml("shuffleBtn", "Song", "", "Shuffle", T.penalty + " point penalty") +
           actionHtml("hintBtn", (T.hints || 0) + " of 3", "", "Give hint", hintCostText(T)) + "</div>" +
-          '<button id="gotBtn" class="btn gotbtn">Someone got it</button>' + skipHtml(s) +
-          '<div class="ovl" id="confirm" hidden><div class="scrim"></div><div class="sheet"><span class="label">Who got it first?</span>' +
-          '<p class="small" id="confSub"></p><div class="whogrid" id="whoGrid"></div>' +
-          '<button id="yesBtn" class="btn" disabled>Confirm</button><button id="noBtn" class="txt" style="align-self:center">Not yet, keep going</button></div></div></div>',
+          '<button id="gotBtn" class="btn gotbtn">Someone got it</button>' +
+          '<div class="ovl" id="confirm" hidden><div class="scrim"></div><div class="sheet" id="confSheet"></div></div></div>',
         bind: function () {
           $("#shuffleBtn").onclick = function () { send({ t: "shuffle" }); };
           $("#hintBtn").onclick = function () { send({ t: "hint" }); };
           $("#gotBtn").onclick = function () { send({ t: "gotIt" }); };
-          $("#yesBtn").onclick = function () { if (whoState.picks.length) { send({ t: "confirm", ok: true, who: whoState.picks.slice() }); } };
-          $("#noBtn").onclick = function () { send({ t: "confirm", ok: false }); };
-          bindSkip();
         },
         update: function () {
-          var t = st.turn, conf = t.stage === "confirming" && t.pending;
+          var t = st.turn, conf = (t.stage === "confirming" && t.pending) || (t.stage === "claiming" && t.claim);
           $("#songTitle").textContent = t.song ? t.song.title : "";
           $("#songArtist").textContent = t.song ? t.song.artist : "";
           $("#confirm").hidden = !conf;
-          if (conf) { buildWho(t); } else { whoState.built = null; }
+          if (conf) { buildWho(t); } else { whoState.built = null; whoState.picks = []; }
           showHints(t);
           syncWhistlerActions(t);
         }
       };
     }
 
-    // 6. Whistling or confirming, guesser's phone
-    if (T.stage === "whistling" || T.stage === "confirming") {
+    // 6. Whistling, confirming or waiting for a claim: a guesser's phone. A phone that is listening shows
+    // the mic. Any other phone gets the buzzer: tap, then say the title out loud.
+    if (liveStage(T)) {
+      var canVoice = !!SR && !IN_APP && mic.state !== "blocked" && mic.state !== "unsupported";
+      var useBuzz = mic.buzzMode || !mic.enabled || !canVoice || mic.state === "stopped" || mic.state === "off";
       return {
-        key: "g-" + T.id + (mic.typeMode ? "-t" : "-m"), field: "time",
-        html: '<div class="screen">' + topBar(s) + timerHtml(mic.typeMode) +
+        key: "g-" + T.id + (useBuzz ? "-b" + (mic.state === "stopped" ? "s" : "") : "-m"), field: "time",
+        html: '<div class="screen">' + topBar(s) + timerHtml(false) +
           '<div class="hstack" id="hintBox" hidden></div>' +
-          actionHtml("askHintBtn", "No hints yet", "Ask", "Ask for a hint", "Nudges the performer") +
-          (mic.typeMode
-            ? '<div class="typebox"><form id="gform" class="typebox">' +
-              '<input id="ginput" class="input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the song title" aria-label="Type the song title">' +
-              '<button class="btn" type="submit">Send guess</button></form>' +
-              (SR ? '<button id="toMic" class="txt" style="align-self:center">Use the mic</button>' : "") + "</div>"
+          '<button id="askHintBtn" class="btn btn--outline">Ask for a hint</button>' +
+          (useBuzz
+            ? '<div class="buzzwrap"><button id="buzzBtn" class="buzz"><span class="display">Buzz</span><span class="small" id="buzzSub">Tap when you know it, then say it out loud</span></button>' +
+              (canVoice ? '<button id="toMic" class="txt">' + (mic.state === "stopped" && !mic.buzzMode ? "Mic did not start. Tap to try again" : "Use the mic") + "</button>" : "") + "</div>"
             : '<div class="micwrap mid"><button class="orb off" id="orb" aria-label="Turn on mic"></button>' +
-              '<p class="title" id="listenHead">Mic is off, tap to turn on</p>' +
-              '<button id="toType" class="txt">Type instead</button></div>') +
-          skipHtml(s) +
-          '<div class="checking" id="checking" hidden><h2 class="headline pulse">Checking</h2>' +
-          '<p class="small">Someone might\'ve got it! Waiting for the performer to confirm.</p></div></div>',
+              '<p class="title" id="listenHead">Starting mic</p>' +
+              '<button id="toBuzz" class="txt">Buzz in instead</button></div>') +
+          '<div class="checking" id="checking" hidden></div></div>',
         bind: function () {
           if (mic.turnSeen !== st.turn.id) { mic.turnSeen = st.turn.id; mic.base = mic.total || 0; mic.heard = ""; }
-          var f = $("#gform");
-          if (f) {
-            f.onsubmit = function (e) {
-              e.preventDefault();
-              var v = $("#ginput").value.trim();
-              if (v && st && st.turn && st.turn.stage === "whistling") { send({ t: "guess", alts: [v], typed: true }); }
-              $("#ginput").value = "";
-              return false;
-            };
-          }
+          var bz = $("#buzzBtn"); if (bz) { bz.onclick = function () { if (st && st.turn && st.turn.stage === "whistling") { send({ t: "buzz" }); buzz(30); } }; }
           var ah = $("#askHintBtn"); if (ah) { ah.onclick = function () { send({ t: "askHint" }); }; }
-          var tt = $("#toType"); if (tt) { tt.onclick = function () { mic.typeMode = true; render(); }; }
-          var tm = $("#toMic"); if (tm) { tm.onclick = function () { mic.typeMode = false; render(); }; }
-          bindSkip();
+          var tb = $("#toBuzz"); if (tb) { tb.onclick = function () { mic.buzzMode = true; micPark(); render(); }; }
+          var tm = $("#toMic"); if (tm) { tm.onclick = function () { micStart(); render(); }; }
         },
         update: function () {
-          $("#checking").hidden = st.turn.stage !== "confirming";
-          showHints(st.turn);
-          if (mic.turnSeen !== st.turn.id) { mic.turnSeen = st.turn.id; mic.base = mic.total || 0; mic.heard = ""; }
-          syncAskBtn(st.turn);
+          var t = st.turn, chk = $("#checking"), stopped = t.stage === "confirming" || t.stage === "claiming";
+          chk.hidden = !stopped;
+          if (stopped) {
+            var ch = checkingHtml(st);
+            if (chk.getAttribute("data-h") !== ch) {
+              chk.setAttribute("data-h", ch); chk.innerHTML = ch;
+              var cb = $("#claimBtn"); if (cb) { cb.onclick = function () { send({ t: "claim" }); }; }
+            }
+          } else { chk.removeAttribute("data-h"); }
+          showHints(t);
+          if (mic.turnSeen !== t.id) { mic.turnSeen = t.id; mic.base = mic.total || 0; mic.heard = ""; }
+          syncAskBtn(t);
+          // A shuffle makes no sound on this phone, so it has to be seen: the label under the clock says so for two seconds.
+          if (shuffleSeen.id !== t.id) { shuffleSeen = { id: t.id, n: t.shuffles || 0 }; }
+          else if ((t.shuffles || 0) > shuffleSeen.n) {
+            shuffleSeen.n = t.shuffles;
+            var tl = $("#timeLab");
+            if (tl) {
+              tl.textContent = "New song. Forget the last one"; tl.classList.add("flashlab");
+              clearTimeout(newSongTimer);
+              newSongTimer = setTimeout(function () { var e = $("#timeLab"); if (e) { e.textContent = "Seconds left"; e.classList.remove("flashlab"); } }, 2000);
+            }
+          }
         }
       };
     }
@@ -1379,28 +1492,34 @@
     var guessers = gAwards.map(function (x) { return pname(s, x.id); });
     var correct = R.outcome === "correct";
     if (correct) {
-      head = esc(who) + " scores";
-      sub = guessers.length ? guessers.map(esc).join(", ").replace(/, ([^,]*)$/, " and $1") + (guessers.length > 1 ? " named it and earn " + pts(gAwards[0].points) + " each" : " named it and earns " + pts(gAwards[0].points)) : "";
+      head = who + " scores";
+      // Whose phone heard it, or who buzzed, is said out loud on every screen.
+      var heard = R.heardFrom ? (R.source === "buzz" ? pname(s, R.heardFrom) + " buzzed in. " : "Heard on " + pname(s, R.heardFrom) + "'s phone. ") : "";
+      sub = heard + (guessers.length ? listNames(guessers) + (guessers.length > 1 ? " named it and earn " + pts(gAwards[0].points) + " each." : " named it and earns " + pts(gAwards[0].points) + ".") : "");
     } else if (R.outcome === "timeout") {
       head = "Time's up";
-      sub = "Nobody guessed " + esc(who) + "'s song, so no points. Ouch.";
+      sub = "Nobody guessed " + who + "'s song, so no points. Ouch.";
     } else {
       head = "Turn skipped";
-      sub = esc(who) + " scores nothing.";
+      sub = who + " scores nothing.";
     }
     var last = s.turnNumber >= s.totalTurns;
     var big = Math.max(R.base || 0, R.afterMult || 0, R.score || 0) >= 1000;
-    var lim = window.innerHeight >= 880 ? 5 : window.innerHeight >= 780 ? 4 : 3;
+    // At the end of a round the score lands first, then the whole table takes its place: every player, one row each.
+    var boardHtml = T.roundEnd
+      ? '<div class="stack rvboard" id="board"><span class="label">' + (T.sd ? "Tie-break" : last ? "Scores after the last round" : "Scores after round " + T.round) + "</span>" +
+          '<p class="small">' + esc((R.song ? R.song.title + ": " : "") + (correct ? who + " scores " + pts(R.score) : R.outcome === "timeout" ? "nobody got it" : "turn skipped")) + "</p>" +
+          standingsHtml(s, R.awards, null, { change: true }) + "</div>"
+      : (T.nextId ? '<div class="stack rvhide" id="board"><span class="label">Up next</span><p class="title pn">' + avatarHtml(s, player(s, T.nextId) || { name: "?" }) + esc(T.nextId === s.me ? "You" : pname(s, T.nextId)) + "</p></div>" : "");
     return {
       key: "reveal-" + T.id + "-" + s.totalTurns, field: correct ? "blue" : "ground",
-      html: '<div class="screen">' + topBar(s) +
+      html: '<div class="screen' + (T.roundEnd ? " rv-round" : "") + '" id="rvScreen">' + topBar(s) +
+        '<div class="stack stack--16" id="rvScore">' +
         '<div class="revealtop">' + (R.song ? '<span class="label">The song was</span><h1 class="headline">' + esc(R.song.title) + '</h1><p class="title">' + esc(R.song.artist) + "</p>" : "") + "</div>" +
         '<div class="scorebox"><div class="scorerow"><div class="numeral scoreNum' + (big ? " numeral--120" : "") + '" id="scoreNum">0</div></div>' +
-          '<div class="rowc" style="justify-content:flex-start;gap:8px"><span class="label" id="scoreCap">Guessed in</span><span class="tag stamp" id="multBadge" hidden></span><span class="tag stamp" id="deltaTag" hidden></span></div>' +
-          '<div class="stack" style="gap:2px"><h2 class="title">' + head + "</h2>" + (sub ? '<p class="small">' + sub + "</p>" : "") + "</div></div>" +
-        (T.roundEnd
-          ? '<div class="board rvhide" id="board">' + standingsHtml(s, R.awards, null, { change: true, limit: lim }) + "</div>"
-          : (T.nextId ? '<div class="stack rvhide" id="board"><span class="label">Up next</span><p class="title pn">' + avatarHtml(s, player(s, T.nextId) || { name: "?" }) + esc(T.nextId === s.me ? "You" : pname(s, T.nextId)) + "</p></div>" : "")) +
+          '<div class="rowc rowc--l"><span class="label" id="scoreCap">Guessed in</span><span class="tag stamp" id="multBadge" hidden></span><span class="tag stamp" id="deltaTag" hidden></span></div>' +
+          '<div class="stack stack--4"><h2 class="title">' + esc(head) + "</h2>" + (sub ? '<p class="small">' + esc(sub) + "</p>" : "") + "</div></div></div>" +
+        boardHtml +
         '<div class="spacer"></div>' +
         '<p class="label" id="nextIn"></p>' +
         (s.hostId === s.me
@@ -1417,28 +1536,32 @@
   function ease(x) { x = Math.max(0, Math.min(1, x)); return 1 - Math.pow(1 - x, 3); }
   function revealFrame(R, el) {
     if (R.outcome !== "correct") {
-      var fin0 = 1200;
+      var fin0 = 900;
       return { num: 0, cap: el >= fin0 ? "No points" : "Counting up", final: el >= fin0, finalAt: fin0 };
     }
-    var rawS = Math.max(0, R.timeMs / 1000 - R.lockedS), cur = 2400, run = R.base;
+    var rawS = Math.max(0, R.timeMs / 1000 - R.lockedS), cur = 1500, run = R.base;
     // Order: base score, then the song multiplier, then shuffles, then hints, then the big reveal.
-    var segs = [{ from: 0, to: R.base, at: 0, len: 1600, cap: "Guessed in " + rawS.toFixed(1) + "s" }];
+    // The whole count has to finish well inside the 8 second reveal, with every penalty in play.
+    var segs = [{ from: 0, to: R.base, at: 0, len: 1000, cap: "Guessed in " + rawS.toFixed(1) + "s" }];
     if (R.multiplier && R.multiplier !== 1) {
-      segs.push({ from: run, to: R.afterMult, at: cur + 500, len: 1400, cap: cap(R.difficulty || "") + " song", badge: "x" + R.multiplier + " " + (R.difficulty || "").toUpperCase(), badgeAt: cur });
-      run = R.afterMult; cur += 2300;
+      segs.push({ from: run, to: R.afterMult, at: cur + 300, len: 800, cap: cap(R.difficulty || "") + " song", badge: "x" + R.multiplier + " " + (R.difficulty || "").toUpperCase(), badgeAt: cur });
+      run = R.afterMult; cur += 1300;
     }
     if (R.shuffles) {
-      var sp = Math.min(run, R.shufflePts);
-      segs.push({ from: run, to: run - sp, at: cur, len: 900, cap: R.shuffles === 1 ? "Shuffle" : R.shuffles + " shuffles", delta: "-" + R.shufflePts });
-      run -= sp; cur += 1700;
+      var sp = Math.max(0, Math.min(run - R.score, R.shufflePts));
+      segs.push({ from: run, to: run - sp, at: cur, len: 600, cap: R.shuffles === 1 ? "Shuffle" : R.shuffles + " shuffles", delta: "-" + R.shufflePts });
+      run -= sp; cur += 1000;
     }
     if (R.hints) {
-      var hp = Math.min(run, R.hintPts);
-      segs.push({ from: run, to: run - hp, at: cur, len: 900, cap: R.hints === 1 ? "Hint" : R.hints + " hints", delta: "-" + R.hintPts });
-      run -= hp; cur += 1700;
+      // The floor: penalties never take a correct guess below the minimum, so the count stops there.
+      var hp = Math.max(0, Math.min(run - R.score, R.hintPts));
+      segs.push({ from: run, to: run - hp, at: cur, len: 600, cap: R.hints === 1 ? "Hint" : R.hints + " hints", delta: "-" + R.hintPts });
+      run -= hp; cur += 1000;
     }
-    var finalAt = Math.max(cur + 1400, 4500);
-    if (el >= finalAt) { return { num: R.score, cap: "Final score", final: true, finalAt: finalAt }; }
+    var finalAt = Math.max(cur + 700, 2600);
+    // When the floor has stepped in, say so, or the last number looks like a mistake.
+    var floored = R.score > Math.max(0, R.afterMult - R.shufflePts - R.hintPts);
+    if (el >= finalAt) { return { num: R.score, cap: floored ? "Minimum for a correct guess" : "Final score", final: true, finalAt: finalAt }; }
     var out = { num: 0, cap: segs[0].cap, final: false, finalAt: finalAt, badge: "", delta: "" };
     for (var i = 0; i < segs.length; i++) {
       var g = segs[i];
@@ -1451,85 +1574,68 @@
     return out;
   }
 
-  // End-of-game awards: shown one at a time, then the final scores.
-  var awardState = { key: null, idx: 0, done: false, timer: null };
-  var AWARD_HUES = ["green", "yellow", "orange", "pink", "blue"];
+  // End-of-game awards: one screen of titles, then the final scores. Awards carry no points.
+  var awardState = { key: null, done: false, timer: null };
 
   function awardsKey(s) { return s.code + "|" + (s.endAwards || []).map(function (d) { return d.key + d.winners.map(function (w) { return w.id; }).join(","); }).join(";"); }
 
-  function awardAdvance(s) {
-    clearTimeout(awardState.timer);
-    if (awardState.idx + 1 >= (s.endAwards || []).length) { awardState.done = true; } else { awardState.idx++; }
-    render();
-  }
-
-  function awardCardHtml(s) {
-    var d = s.endAwards[awardState.idx];
-    var names = d.winners.map(function (w) { return esc(pname(s, w.id)); });
-    var who = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names[names.length - 1] : names[0];
-    var got = d.winners[0].bonus;
-    var detail = d.winners.length === 1 ? esc(d.winners[0].detail) : "Shared award";
-    var dots = s.endAwards.map(function (_, i) { return '<i class="adot' + (i === awardState.idx ? " on" : "") + '"></i>'; }).join("");
-    var hue = AWARD_HUES[awardState.idx % AWARD_HUES.length];
-    return '<div class="awardcard awardcard--' + hue + '"><span class="label">' + esc(d.title) + '</span><h1 class="display" style="font-size:' + (who.length > 12 ? 40 : 56) + 'px;line-height:1.0">' + who + "</h1>" +
-      '<p class="title">' + detail + "</p>" +
-      (got > 0 ? '<div class="numeral numeral--80 awardcard__p">+' + pts(got) + '</div><p class="label">' + (d.winners.length > 1 ? "Points each" : "Bonus points") + "</p>"
-               : '<p class="title awardcard__p">Bonus held back so the leader stays the leader</p>') + "</div>" +
-      '<div class="adots">' + dots + "</div>";
-  }
-
   function viewAwards(s) {
+    var rows = s.endAwards.map(function (d) {
+      var names = d.winners.map(function (w) { return pname(s, w.id); });
+      return '<div class="awrow"><span class="label">' + esc(d.title) + '</span><span class="title">' + esc(listNames(names)) + "</span>" +
+        '<span class="small">' + esc(d.winners.length === 1 ? d.winners[0].detail : "Shared between them") + "</span></div>";
+    }).join("");
     return {
-      key: "awards-" + awardState.idx, field: "ground",
-      html: '<div class="screen" id="awardScreen">' +
-        '<div class="label">Game awards</div>' + awardCardHtml(s) +
-        '<button id="awardNext" class="btn">' + (awardState.idx + 1 >= s.endAwards.length ? "See final scores" : "Next award") + "</button>" +
-        '<button id="awardSkip" class="txt" style="align-self:center">Skip</button></div>',
+      key: "awards", field: "yellow",
+      html: '<div class="screen">' +
+        '<div class="label">Game awards</div><h1 class="headline">For glory, not points</h1>' +
+        '<div class="awlist">' + rows + "</div>" +
+        '<div class="spacer"></div>' +
+        '<button id="awardNext" class="btn">See final scores</button></div>',
       bind: function () {
         clearTimeout(awardState.timer);
-        var left = 5, nb = $("#awardNext"), base = nb.textContent;
+        var left = 12, nb = $("#awardNext");
+        var done = function () { clearTimeout(awardState.timer); awardState.done = true; render(); };
         var tickA = function () {
-          if (left <= 0) { awardAdvance(st); return; }
-          nb.textContent = base + " (" + left + ")"; left--;
+          if (left <= 0) { done(); return; }
+          nb.textContent = "See final scores (" + left + ")"; left--;
           awardState.timer = setTimeout(tickA, 1000);
         };
         tickA();
-        nb.onclick = function () { awardAdvance(st); };
-        $("#awardSkip").onclick = function () { clearTimeout(awardState.timer); awardState.done = true; render(); };
+        nb.onclick = done;
       }
     };
   }
 
   function viewOver(s) {
     var k = awardsKey(s);
-    if (awardState.key !== k) { awardState.key = k; awardState.idx = 0; awardState.done = false; }
+    if (awardState.key !== k) { awardState.key = k; awardState.done = false; }
     if (s.endAwards && s.endAwards.length && !awardState.done) { return viewAwards(s); }
     clearTimeout(awardState.timer);
     var isHost = s.hostId === s.me;
-    var bonuses = s.players.filter(function (p) { return p.bonus > 0; }).map(function (p) { return { id: p.id, points: p.bonus }; });
     var names = (s.winners || []).map(function (id) { return pname(s, id); });
     var bests = recordGame(s), mine = readStats()[pname(s, s.me).toLowerCase()];
-    var myStatsHtml = s.myGame && mine ? '<div class="stack"><div class="label">Your lifetime stats</div>' +
-      (bests.length ? '<p class="title">New best: ' + esc(bests.join(", ")) + "</p>" : "") +
-      '<button id="myStatsBtn" class="txt" style="align-self:flex-start;padding-left:0">See your stats</button></div>' : "";
     var head = names.length > 1 ? "It's a draw: " + names.map(esc).join(" and ") : esc(names[0] || "Nobody") + " wins";
+    var hasAwards = !!(s.endAwards && s.endAwards.length);
     return {
       key: "over", field: "blue",
       html: '<div class="screen">' +
         '<div class="label">Game over</div>' +
         '<div class="head"><h1 class="display">' + head + "</h1>" +
         (s.tieBreakWon ? '<p class="small">Settled in a tie-break.</p>' : "") + "</div>" +
-        '<div class="stack"><div class="label">Final scores</div>' + standingsHtml(s, bonuses, s.winners, { bonus: true }) + "</div>" +
-        myStatsHtml + (bonuses.length ? '<p class="small">Bonus points from the awards are included.' + (s.bonusCapped ? " A big lead cannot be overturned by bonuses." : "") + "</p>" : "") +
+        '<div class="stack"><div class="label">Final scores</div>' + standingsHtml(s, null, s.winners, { final: true }) + "</div>" +
+        (s.myGame && mine && bests.length ? '<p class="small">New personal best: ' + esc(bests.join(", ")) + ".</p>" : "") +
         '<div class="spacer"></div>' +
-        (s.endAwards && s.endAwards.length ? '<button id="awardsBtn" class="btn btn--outline">View awards</button>' : "") +
-        (isHost ? '<button id="againBtn" class="btn">Play again</button>' : '<p class="title center">Waiting for ' + esc(pname(s, s.hostId)) + "</p>") +
-        '<button id="leaveBtn" class="txt" style="align-self:center">Leave room</button></div>',
+        (isHost ? "" : '<p class="title center">Waiting for ' + esc(pname(s, s.hostId)) + "</p>") +
+        '<div class="btnrow">' + (hasAwards ? '<button id="awardsBtn" class="btn btn--outline">Awards</button>' : "") +
+        (isHost ? '<button id="againBtn" class="btn">Play again</button>' : "") + "</div>" +
+        '<div class="rowc">' + (s.myGame && mine ? '<button id="myStatsBtn" class="txt">Your stats</button>' : "<span></span>") +
+        '<button id="leaveBtn" class="txt">Leave game</button></div></div>',
       bind: function () {
         var a = $("#againBtn"); if (a) { a.onclick = function () { send({ t: "playAgain" }); }; }
         $("#leaveBtn").onclick = leaveRoom;
         var ms = $("#myStatsBtn"); if (ms) { ms.onclick = function () { showStats(pname(s, s.me)); }; }
-        var aw = $("#awardsBtn"); if (aw) { aw.onclick = function () { awardState.idx = 0; awardState.done = false; render(); }; }
+        var aw = $("#awardsBtn"); if (aw) { aw.onclick = function () { awardState.done = false; render(); }; }
       }
     };
   }
@@ -1537,11 +1643,11 @@
   // How to play: a short animated walkthrough. The words sit on the dark background; the game screens
   // sit inside a phone frame, so it is always clear which part is the instruction and which is the app.
   function showHelp() {
-    var AV = function (n, k) { return '<span class="avatar pc pc' + k + ' avatar--md">' + n.charAt(0) + "</span>"; };
+    var AV = function (n, k) { return '<span class="avatar pc pc' + k + '">' + n.charAt(0) + "</span>"; };
     var TAP = function (x, y, d) { return '<i class="hv-tap" style="left:' + x + 'px;top:' + y + 'px;animation-delay:' + d + 'ms"></i>'; };
     var scenes = [
       { ms: 5000, full: true, chip: "How to play", head: "One person performs.<br>Everyone else listens and guesses.", text: "Take turns. Guess fast, score big!", bg: FIELD_BG.orange },
-      { ms: 5400, role: "w", chip: "Your turn to perform", head: "Pick a song", text: "Only you can see it. Go harder for bonus points!", bg: FIELD_BG.ground,
+      { ms: 5400, role: "w", chip: "Your turn to perform", head: "Pick a song", text: "Only you can see it. Hard songs score double!", bg: FIELD_BG.ground,
         mock: '<div class="m-cards">' +
           '<div class="m-card"><span>Easy</span><b>Dancing Queen</b><i>ABBA</i></div>' +
           '<div class="m-card m-pick"><span>Medium</span><b>Wonderwall</b><i>Oasis</i></div>' +
@@ -1551,18 +1657,18 @@
       { ms: 6200, role: "w", chip: "Your turn to perform", head: "Whistle or kazoo the tune", text: "Whistle it or kazoo it. No words allowed! Shuffles and hints cost points.", bg: FIELD_BG.green,
         mock: '<div><div class="m-label">Your song to perform</div><div class="m-song">Dancing Queen</div><div class="m-art">ABBA</div></div><div class="m-timer" data-timer="42">42</div>' +
           '<div class="m-two"><div class="m-mini"><span>Song</span><b>Shuffle</b></div><div class="m-mini"><span>0 of 3</span><b>Give hint</b></div></div><div class="m-btn">Someone got it</div>' },
-      { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is performing. Your phone's mic should catch your guess. If it doesn't, tap Type instead.", bg: FIELD_BG.green,
+      { ms: 6400, role: "l", chip: "Your turn to listen", head: "Say the title out loud", text: "Someone else is performing. Your phone's mic should catch your guess. If it doesn't, buzz in and say it.", bg: FIELD_BG.green,
         mock: '<div class="m-orbwrap"><div class="hv-orb"><i></i><i></i><i></i><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="18" y="5" width="12" height="23" rx="6"/><path d="M11 22v2a13 13 0 0 0 26 0v-2"/><path d="M24 37v6M17 43h14"/></svg></div>' +
-          '<div class="m-say"><span>You say</span><b>Dancing Queen</b></div></div><div class="m-head">Listening</div><div class="m-link">Type instead</div>' },
+          '<div class="m-say"><span>You say</span><b>Dancing Queen</b></div></div><div class="m-head">Listening</div><div class="m-link">Buzz in instead</div>' },
       { ms: 5600, role: "w", chip: "Your turn to perform", head: "Say who got it", text: "Someone nailed it? Tap Someone got it, pick who got it first, then confirm.", bg: FIELD_BG.ground,
         mock: '<div class="m-rows">' +
           '<div class="m-row m-on">' + AV("Theo", 1) + '<b>Theo</b><em>Got it</em></div><div class="m-row">' + AV("Priya", 2) + '<b>Priya</b></div><div class="m-row">' + AV("Sam", 3) + '<b>Sam</b></div></div><div class="m-btn">Confirm</div>' + TAP(80, 135, 1500) },
-      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The performer bags the full score. Whoever got it first gets half.", bg: FIELD_BG.blue, light: true,
+      { ms: 5600, role: "e", chip: "Everyone sees the score", head: "Faster guesses score more", text: "The performer bags the full score. Whoever got it gets half.", bg: FIELD_BG.blue, light: true,
         mock: '<div class="m-big" data-count="917" data-ms="1600">0</div><div class="m-label">Guessed in 12.4s</div><div class="m-sub2">Maya scores<br>Theo named it and earns 459</div>' },
-      { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards chuck in bonus points at the end.", bg: FIELD_BG.pink,
+      { ms: 5600, role: "e", chip: "After the last round", head: "Most points wins", text: "Awards at the end are for glory only.", bg: FIELD_BG.pink,
         mock: '<div class="m-rows">' +
           '<div class="m-row m-light"><b class="m-rk">1</b>' + AV("Maya", 0) + '<b>Maya</b><em>2,140</em></div><div class="m-row m-light"><b class="m-rk">2</b>' + AV("Theo", 1) + '<b>Theo</b><em>1,820</em></div><div class="m-row m-light"><b class="m-rk">3</b>' + AV("Priya", 2) + '<b>Priya</b><em>1,310</em></div></div>' },
-      { ms: 4500, full: true, chip: "Stuck?", head: "Stuck? Hit the ? icon.", text: "It lives in the corner of every screen and tells you exactly what to do.", bg: FIELD_BG.orange }
+      { ms: 4500, full: true, chip: "Stuck?", head: "Stuck? Tap Help.", text: "It sits at the top of the screen between turns and tells you exactly what to do.", bg: FIELD_BG.orange }
     ];
     var o = document.createElement("div");
     o.className = "hv"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "How to play");
@@ -1631,23 +1737,23 @@
   // What to do on this screen, for the ? button. It depends on the screen and on whether you are performing or guessing.
   function helpFor(key) {
     var host = st && st.hostId === st.me, T = st && st.turn, who = T && st.players ? pname(st, T.playerId) : "The performer";
-    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Harder ones earn bonus points! Don't know any? Refresh as often as you like for new ones. Only you can see them."]; }
+    if (/^choose-/.test(key)) { return ["Your turn to perform", "Pick one of the three songs. Medium is worth half as much again and hard is worth double. Don't know any? You get one refresh. Take too long and the middle one is picked for you. Only you can see them."]; }
     if (/^ready-/.test(key)) { return ["Get ready", "Only you can see your song. Ready? Tap Ready and a 3, 2, 1 starts for everyone. Then whistle or kazoo the tune. No words!"]; }
-    if (/^wait-/.test(key)) { return ["Get ready to guess", who + " is getting ready to perform. When they start, shout the song title. Mic off? Type it instead."]; }
+    if (/^wait-/.test(key)) { return ["Get ready to guess", who + " is picking a song. When the countdown ends, shout the song title. No mic? Tap Buzz, then say it out loud."]; }
     if (/^cd-/.test(key)) {
       return T && T.playerId === st.me
         ? ["Countdown", "When it ends, whistle or kazoo the tune. No words! Shuffles and hints cost points."]
-        : ["Countdown", "When it ends, " + who + " starts performing. Shout the title as soon as you know it, or tap Type instead."];
+        : ["Countdown", "When it ends, " + who + " starts performing. Shout the title as soon as you know it, or buzz in and say it."];
     }
-    if (/^w-/.test(key)) { return ["You are performing", "Whistle or kazoo the tune. No words! When someone says the right title, tap Someone got it, pick who got it first, then confirm."]; }
-    if (/^g-/.test(key)) { return ["You are guessing", "Listen to " + who + " and shout the song title, or tap Type instead. The faster you guess, the more you score. Stuck? Ask for a hint."]; }
-    if (/^reveal-/.test(key)) { return ["Score", "The performer bags the full score and whoever got it first gets half. Next turn coming up!"]; }
+    if (/^w-/.test(key)) { return ["You are performing", "Whistle or kazoo the tune. No words! If someone buzzes, tap Right or Wrong. If someone says it and the game misses it, tap Someone got it and pick who."]; }
+    if (/^g-/.test(key)) { return ["You are guessing", "Listen to " + who + " and shout the song title, or buzz in and say it. The faster the guess, the more it scores. Stuck? Ask for a hint."]; }
+    if (/^reveal-/.test(key)) { return ["Score", "The performer gets the full score. Whoever got it gets half, shared if more than one person is named. A correct guess never scores under 100."]; }
     if (key === "lobby") {
       return host
-        ? ["You are the host", "Send the invite link to your friends. Choose the song packs and rounds, then tap Start game once everyone's in. Keep your mic on so the game can hear guesses!"]
-        : ["Waiting to start", "The host starts the game once everyone's in. If room picks is on, tap Pick song packs. Keep your mic on so the game can hear your guesses!"];
+        ? ["You are the host", "Send the invite link to your friends, or show them the QR code. Choose the song packs and rounds, then tap Start game once everyone's in. Your own tile turns your mic on and off."]
+        : ["Waiting to start", "The host starts the game once everyone's in. If room picks is on, tap Songs to pick your packs. Your own tile turns your mic on and off."];
     }
-    if (/^awards-/.test(key)) { return ["Awards", "These awards add bonus points to the final scores. Tap for the next one!"]; }
+    if (/^awards/.test(key)) { return ["Awards", "Awards are for glory only. The scores stay exactly as they were."]; }
     if (key === "over") { return ["Game over", "Top score wins! " + (host ? "Tap Play again for another go with the same players." : "The host can start another go with the same players.")]; }
     return ["Need a hand?", "Tap How to play on the home screen to see the rules."];
   }
@@ -1658,11 +1764,13 @@
     var o = document.createElement("div");
     o.id = "helpsheet"; o.className = "sheetwrap";
     o.innerHTML = '<div class="scrim"></div><div class="sheet"><div class="label">' + esc(h[0]) + '</div><p class="title">' + esc(h[1]) + '</p>' +
-      '<button class="btn" id="hsOk">Got it</button><button class="txt" id="hsHow" style="align-self:center">Show how to play</button></div>';
+      '<button class="btn" id="hsOk">Got it</button><div class="rowc"><button class="txt" id="hsHow">Show how to play</button>' +
+      '<button class="txt" id="hsSfx">' + (sfxOn ? "Sound on" : "Sound off") + "</button></div></div>";
     document.body.appendChild(o);
     var close = function () { if (o.parentNode) { o.parentNode.removeChild(o); } };
     $("#hsOk", o).onclick = close; $(".scrim", o).onclick = close;
     $("#hsHow", o).onclick = function () { close(); usage("howto", "sheet"); showHelp(); };
+    $("#hsSfx", o).onclick = function () { setSfx(!sfxOn); this.textContent = sfxOn ? "Sound on" : "Sound off"; };
   }
   // First time in a room: ask once. A first-timer gets a short line and the how-to-play walkthrough.
   function askPlayed() {
@@ -1670,7 +1778,7 @@
     var o = document.createElement("div");
     o.className = "sheetwrap";
     o.innerHTML = '<div class="scrim"></div><div class="sheet" id="apSheet"><p class="headline">Have you played before?</p>' +
-      '<div class="rowc" style="gap:12px"><button class="btn btn--outline" id="pYes" style="flex:1">Yes</button><button class="btn" id="pNo" style="flex:1">No</button></div></div>';
+      '<div class="btnrow"><button class="btn btn--outline" id="pYes">Yes</button><button class="btn" id="pNo">No</button></div></div>';
     document.body.appendChild(o);
     var done = function (v) {
       newbie = !v; try { localStorage.setItem("ttt_played", v ? "yes" : "no"); } catch (e) {}
@@ -1682,24 +1790,12 @@
     $("#pYes", o).onclick = function () { done(true); };
     $("#pNo", o).onclick = function () { done(false); };
   }
-  // The ? button sits in the corner of every in-game screen.
+  // Help is a word in the top row of every screen between turns (see topBar). There are no floating buttons.
   function refreshTip() {
-    var old = document.getElementById("helpfab");
-    if (!st || st.admin) { if (old) { old.parentNode.removeChild(old); } var sf = document.getElementById("sfxfab"); if (sf) { sf.parentNode.removeChild(sf); } return; }
+    var old = document.getElementById("helpfab"); if (old) { old.parentNode.removeChild(old); }
+    var sf = document.getElementById("sfxfab"); if (sf) { sf.parentNode.removeChild(sf); }
+    if (!st || st.admin) { return; }
     if (newbie === null && !askedPlayed) { askPlayed(); }
-    if (!document.getElementById("sfxfab")) {
-      var sb = document.createElement("button");
-      sb.id = "sfxfab"; sb.className = "helpfab"; sb.innerHTML = sfxIcon(); sb.setAttribute("aria-pressed", String(sfxOn));
-      sb.setAttribute("aria-label", sfxOn ? "Sound and buzz on, tap to mute" : "Muted, tap to turn sound and buzz on");
-      sb.onclick = function () { setSfx(!sfxOn); };
-      document.body.appendChild(sb);
-    }
-    if (!old) {
-      var b = document.createElement("button");
-      b.id = "helpfab"; b.className = "helpfab"; b.setAttribute("aria-label", "Help: what should I do now?"); b.textContent = "?";
-      b.onclick = showHelpSheet;
-      document.body.appendChild(b);
-    }
   }
 
   // ---------------------------------------------------------------- render
@@ -1707,10 +1803,10 @@
     var base = T.accumulatedMs + (T.runningSince !== null ? nowS() - T.runningSince : 0);
     return Math.max(0, Math.min(base, T.limitMs));
   }
-  // Time sets the field: green over half the time left, yellow to 20 percent, then orange.
+  // Time sets the field: green with more than 30 seconds left, yellow down to 10, orange for the last 10.
   function timeField(T) {
-    var frac = (T.limitMs - elapsedMs(T)) / T.limitMs;
-    return frac > 0.5 ? "green" : frac > 0.2 ? "yellow" : "orange";
+    var left = T.limitMs - elapsedMs(T);
+    return left > 30000 ? "green" : left > 10000 ? "yellow" : "orange";
   }
 
   // ------------------------------------------------------- sound effects and haptics (no music, all synthesised)
@@ -1783,68 +1879,49 @@
   }
   function setSfx(on) {
     sfxOn = on; try { localStorage.setItem("ttt_sfx", on ? "on" : "off"); } catch (e) {}
-    var b = document.getElementById("sfxfab"); if (b) { b.innerHTML = sfxIcon(); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", on ? "Sound and buzz on, tap to mute" : "Muted, tap to turn sound and buzz on"); }
     usage(on ? "unmute" : "mute");
     if (on) { sfx("pop"); buzz(30); }
   }
-  function sfxIcon() {
-    return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/>' +
-      (sfxOn ? '<path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>' : '<path d="M17 9l5 6M22 9l-5 6"/>') + "</svg>";
-  }
-  // Sounds that follow state changes. They run before the screen is redrawn.
-  var sfxTimers = [], sfxTurn = null, drumTurn = null, slamTurn = null;
+  // Cues that follow state changes. They run before the screen is redrawn.
+  // Sound plays on one phone only: the whistler's during a turn, the host's in the lobby and at the end.
+  // Eight phones beeping together is noise, and most phones are on silent anyway, so every cue is also
+  // something you can see, and every phone still gets the buzz.
+  var sfxTimers = [], drumTurn = null, slamTurn = null;
   function clearSfxTimers() { sfxTimers.forEach(clearTimeout); sfxTimers = []; }
   function audioEvents(prev, cur) {
     if (!cur) { return; }
-    var T = cur.turn, P = prev && prev.turn;
-    if (cur.phase === "lobby" && prev && prev.phase === "lobby" && cur.players.length > prev.players.length) { sfx("pop"); buzz(25); }
-    if (cur.phase === "gameover" && (!prev || prev.phase !== "gameover")) { sfx("fanfare"); buzz([60, 40, 60, 40, 140]); }
+    var T = cur.turn, P = prev && prev.turn, host = cur.hostId === cur.me;
+    if (cur.phase === "lobby" && prev && prev.phase === "lobby" && cur.players.length > prev.players.length) { if (host) { sfx("pop"); } buzz(25); }
+    if (cur.phase === "gameover" && (!prev || prev.phase !== "gameover")) { if (host) { sfx("fanfare"); } buzz([60, 40, 60, 40, 140]); }
     if (!T) { return; }
-    var same = P && P.id === T.id;
+    var same = P && P.id === T.id, mine = T.playerId === cur.me;
+    if (!same && T.stage === "choose") { if (mine) { sfx("turn"); } buzz(mine ? [80, 50, 80, 50, 140] : 30); }
     if (T.stage === "countdown" && !(same && P.stage === "countdown")) {
       clearSfxTimers();
       var end = T.countdownEndsAt;
       [3, 2, 1].forEach(function (k) {
         var d = end - k * 1000 - nowS();
-        if (d > -150) { sfxTimers.push(setTimeout(function () { sfx("tick"); buzz(25); }, Math.max(0, d))); }
+        if (d > -150) { sfxTimers.push(setTimeout(function () { if (mine) { sfx("tick"); } buzz(25); }, Math.max(0, d))); }
       });
       var gd = end - nowS();
-      if (gd > -150) { sfxTimers.push(setTimeout(function () { sfx("go"); buzz(T.playerId === cur.me ? [70, 40, 120] : 50); }, Math.max(0, gd))); }
+      if (gd > -150) { sfxTimers.push(setTimeout(function () { if (mine) { sfx("go"); } buzz(mine ? [70, 40, 120] : 50); }, Math.max(0, gd))); }
     }
-    if (same && T.stage !== "countdown" && P.stage === "countdown") { /* the go cue is already scheduled */ }
-    if (T.stage === "confirming" && !(same && P.stage === "confirming") && T.playerId === cur.me) { sfx("ping"); buzz([50, 40, 50]); }
-    if (same && (T.hints || 0) > (P.hints || 0)) { sfx("hint"); buzz(40); }
-    if (same && T.shuffles !== undefined && P.shuffles !== undefined && T.shuffles > P.shuffles) { sfx("shuffle"); buzz(30); }
+    if (T.stage === "confirming" && !(same && P.stage === "confirming")) {
+      if (mine) { sfx("ping"); buzz([50, 40, 50]); }
+      else if (T.buzzer) { buzz(T.buzzer === cur.me ? [40, 30, 40] : 30); }
+    }
+    if (T.stage === "claiming" && !(same && P.stage === "claiming") && T.claim && T.claim.ids.indexOf(cur.me) !== -1) { buzz([60, 40, 60]); }
+    if (same && (T.hints || 0) > (P.hints || 0)) { if (mine) { sfx("hint"); } buzz(40); }
+    if (same && T.shuffles !== undefined && P.shuffles !== undefined && T.shuffles > P.shuffles) { if (mine) { sfx("shuffle"); } buzz(30); }
   }
 
-  // ---- Turn splash: a full-screen "it's show time" card, about three seconds, before each player's turn.
+  // ---- The line that names the whistler under the 3, 2, 1 (see showLine and the countdown view).
   var SPLASH_LINES = [
     "{n}, it's show time!", "{n}, you're up!", "{n}, it's your turn!", "{n}, your time to shine!",
     "{n}, the floor is yours!", "{n}, take centre stage!", "{n}, take it away!", "{n}, over to you!",
     "{n}, the room is ready!", "{n}, give us a tune!", "{n}, let's hear it!", "{n}, the stage is set!",
     "You've got this, {n}!", "Break a leg, {n}!", "All eyes on {n}!"
   ];
-  var SPLASH_HUES = [["#FF4B14", "#111"], ["#FF4FA3", "#111"], ["#00B86B", "#111"], ["#FFD21F", "#111"], ["#2640EC", "#ECEAE4"]];
-  var SPLASH_MS = 4000, lastSplashTurn = null, lastSplashLine = -1, lastSplashHue = -1, splashTimer = null;
-  function pickDifferent(n, last) { var i; do { i = Math.floor(Math.random() * n); } while (n > 1 && i === last); return i; }
-  var splashSfx = [];
-  function showSplash(name, avatar, mine) {
-    var old = document.getElementById("splash"); if (old) { old.remove(); }
-    clearTimeout(splashTimer); splashSfx.forEach(clearTimeout); splashSfx = [];
-    sfx(mine ? "turn" : "next"); buzz(mine ? [80, 50, 80, 50, 140] : 30);
-    [1000, 2000, 3000].forEach(function (d) { splashSfx.push(setTimeout(function () { sfx("tick"); buzz(20); }, d)); });
-    var li = lastSplashLine = pickDifferent(SPLASH_LINES.length, lastSplashLine);
-    var hi = lastSplashHue = pickDifferent(SPLASH_HUES.length, lastSplashHue);
-    var text = esc(SPLASH_LINES[li]).replace(/\{n\}([,!]?)/, function (m, pu) { return '<span class="sp-n">' + esc(name) + pu + "</span>"; });
-    var el = document.createElement("div");
-    el.id = "splash"; el.setAttribute("role", "status");
-    el.style.background = SPLASH_HUES[hi][0]; el.style.color = SPLASH_HUES[hi][1];
-    el.style.setProperty("--sp-ms", SPLASH_MS + "ms");
-    el.innerHTML = '<div class="sp-av">' + avatar + '</div><h1 class="sp-tx' + (name.length > 10 ? " sp-long" : "") + '">' + text + '</h1><div class="sp-count" aria-hidden="true"><span>3</span><span>2</span><span>1</span></div>';
-    document.body.appendChild(el);
-    var done = function () { clearTimeout(splashTimer); if (el.parentNode) { el.remove(); } };
-    splashTimer = setTimeout(done, SPLASH_MS);
-  }
   // ---- Halfway interlude: "check the scores on the doors" with a few cheeky stats, before the next round starts.
   var IV_TITLES = ["Halftime. Check the scores on the doors.", "Check the scores on the doors!", "Interval. Check the scores on the doors.", "Halfway there. Check the scores on the doors."];
   var IV_PERF = ["Star performer: {n}. Someone get this one a record deal.", "Star performer: {n}. Averaging {pts} a turn. Show off.", "Top of the bill: {n}. The rest of you have some catching up to do.", "{n} is the one to beat. {pts} a turn."];
@@ -1871,11 +1948,12 @@
     var el = document.createElement("div");
     el.id = "interlude"; el.setAttribute("role", "status");
     el.style.setProperty("--iv-ms", IV_MS + "ms");
-    el.innerHTML = '<h1 class="iv-title">' + esc(IV_TITLES[sd % IV_TITLES.length]) + '</h1><div class="iv-rows">' + rows + '</div><p class="small iv-skip">Tap to skip</p>';
+    el.innerHTML = '<h1 class="iv-title">' + esc(IV_TITLES[sd % IV_TITLES.length]) + '</h1><div class="iv-rows">' + rows + '</div><p class="label iv-skip">Tap to skip</p>';
     document.body.appendChild(el);
-    sfx("drum"); buzz(40); ivSfx.forEach(clearTimeout); ivSfx = [setTimeout(function () { sfx("crash"); buzz([60, 30, 100]); }, 1250)];
-    for (var q = 1; q < i; q++) { (function (d) { ivSfx.push(setTimeout(function () { sfx("pop"); }, d)); })(1400 * q + 150); }
-    var done = function () { clearTimeout(ivTimer); ivSfx.forEach(clearTimeout); if (el.parentNode) { el.remove(); } maybeSplash(); };
+    var loud = s.hostId === s.me; // one phone makes the noise
+    if (loud) { sfx("drum"); } buzz(40); ivSfx.forEach(clearTimeout); ivSfx = [setTimeout(function () { if (loud) { sfx("crash"); } buzz([60, 30, 100]); }, 1250)];
+    if (loud) { for (var q = 1; q < i; q++) { (function (d) { ivSfx.push(setTimeout(function () { sfx("pop"); }, d)); })(1400 * q + 150); } }
+    var done = function () { clearTimeout(ivTimer); ivSfx.forEach(clearTimeout); if (el.parentNode) { el.remove(); } };
     el.onclick = done;
     ivTimer = setTimeout(done, IV_MS);
   }
@@ -1893,14 +1971,6 @@
     var me = player(st, st.me);
     if (me && me.late && !lateNoted) { lateNoted = true; toast("You're in! You'll guess for now and perform from the next round."); }
   }
-  function maybeSplash() {
-    if (interludeShowing()) { return; }
-    if (!st || st.phase !== "turn" || !st.turn || st.turn.stage !== "choose" || st.turn.id === lastSplashTurn) { return; }
-    lastSplashTurn = st.turn.id;
-    var p = null; st.players.forEach(function (q) { if (q.id === st.turn.playerId) { p = q; } });
-    if (p) { showSplash(p.name, avatarHtml(st, p, "sp-avatar"), p.id === st.me); }
-  }
-
   function render() {
     var view;
     if (st && st.phase !== "lobby") { pickerOpen = false; packDraft = null; }
@@ -1924,6 +1994,7 @@
     if (nb && pTop && keepPickerScroll) { nb.scrollTop = pTop; }
     keepPickerScroll = true;
     document.body.classList.toggle("noscroll", pickerOpen);
+    micSync();
     refreshMic();
     refreshTop();
     refreshAdmin();
@@ -1931,12 +2002,11 @@
     refreshTip();
     lateNote();
     maybeInterlude();
-    maybeSplash();
   }
 
   // Keep the page behind the app (overscroll, notch) the same colour as the current field.
   var lastBg = "";
-  var FIELD_BG = { ground: "#E4E2DD", pink: "#FF4FA3", green: "#00B86B", yellow: "#FFD21F", orange: "#FF4B14", blue: "#2640EC" };
+  var FIELD_BG = { ground: "#E4E2DD", pink: "#FF4FA3", green: "#00B86B", yellow: "#FFD21F", orange: "#FF4B14", blue: "#2640EC" }; // the same six values as the tokens in style.css
   function syncBg() {
     try {
       var m0 = /field--(\w+)/.exec(app.className), c = FIELD_BG[m0 ? m0[1] : "ground"] || FIELD_BG.ground;
@@ -1951,10 +2021,16 @@
 
   // The clock and countdown run locally between server messages.
   var lastSecond = null;
+  function setText(el, t) { if (el && el.textContent !== t) { el.textContent = t; } }
   function tick() {
     requestAnimationFrame(tick);
     var T = st && st.turn;
     if (!T) { return; }
+    var mineT = T.playerId === st.me;
+    if (T.stage === "choose") {
+      var ci = $("#chooseIn");
+      if (ci) { setText(ci, T.chooseEndsAt ? "The middle one is picked for you in " + Math.max(0, Math.ceil((T.chooseEndsAt - nowS()) / 1000)) : ""); }
+    }
     if (T.stage === "countdown") {
       var cd = $("#cd");
       if (cd) {
@@ -1969,35 +2045,50 @@
       var R = T.result, ms = REDUCED ? 1e9 : Math.max(0, nowS() - R.revealAt), fr = revealFrame(R, ms);
       var sn = $("#scoreNum");
       if (sn) {
-        var txt = String(Math.round(fr.num)); if (sn.textContent !== txt) { sn.textContent = txt; }
-        var cp = $("#scoreCap"); if (cp && cp.textContent !== fr.cap) { cp.textContent = fr.cap; }
+        setText(sn, String(Math.round(fr.num)));
+        setText($("#scoreCap"), fr.cap);
         var mb = $("#multBadge"), dt = $("#deltaTag");
-        if (mb) { mb.hidden = !fr.badge || fr.final; if (fr.badge && mb.textContent !== fr.badge) { mb.textContent = fr.badge; } }
-        if (dt) { dt.hidden = !fr.delta || fr.final; if (fr.delta && dt.textContent !== fr.delta) { dt.textContent = fr.delta; } }
+        if (mb) { mb.hidden = !fr.badge || fr.final; if (fr.badge) { setText(mb, fr.badge); } }
+        if (dt) { dt.hidden = !fr.delta || fr.final; if (fr.delta) { setText(dt, fr.delta); } }
         sn.classList.toggle("big", !!fr.final);
-        if (fr.drum && drumTurn !== T.id && R.outcome === "correct") { drumTurn = T.id; sfx("drum"); }
-        if (fr.final && !sn.classList.contains("slam")) { sn.classList.add("slam"); buzz(R.score > 0 ? [60, 40, 90] : 40); if (slamTurn !== T.id) { slamTurn = T.id; if (R.outcome === "correct") { sfx("win"); } else if (R.outcome !== "skipped") { sfx("fail"); } } }
-        var late = ms >= fr.finalAt + 300;
-        var bd = $("#board");
-        if (bd) { bd.classList.toggle("rvhide", !late); }
+        if (fr.drum && drumTurn !== T.id && R.outcome === "correct") { drumTurn = T.id; if (mineT) { sfx("drum"); } }
+        if (fr.final && !sn.classList.contains("slam")) {
+          sn.classList.add("slam"); buzz(R.score > 0 ? [60, 40, 90] : 40);
+          if (slamTurn !== T.id) { slamTurn = T.id; if (mineT) { if (R.outcome === "correct") { sfx("win"); } else if (R.outcome !== "skipped") { sfx("fail"); } } }
+        }
+        // After the score has landed: "Up next" on an ordinary turn, the whole table at the end of a round.
+        var scr = $("#rvScreen"), bd = $("#board");
+        if (T.roundEnd) { if (scr) { scr.classList.toggle("showboard", ms >= fr.finalAt + 1200); } }
+        else if (bd) { bd.classList.toggle("rvhide", ms < fr.finalAt + 300); }
       }
       var ni = $("#nextIn");
       if (ni) {
         var rem = T.nextAt ? T.nextAt - nowS() : null, last = st.turnNumber >= st.totalTurns;
-        var nt = rem !== null && rem <= 5000 ? (last ? "Final scores in " : T.roundEnd ? "Next round in " : "Next turn in ") + Math.max(1, Math.ceil(rem / 1000)) : "";
-        if (ni.textContent !== nt) { ni.textContent = nt; }
+        setText(ni, rem !== null && rem <= 3000 ? (last ? "Final scores in " : T.roundEnd ? "Next round in " : "Next turn in ") + Math.max(1, Math.ceil(rem / 1000)) : "");
       }
     }
-    if (T.stage === "whistling" || T.stage === "confirming") {
+    if (liveStage(T) && T.stage !== "countdown") {
       var el = elapsedMs(T), remain = T.limitMs - el;
       var big = $("#bigtime");
-      if (big) { var tt = pad2(Math.ceil(remain / 1000)); if (big.textContent !== tt) { big.textContent = tt; } }
+      if (big) { setText(big, pad2(Math.ceil(remain / 1000))); }
       var cls = "field field--" + timeField(T);
       if (app.className !== cls) { app.className = cls; syncBg(); }
+      // The last ten seconds: the numeral beats once a second, on every phone, sound or no sound.
       if (remain <= 10000 && T.stage === "whistling") {
         var sec = Math.ceil(remain / 1000);
-        if (sec !== lastSecond) { lastSecond = sec; buzz(40); }
+        if (sec !== lastSecond) {
+          lastSecond = sec; buzz(40);
+          if (big) { big.classList.remove("beat10"); void big.offsetWidth; big.classList.add("beat10"); }
+        }
       } else { lastSecond = null; }
+      // The buzzer: off whilst the clock is stopped, and for five seconds after a wrong buzz.
+      var bb = $("#buzzBtn");
+      if (bb) {
+        var lock = T.buzzLockUntil && T.buzzLockUntil > nowS() ? Math.ceil((T.buzzLockUntil - nowS()) / 1000) : 0;
+        var offNow = !!lock || T.stage !== "whistling";
+        if (bb.disabled !== offNow) { bb.disabled = offNow; }
+        setText($("#buzzSub"), lock ? "Wrong. Back in " + lock : "Tap when you know it, then say it out loud");
+      }
     } else {
       lastSecond = null;
     }

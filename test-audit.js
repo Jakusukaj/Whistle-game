@@ -109,10 +109,9 @@ function rawGet(port, p) {
   r2.stats.a = { whistles: 3, solved: 3, streak: 3, bestStreak: 3, bestTimeMs: 4000, hardSolved: 3, guessed: 3, whistlePts: 3000, guessBestMs: 2000, packs: {} };
   r2.stats.b = { whistles: 3, solved: 1, streak: 0, bestStreak: 1, bestTimeMs: 9000, hardSolved: 0, guessed: 1, whistlePts: 900, guessBestMs: 5000, packs: {} };
   var beforeA = r2.players[0].total;
-  m.applyEndBonuses(r2);
+  m.settleAwards(r2);
   var credited = r2.players[0].total - beforeA;
-  var shown = 0; r2.endAwards.forEach(function (d) { d.winners.forEach(function (w) { if (w.id === "a") { shown += w.bonus; } }); });
-  check("award breakdown matches the bonus credited", shown === credited && credited > 0, "shown " + shown + ", credited " + credited);
+  check("awards are titles only: no points change hands", credited === 0 && r2.endAwards.length > 0 && r2.endAwards.every(function (d) { return d.winners.every(function (w) { return w.bonus === undefined && !!w.detail; }); }), "credited " + credited);
 
   if (failed) { console.log("\n" + failed + " FAILED"); process.exit(1); }
   console.log("\nALL PASSED"); process.exit(0);

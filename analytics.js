@@ -104,9 +104,20 @@ function recentGames(n) {
 
 // How well voice guessing is working: of the guesses the game heard, how many did the performer accept.
 function voiceStats(turns) {
-  var det = 0, rej = 0, bySrc = { voice: 0, typed: 0, manual: 0 };
+  var det = 0, rej = 0, bySrc = { voice: 0, buzz: 0, typed: 0, manual: 0 };
   turns.forEach(function (t) { det += t.detected || 0; rej += t.rejected || 0; if (bySrc[t.source] !== undefined) { bySrc[t.source]++; } });
-  return { heardGuesses: det, rejectedByPerformer: rej, rejectRate: det ? Math.round(100 * rej / det) / 100 : null, correctBySource: bySrc };
+  return { heardGuesses: det, rejectedByPerformer: rej, rejectRate: det ? Math.round(100 * rej / det) / 100 : null, correctBySource: bySrc, byDifficulty: tierStats(turns) };
+}
+// How each tier really plays: how often it is picked, how often it is guessed and how long that takes.
+// This is the number to read before changing the multipliers.
+function tierStats(turns) {
+  var out = {};
+  ["easy", "medium", "hard"].forEach(function (d) {
+    var list = turns.filter(function (t) { return t.difficulty === d && !t.sd && t.outcome !== "skipped"; });
+    var ok = list.filter(function (t) { return t.outcome === "correct"; });
+    out[d] = { turns: list.length, guessedPct: list.length ? Math.round(100 * ok.length / list.length) : null, avgGuessSec: ok.length ? r1(avg(ok.map(function (t) { return t.performMs / 1000; }))) : null };
+  });
+  return out;
 }
 function packStats(turns) {
   var c = {}; turns.forEach(function (t) { (t.packs || []).forEach(function (p) { c[p] = (c[p] || 0) + 1; }); });
